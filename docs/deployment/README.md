@@ -4,6 +4,10 @@ Complete guide for deploying the PawSpa Chat Application to production.
 
 ## 📚 Documentation Files
 
+### 🚀 Ready to Deploy?
+- **[DEPLOY_NOW.md](./DEPLOY_NOW.md)** - ⭐ Start here! Step-by-step deployment
+- **[YOUR_ENV_VARIABLES.md](./YOUR_ENV_VARIABLES.md)** - Your specific credentials & setup
+
 ### Quick Reference
 - **[QUICK_START.md](./QUICK_START.md)** - 5-minute local setup & 10-minute deployment guide
 - **[DEPLOY_GUIDE.md](./DEPLOY_GUIDE.md)** - One-command deployment with Vercel CLI
