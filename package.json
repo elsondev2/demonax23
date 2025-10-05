@@ -1,0 +1,23 @@
+{
+  "name": "pawspa-chat-app",
+  "version": "1.0.0",
+  "main": "index.js",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "install:backend": "npm install --prefix backend",
+    "install:frontend": "npm install --prefix frontend",
+    "install:all": "npm run install:backend && npm run install:frontend",
+    "build": "npm run install:all && npm run build --prefix frontend",
+    "build:frontend": "npm run build --prefix frontend",
+    "start": "npm run start --prefix backend",
+    "dev:backend": "npm run dev --prefix backend",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "vercel-build": "npm install --prefix frontend && npm run build --prefix frontend"
+  },
+  "keywords": ["chat", "video-call", "socket.io", "react", "express"],
+  "author": "",
+  "license": "ISC",
+  "description": "PawSpa - A full-stack chat application with video calling, built with React, Express, Socket.io, and MongoDB"
+}

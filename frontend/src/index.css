@@ -1,0 +1,691 @@
+/* stylelint-disable at-rule-no-unknown */
+/* Include all DaisyUI built-in themes (v5) */
+@import "daisyui/themes.css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+/* stylelint-enable at-rule-no-unknown */
+
+/* Custom Font System Optimizations */
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('https://fonts.gstatic.com/s/poppins/v21/pxiEyp8kv8JHgFVrJJA_Uxs.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('https://fonts.gstatic.com/s/poppins/v21/pxiGyp8kv8JHgFVrJJA_Uxs.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Playfair Display';
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url('https://fonts.gstatic.com/s/playfairdisplay/v30/nuFvD-vYSZviVYUb_rj3ij__anPXJzDwcbmjWBN2PKeiunDTbtXK-F2qC0s.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Playfair Display';
+  font-style: italic;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url('https://fonts.gstatic.com/s/playfairdisplay/v30/nuFXD-vYSZviVYUb_rj3ij__anPXJzDwcbmjWBN2PKeiunDTbtXK-F2qO0iXqV.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Space Mono';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('https://fonts.gstatic.com/s/spacemono/v13/i7dPIFZifjKcF5UAWdTRYE98RWq7.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Space Mono';
+  font-style: italic;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('https://fonts.gstatic.com/s/spacemono/v13/i7dQIFZifjKcF5UAWdTRxEWq7Xw.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Global theme transition for smooth theme changes */
+:root {
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+}
+
+/* Ensure all elements inherit smooth transitions for theme changes */
+* {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 200ms;
+}
+
+/* Modal animations - compatible with DaisyUI modal structure */
+@keyframes modalBackdropFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes modalSlideOut {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+}
+
+@keyframes modalBackdropFadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* DaisyUI modal animation classes */
+.modal:not(.modal-open) {
+  animation: modalBackdropFadeOut 0.15s ease-in;
+}
+
+.modal.modal-open {
+  animation: modalBackdropFadeIn 0.2s ease-out;
+}
+
+.modal-box {
+  animation: modalSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Legacy animation classes for backward compatibility */
+.modal-backdrop {
+  animation: modalBackdropFadeIn 0.2s ease-out;
+}
+
+.modal-backdrop-exit {
+  animation: modalBackdropFadeOut 0.15s ease-in;
+}
+
+.modal-content {
+  animation: modalSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.modal-content-exit {
+  animation: modalSlideOut 0.2s ease-in;
+}
+
+/* Theme card staggered animation */
+@keyframes themeCardFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.theme-card {
+  animation: themeCardFadeIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@property --border-angle {
+  inherits: false;
+  initial-value: 0deg;
+  syntax: "<angle>";
+}
+
+/* Remove conflicting input styles - DaisyUI handles these */
+/* Custom input styles removed to prevent conflicts with DaisyUI input classes */
+
+/* Enhanced placeholder styles for better theme compatibility */
+.input::placeholder,
+.textarea::placeholder {
+  color: hsl(var(--bc) / 0.6);
+}
+
+/* Auth component utilities using DaisyUI color variables */
+.auth-input-icon {
+  @apply absolute left-3 top-1/2 -translate-y-1/2 size-5;
+  color: hsl(var(--bc) / 0.6);
+}
+
+.auth-input-label {
+  @apply block text-sm font-medium mb-2;
+  color: hsl(var(--bc));
+}
+
+/* Replace custom auth styles with DaisyUI-compatible versions */
+.auth-badge {
+  @apply badge badge-primary badge-outline;
+}
+
+/* Remove custom button styles - use DaisyUI btn classes instead */
+.auth-btn {
+  @apply btn btn-primary w-full;
+}
+
+.auth-link {
+  @apply btn btn-ghost btn-sm;
+  color: hsl(var(--p));
+}
+
+/* Make sure the body takes full height */
+body {
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  /* Allow scrolling on mobile, prevent on desktop */
+  overflow: hidden;
+}
+
+/* Mobile-specific body styles */
+@media (max-width: 767px) {
+  body {
+    overflow: hidden;
+    height: 100vh;
+    height: 100dvh;
+    /* Use dynamic viewport height for mobile */
+    position: fixed;
+    width: 100%;
+  }
+
+  #root {
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+  }
+}
+
+/* Message edit modal styles - aligned with DaisyUI modal system */
+.message-edit-modal {
+  @apply modal modal-open;
+}
+
+.message-edit-container {
+  @apply modal-box;
+}
+
+.message-edit-header {
+  @apply text-lg font-semibold mb-4;
+  color: hsl(var(--bc));
+}
+
+.message-edit-textarea {
+  @apply textarea w-full mb-4;
+}
+
+.message-edit-buttons {
+  @apply modal-action;
+}
+
+.message-edit-cancel {
+  @apply btn btn-ghost;
+}
+
+.message-edit-save {
+  @apply btn btn-primary;
+}
+
+/* Custom scrollbar styles using DaisyUI color variables */
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--bc) / 0.3);
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--bc) / 0.5);
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Emoji picker specific styles */
+.emoji-picker-backdrop {
+  backdrop-filter: blur(8px);
+}
+
+/* Swipe animations */
+@keyframes slideInFromLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.slide-in-from-left-4 {
+  animation: slideInFromLeft 0.3s ease-out;
+}
+
+.slide-in-from-right-4 {
+  animation: slideInFromRight 0.3s ease-out;
+}
+
+/* Smooth transitions for mobile navigation */
+@media (max-width: 767px) {
+  .mobile-nav-transition {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+  }
+}
+
+/* Bubble-like text animations */
+@keyframes bubbleIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.1) translateY(30px);
+  }
+
+  60% {
+    opacity: 0.9;
+    transform: scale(1.1) translateY(-10px);
+  }
+
+  80% {
+    opacity: 1;
+    transform: scale(0.95) translateY(2px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes bubbleInDelayed {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) translateY(15px);
+  }
+
+  60% {
+    opacity: 0.9;
+    transform: scale(1.02) translateY(-3px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes fadeInUp {
+   0% {
+     opacity: 0;
+     transform: translateY(10px);
+   }
+
+   100% {
+     opacity: 1;
+     transform: translateY(0);
+   }
+}
+
+@keyframes fadeInOut {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.95);
+  }
+  10% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  90% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.95);
+  }
+}
+
+.bubble-in {
+  animation: bubbleIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.bubble-in-delayed {
+  animation: bubbleInDelayed 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.fade-in-up {
+  animation: fadeInUp 0.3s ease-out;
+}
+
+/* Stories strip - prevent vertical scrolling */
+.stories-strip {
+  overflow: hidden !important;
+}
+
+.stories-strip .stories-container {
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.stories-strip .stories-container::-webkit-scrollbar {
+  display: none !important;
+}
+
+/* Sidebar chat list - prevent horizontal scrolling */
+.sidebar-chat-list {
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+/* Quick access chats - prevent vertical scrolling */
+.quick-access-scroll {
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.quick-access-scroll::-webkit-scrollbar {
+  display: none !important;
+}
+
+/* Staggered animations for lists */
+.stagger-item {
+  animation: fadeInUp 0.4s ease-out;
+}
+
+.stagger-item:nth-child(1) {
+  animation-delay: 0.1s;
+}
+
+.stagger-item:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.stagger-item:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.stagger-item:nth-child(4) {
+  animation-delay: 0.4s;
+}
+
+.stagger-item:nth-child(5) {
+  animation-delay: 0.5s;
+}
+
+/* Smooth scrolling for all scrollable elements */
+* {
+  scroll-behavior: smooth;
+}
+
+/* Enhanced smooth scrolling for modal content */
+.modal-content {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Momentum scroll utility applied to scrollable panes */
+.momentum-scroll {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* Make all overflow-y-auto have momentum on iOS */
+.overflow-y-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Chat item entrance animation - only plays once on initial render */
+@keyframes chatSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Add the chat-animated class only on initial render to prevent re-animation on scroll */
+.chat-item.chat-animated {
+  animation: chatSlideIn 0.2s ease-out forwards;
+}
+
+/* Staggered chat items for initial load - only when animated class is present */
+.chat-item.chat-animated:nth-child(1) {
+  animation-delay: 0.05s;
+  opacity: 0;
+}
+
+.chat-item.chat-animated:nth-child(2) {
+  animation-delay: 0.1s;
+  opacity: 0;
+}
+
+.chat-item.chat-animated:nth-child(3) {
+  animation-delay: 0.15s;
+  opacity: 0;
+}
+
+.chat-item.chat-animated:nth-child(4) {
+  animation-delay: 0.2s;
+  opacity: 0;
+}
+
+.chat-item.chat-animated:nth-child(5) {
+  animation-delay: 0.25s;
+  opacity: 0;
+}
+
+/* Unread message highlighting using DaisyUI color variables */
+.message-unread {
+  position: relative;
+  animation: pulse-glow 1.5s ease-in-out infinite;
+}
+
+.message-unread::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, hsl(var(--p) / 0.3), transparent);
+  z-index: -1;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 hsl(var(--p) / 0);
+  }
+
+  50% {
+    box-shadow: 0 0 20px 2px hsl(var(--p) / 0.3);
+  }
+}
+
+.message-unread-indicator {
+  @apply badge badge-primary badge-xs;
+  margin-left: 8px;
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.6;
+    transform: scale(1.2);
+  }
+}
+
+/* Cassisiacum gradient logo style */
+.cassisiacum-logo {
+  font-weight: 700;
+  font-style: italic;
+  background: linear-gradient(45deg, #feda77, #f58529, #dd2a7b, #8134af, #515bd4);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  letter-spacing: 0.4px;
+}
+
+/* Cassisiacum gradient border for profile pictures */
+.cassisiacum-border {
+  background: linear-gradient(45deg, #feda77, #f58529, #dd2a7b, #8134af, #515bd4);
+}
+
+/* DaisyUI theme-compatible utility classes */
+.text-content {
+  color: hsl(var(--bc));
+}
+
+.text-content-muted {
+  color: hsl(var(--bc) / 0.7);
+}
+
+.text-content-subtle {
+  color: hsl(var(--bc) / 0.5);
+}
+
+.bg-content {
+  background-color: hsl(var(--b1));
+}
+
+.bg-content-2 {
+  background-color: hsl(var(--b2));
+}
+
+.bg-content-3 {
+  background-color: hsl(var(--b3));
+}
+
+.border-content {
+  border-color: hsl(var(--bc) / 0.2);
+}
+
+.border-content-focus {
+  border-color: hsl(var(--p));
+}
+
+/* Enhanced contrast utilities for accessibility */
+.contrast-safe-text {
+  color: hsl(var(--bc));
+  text-shadow: 0 0 1px hsl(var(--b1));
+}
+
+.contrast-safe-bg {
+  background-color: hsl(var(--b1));
+  color: hsl(var(--bc));
+}
+
+/* Theme-aware focus styles */
+.focus-theme {
+  @apply focus:outline-none focus:ring-2;
+  --tw-ring-color: hsl(var(--p) / 0.5);
+}
+
+/* Theme-aware hover states */
+.hover-theme {
+  transition: all 0.2s ease;
+}
+
+.hover-theme:hover {
+  background-color: hsl(var(--b2));
+  color: hsl(var(--bc));
+}
+
+/* Custom chat message alignment for better spacing */
+.chat {
+  margin-bottom: 0.5rem;
+}
+
+.chat-start {
+  justify-content: flex-start;
+  margin-right: 25%;
+}
+
+.chat-end {
+  justify-content: flex-end;
+  margin-left: 25%;
+}
+
+.chat-bubble {
+  margin-bottom: 0;
+}
+
+/* Reduce excessive padding in chat container */
+.chat-container {
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}

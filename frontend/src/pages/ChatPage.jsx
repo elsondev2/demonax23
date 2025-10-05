@@ -1,0 +1,230 @@
+import { useChatStore } from "../store/useChatStore";
+import { useEffect, useState, useRef, useCallback } from "react";
+import { useAuthStore } from "../store/useAuthStore";
+import { useNavigate, useLocation } from "react-router";
+
+import BorderAnimatedContainer from "../components/BorderAnimatedContainer";
+import SwipeableViews from "../components/SwipeableViews";
+import ChatsView from "../components/ChatsView";
+import FeedView from "../components/FeedView";
+import PostsView from "../components/PostsView";
+import CallModal from "../components/CallModal";
+import CallScreen from "../components/CallScreen";
+import { useCallStore } from "../store/useCallStore";
+
+
+function ChatPage() {
+  const { selectedUser, selectedGroup, getMyChatPartners } = useChatStore();
+  const { socket, connectSocket, authUser, isConnecting } = useAuthStore();
+  // Call system cleanup is handled automatically
+
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const isPostsRoute = location.pathname === '/posts' || location.pathname === '/posts/public' || location.pathname === '/posts/mine';
+
+  // Detect mobile to enable swipe-only on mobile
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const mobile = window.innerWidth < 768;
+      console.log('🔍 ChatPage.jsx Debug - Initial mobile detection:', mobile, 'Width:', window.innerWidth);
+      return mobile;
+    }
+    return false;
+  });
+  useEffect(() => {
+    const onResize = () => {
+      const mobile = window.innerWidth < 768;
+      console.log('🔍 ChatPage.jsx Debug - Resize mobile detection:', mobile, 'Width:', window.innerWidth);
+      setIsMobile(mobile);
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  
+  // Determine initial view index based on route (mobile only)
+  const getInitialIndex = () => {
+    if (isPostsRoute) return 1; // Right view when directly on posts
+    return 0; // Sidebar (home)
+  };
+
+  const [currentViewIndex, setCurrentViewIndex] = useState(getInitialIndex());
+  // Track the last right-side destination (1 = Chat, 2 = Posts)
+  const [lastRightView, setLastRightView] = useState(() => (isPostsRoute ? 2 : 1));
+
+  // Only track the index (routing is handled in onSwipeDirection and other actions)
+  const handleIndexChange = useCallback((index) => {
+    setCurrentViewIndex(index);
+  }, []);
+
+  // Update view index and lastRightView when route changes externally (mobile)
+  useEffect(() => {
+    const newIndex = getInitialIndex();
+    if (newIndex !== currentViewIndex) {
+      setCurrentViewIndex(newIndex);
+    }
+    // Update lastRightView based on route
+    if (isPostsRoute) setLastRightView(2);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname, isMobile]);
+
+  // Ensure socket connection
+  useEffect(() => {
+    if (authUser && (!socket || !socket.connected) && !isConnecting) {
+      const connectTimeout = setTimeout(() => {
+        connectSocket();
+      }, 100);
+      
+      return () => {
+        clearTimeout(connectTimeout);
+      };
+    }
+  }, [authUser, socket, isConnecting, connectSocket]);
+
+  // Keep stable reference for refreshing chat list
+  const getMyChatPartnersRef = useRef();
+  const callSystemInitializedRef = useRef(false);
+  
+  useEffect(() => {
+    getMyChatPartnersRef.current = getMyChatPartners;
+  }, [getMyChatPartners]);
+
+  // Initialize call system on mount if socket is already connected
+  useEffect(() => {
+    if (socket && socket.connected && !callSystemInitializedRef.current) {
+      const result = useCallStore.getState().initializeCallSystem();
+      if (result) {
+        callSystemInitializedRef.current = true;
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount
+
+  // Refresh chat partners and initialize call system when socket connects
+  useEffect(() => {
+    if (socket && socket.connected) {
+      if (getMyChatPartnersRef.current) {
+        getMyChatPartnersRef.current();
+      }
+
+      // Initialize call system when socket is ready
+      const callSystemInitialized = useCallStore.getState().initializeCallSystem();
+      
+      if (callSystemInitialized) {
+        callSystemInitializedRef.current = true;
+      } else {
+        // Retry after a short delay if initialization failed
+        setTimeout(() => {
+          useCallStore.getState().initializeCallSystem();
+        }, 1000);
+      }
+    }
+  }, [socket, socket?.connected]); // Re-run when socket connects
+
+  // When a chat or contact is selected on mobile, go to Chat view and mark as lastRight
+  useEffect(() => {
+    const toChat = () => { if (isMobile) setCurrentViewIndex(1); setLastRightView(1); };
+    const toPosts = () => { setLastRightView(2); };
+    window.addEventListener('chatSelected', toChat);
+    window.addEventListener('contactSelected', toChat);
+    window.addEventListener('postsOpened', toPosts);
+    return () => {
+      window.removeEventListener('chatSelected', toChat);
+      window.removeEventListener('contactSelected', toChat);
+      window.removeEventListener('postsOpened', toPosts);
+    };
+  }, [isMobile]);
+
+  // Also watch selectedUser/Group to switch to Chat view and route; update lastRight
+  useEffect(() => {
+    if (selectedUser || selectedGroup) {
+      setLastRightView(1);
+      if (isPostsRoute) navigate('/', { replace: true });
+      if (isMobile) setCurrentViewIndex(1);
+    }
+  }, [selectedUser, selectedGroup, isMobile, isPostsRoute, navigate]);
+
+  // Handle direct switch to posts view in mobile
+  useEffect(() => {
+    const handleSwitchToPosts = () => {
+      if (isMobile) {
+        setCurrentViewIndex(1); // Switch to posts view (index 1)
+        setLastRightView(2); // Set posts as the last right view
+      }
+    };
+
+    window.addEventListener('switchToPostsView', handleSwitchToPosts);
+    return () => {
+      window.removeEventListener('switchToPostsView', handleSwitchToPosts);
+    };
+  }, [isMobile]);
+
+  // Define two swipeable views (mobile only): Sidebar and Right (Chat or Posts)
+  const views = [
+    { name: 'Sidebar', component: <ChatsView /> },
+    { name: 'Right', component: isPostsRoute ? <PostsView /> : <FeedView /> },
+  ];
+
+  // On mobile, if we're on the Right view but no conversation is selected and not in posts route,
+  // immediately bounce back to Sidebar (avoid staying on the placeholder)
+  useEffect(() => {
+    if (!isMobile) return;
+    if (!isPostsRoute && currentViewIndex === 1 && !(selectedUser || selectedGroup)) {
+      setCurrentViewIndex(0);
+    }
+  }, [isMobile, isPostsRoute, currentViewIndex, selectedUser, selectedGroup]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      useCallStore.getState().cleanupCallSystem();
+    };
+  }, []);
+
+  // Debug logging for mobile scroll issue
+  useEffect(() => {
+    console.log('🔍 ChatPage.jsx Debug - Render with classes:', 'w-full h-screen');
+    console.log('🔍 ChatPage.jsx Debug - Current mobile state:', isMobile);
+    console.log('🔍 ChatPage.jsx Debug - Current view index:', currentViewIndex);
+  });
+
+  return (
+    <div className="w-full h-screen md:h-screen">
+      <BorderAnimatedContainer>
+        {isMobile ? (
+          <SwipeableViews
+            views={views}
+            index={currentViewIndex}
+            onIndexChange={handleIndexChange}
+            onSwipeDirection={(dir, idx) => {
+              if (dir === 'left' && idx === 1) { navigate('/', { replace: true }); return 0; }
+              if (dir === 'right' && idx === 0) { navigate(lastRightView === 2 ? '/posts' : '/', { replace: true }); return 1; }
+              return undefined; // do nothing
+            }}
+            allowMouseDrag={false}
+            showDots={false}
+            showTitle={false}
+            swipeThreshold={220}
+          />
+        ) : (
+          <div className="w-full h-full flex overflow-hidden">
+            {/* Sidebar - Fixed width, scrollable content */}
+            <div className="w-96 h-full bg-base-200 border-r border-base-300 flex-shrink-0 overflow-hidden">
+              <ChatsView />
+            </div>
+            {/* Main content area - Takes remaining space */}
+            <div className="flex-1 h-full overflow-hidden">
+              {isPostsRoute ? <PostsView /> : <FeedView />}
+            </div>
+          </div>
+        )}
+      </BorderAnimatedContainer>
+
+      {/* Call Components - Render globally */}
+      <CallModal />
+      <CallScreen />
+    </div>
+  );
+}
+
+export default ChatPage;
