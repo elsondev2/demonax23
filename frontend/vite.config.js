@@ -41,6 +41,7 @@ export default defineConfig({
   preview: {
     allowedHosts: [
       'demonax23-1.onrender.com',
+      'demonax23-xn9g.vercel.app',
       'localhost',
       '127.0.0.1',
       '0.0.0.0'
