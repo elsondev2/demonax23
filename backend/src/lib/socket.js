@@ -14,6 +14,7 @@ const io = new Server(server, {
       "http://localhost:5173", // Vite default
       "http://localhost:5174", // Current dev server
       "http://localhost:3000", // Common alternative
+      "https://demonax23-1.onrender.com", // Production frontend
       ENV.CLIENT_URL // From env file
     ],
     credentials: true,
