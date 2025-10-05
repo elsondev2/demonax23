@@ -37,4 +37,12 @@ export default defineConfig({
       },
     },
   },
+  preview: {
+    allowedHosts: [
+      'demonax23-1.onrender.com',
+      'localhost',
+      '127.0.0.1',
+      '0.0.0.0'
+    ],
+  },
 })
