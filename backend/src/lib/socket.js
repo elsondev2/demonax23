@@ -14,7 +14,8 @@ const io = new Server(server, {
       "http://localhost:5173", // Vite default
       "http://localhost:5174", // Current dev server
       "http://localhost:3000", // Common alternative
-      "https://demonax23-1.onrender.com", // Production frontend
+      "https://demonax23-1.onrender.com", // Production frontend (Render)
+      "https://demonax23-xn9g.vercel.app", // Production frontend (Vercel)
       ENV.CLIENT_URL // From env file
     ],
     credentials: true,
