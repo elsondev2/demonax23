@@ -4,7 +4,15 @@ This directory contains all documentation for the V8 Chat Application, organized
 
 ## 📚 Documentation Categories
 
-### 🚀 [Setup & Configuration](./setup/)
+### 🚀 [Deployment](./deployment/)
+- **[Quick Start Guide](./deployment/QUICK_START.md)** - 5-minute setup & 10-minute deployment
+- **[Vercel Deployment](./deployment/VERCEL_DEPLOYMENT.md)** - Complete Vercel deployment guide
+- **[Environment Setup](./deployment/ENV_SETUP.md)** - Get all required credentials
+- **[Deployment Checklist](./deployment/DEPLOYMENT_CHECKLIST.md)** - Pre-launch checklist
+- **[Deployment Summary](./deployment/DEPLOYMENT_SUMMARY.md)** - Overview of deployment setup
+- **[Deploy Guide](./deployment/DEPLOY_GUIDE.md)** - One-command deployment with CLI
+
+### ⚙️ [Setup & Configuration](./setup/)
 - **[Google OAuth Setup](./setup/GOOGLE_CLIENT_SETUP.md)** - Configure Google OAuth authentication
 - **[Google OAuth Setup (Alt)](./setup/GOOGLE_OAUTH_SETUP.md)** - Alternative OAuth configuration guide
 - **[CSS Migration Summary](./setup/CSS_MIGRATION_SUMMARY.md)** - CSS migration documentation
@@ -47,9 +55,16 @@ This directory contains all documentation for the V8 Chat Application, organized
 ## 🔍 Quick Access
 
 ### For New Developers
-1. Start with **[Feature Comparison](./features/FEATURE_COMPARISON.md)** to understand the project scope
-2. Check **[Setup & Configuration](./setup/)** for environment setup
-3. Review **[Bug Fixes](./fixes/)** for known issues and solutions
+1. Start with **[Quick Start Guide](./deployment/QUICK_START.md)** for immediate setup
+2. Read **[Feature Comparison](./features/FEATURE_COMPARISON.md)** to understand the project scope
+3. Check **[Setup & Configuration](./setup/)** for environment setup
+4. Review **[Bug Fixes](./fixes/)** for known issues and solutions
+
+### For Deployment
+1. **[Quick Start](./deployment/QUICK_START.md)** - Fast local & production setup
+2. **[Environment Setup](./deployment/ENV_SETUP.md)** - Get credentials
+3. **[Deployment Checklist](./deployment/DEPLOYMENT_CHECKLIST.md)** - Pre-launch tasks
+4. **[Vercel Deployment](./deployment/VERCEL_DEPLOYMENT.md)** - Full deployment guide
 
 ### For Troubleshooting
 1. Check **[Call Troubleshooting](./fixes/CALL_TROUBLESHOOTING.md)** for call-related issues
