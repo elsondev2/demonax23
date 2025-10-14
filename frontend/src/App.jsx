@@ -15,11 +15,13 @@ import ThemeProvider from "./components/ThemeProvider";
 import AppearanceModal from "./components/AppearanceModal";
 import ThemeLoadingBar from "./components/ThemeLoadingBar";
 import ProtectedRoute from "./components/ProtectedRoute";
+import AnnouncementBanner from "./components/AnnouncementBanner";
 
 import { Toaster } from "react-hot-toast";
 
 function AppContent() {
   const location = useLocation();
+  const { authUser } = useAuthStore();
   const isLandingPage = location.pathname === '/';
 
   // Don't apply overflow-hidden to landing page
@@ -40,18 +42,19 @@ function AppContent() {
 
   return (
     <div className={containerClass}>
+      {!isLandingPage && authUser && <AnnouncementBanner />}
       <Routes>
-        <Route path="/" element={<LandingPage />} />
+        <Route path="/" element={authUser ? <Navigate to="/chat" replace /> : <LandingPage />} />
         <Route path="/chat" element={
           <ProtectedRoute>
             <ChatPage />
           </ProtectedRoute>
         } />
-        <Route path="/logintowoof" element={<LoginPageNew />} />
-        <Route path="/login" element={<LoginPageNew />} />
-        <Route path="/signin" element={<LoginPageNew />} />
-        <Route path="/signup" element={<SignUpPageNew />} />
-        <Route path="/register" element={<SignUpPageNew />} />
+        <Route path="/logintowoof" element={authUser ? <Navigate to="/chat" replace /> : <LoginPageNew />} />
+        <Route path="/login" element={authUser ? <Navigate to="/chat" replace /> : <LoginPageNew />} />
+        <Route path="/signin" element={authUser ? <Navigate to="/chat" replace /> : <LoginPageNew />} />
+        <Route path="/signup" element={authUser ? <Navigate to="/chat" replace /> : <SignUpPageNew />} />
+        <Route path="/register" element={authUser ? <Navigate to="/chat" replace /> : <SignUpPageNew />} />
         <Route path="/join/:token" element={
           <ProtectedRoute>
             <JoinGroupPage />
@@ -74,6 +77,21 @@ function AppContent() {
           </ProtectedRoute>
         } />
         <Route path="/posts/mine" element={
+          <ProtectedRoute redirectTo="/login">
+            <ChatPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/notices" element={
+          <ProtectedRoute redirectTo="/login">
+            <ChatPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/apps" element={
+          <ProtectedRoute redirectTo="/login">
+            <ChatPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/donate" element={
           <ProtectedRoute redirectTo="/login">
             <ChatPage />
           </ProtectedRoute>

@@ -4,6 +4,7 @@ import express from "express";
 import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
 import cors from "cors";
+import multer from "multer";
 import { ENV } from "./lib/env.js";
 import { connectDB } from "./lib/db.js";
 import authRoutes from "./routes/auth.route.js";
@@ -13,6 +14,8 @@ import friendRoutes from "./routes/friend.route.js";
 import statusRoutes from "./routes/status.route.js";
 import postsRoutes from "./routes/posts.route.js";
 import adminRoutes from "./routes/admin.route.js";
+import noticesRoutes from "./routes/notices.route.js";
+import followRoutes from "./routes/follow.route.js";
 import { app, server } from "./lib/socket.js";
 import { startStatusCleanupJob } from "./lib/statusCleanup.js";
 import { startPostCleanupJob } from "./lib/postCleanup.js";
@@ -36,7 +39,25 @@ app.use(cors({
   credentials: true
 }));
 
+// Configure multer for file uploads
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Accept only image files
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'), false);
+    }
+  }
+});
+
 app.use(express.json({ limit: "50mb" })); // To parse JSON data in the req.body
+app.use(express.urlencoded({ extended: true })); // To parse form data
 app.use(cookieParser());
 
 app.use("/api/auth", authRoutes);
@@ -46,6 +67,8 @@ app.use("/api/friends", friendRoutes);
 app.use("/api/status", statusRoutes);
 app.use("/api/posts", postsRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/notices", noticesRoutes);
+app.use("/api/follow", followRoutes);
 
 if (ENV.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "../frontend/dist")));

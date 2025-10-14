@@ -23,9 +23,23 @@ const groupSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    admins: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
     groupPic: {
       type: String,
       default: "",
+    },
+    isCommunity: {
+      type: Boolean,
+      default: false,
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
     },
   },
   { timestamps: true }

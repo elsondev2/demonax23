@@ -8,6 +8,9 @@ import SwipeableViews from "../components/SwipeableViews";
 import ChatsView from "../components/ChatsView";
 import FeedView from "../components/FeedView";
 import PostsView from "../components/PostsView";
+import NoticeView from "../components/NoticeView";
+import AppsView from "../components/AppsView";
+import DonateView from "../components/DonateView";
 import CallModal from "../components/CallModal";
 import CallScreen from "../components/CallScreen";
 import { useCallStore } from "../store/useCallStore";
@@ -22,6 +25,10 @@ function ChatPage() {
   const location = useLocation();
 
   const isPostsRoute = location.pathname === '/posts' || location.pathname === '/posts/public' || location.pathname === '/posts/mine';
+  const isNoticesRoute = location.pathname === '/notices';
+  const isAppsRoute = location.pathname === '/apps';
+  const isDonateRoute = location.pathname === '/donate';
+  const isFeatureRoute = isPostsRoute || isNoticesRoute || isAppsRoute || isDonateRoute;
 
   // Detect mobile to enable swipe-only on mobile
   const [isMobile, setIsMobile] = useState(() => {
@@ -44,13 +51,13 @@ function ChatPage() {
   
   // Determine initial view index based on route (mobile only)
   const getInitialIndex = () => {
-    if (isPostsRoute) return 1; // Right view when directly on posts
+    if (isFeatureRoute) return 1; // Right view when directly on feature routes
     return 0; // Sidebar (home)
   };
 
   const [currentViewIndex, setCurrentViewIndex] = useState(getInitialIndex());
-  // Track the last right-side destination (1 = Chat, 2 = Posts)
-  const [lastRightView, setLastRightView] = useState(() => (isPostsRoute ? 2 : 1));
+  // Track the last right-side destination (1 = Chat, 2 = Feature)
+  const [lastRightView, setLastRightView] = useState(() => (isFeatureRoute ? 2 : 1));
 
   // Only track the index (routing is handled in onSwipeDirection and other actions)
   const handleIndexChange = useCallback((index) => {
@@ -64,7 +71,7 @@ function ChatPage() {
       setCurrentViewIndex(newIndex);
     }
     // Update lastRightView based on route
-    if (isPostsRoute) setLastRightView(2);
+    if (isFeatureRoute) setLastRightView(2);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname, isMobile]);
 
@@ -124,14 +131,16 @@ function ChatPage() {
   // When a chat or contact is selected on mobile, go to Chat view and mark as lastRight
   useEffect(() => {
     const toChat = () => { if (isMobile) setCurrentViewIndex(1); setLastRightView(1); };
-    const toPosts = () => { setLastRightView(2); };
+    const toFeature = () => { setLastRightView(2); };
     window.addEventListener('chatSelected', toChat);
     window.addEventListener('contactSelected', toChat);
-    window.addEventListener('postsOpened', toPosts);
+    window.addEventListener('postsOpened', toFeature);
+    window.addEventListener('featureOpened', toFeature);
     return () => {
       window.removeEventListener('chatSelected', toChat);
       window.removeEventListener('contactSelected', toChat);
-      window.removeEventListener('postsOpened', toPosts);
+      window.removeEventListener('postsOpened', toFeature);
+      window.removeEventListener('featureOpened', toFeature);
     };
   }, [isMobile]);
 
@@ -139,40 +148,50 @@ function ChatPage() {
   useEffect(() => {
     if (selectedUser || selectedGroup) {
       setLastRightView(1);
-      if (isPostsRoute) navigate('/', { replace: true });
+      if (isFeatureRoute) navigate('/', { replace: true });
       if (isMobile) setCurrentViewIndex(1);
     }
-  }, [selectedUser, selectedGroup, isMobile, isPostsRoute, navigate]);
+  }, [selectedUser, selectedGroup, isMobile, isFeatureRoute, navigate]);
 
-  // Handle direct switch to posts view in mobile
+  // Handle direct switch to feature views in mobile
   useEffect(() => {
-    const handleSwitchToPosts = () => {
+    const handleSwitchToFeature = () => {
       if (isMobile) {
-        setCurrentViewIndex(1); // Switch to posts view (index 1)
-        setLastRightView(2); // Set posts as the last right view
+        setCurrentViewIndex(1); // Switch to feature view (index 1)
+        setLastRightView(2); // Set feature as the last right view
       }
     };
 
-    window.addEventListener('switchToPostsView', handleSwitchToPosts);
+    window.addEventListener('switchToPostsView', handleSwitchToFeature);
+    window.addEventListener('switchToFeatureView', handleSwitchToFeature);
     return () => {
-      window.removeEventListener('switchToPostsView', handleSwitchToPosts);
+      window.removeEventListener('switchToPostsView', handleSwitchToFeature);
+      window.removeEventListener('switchToFeatureView', handleSwitchToFeature);
     };
   }, [isMobile]);
 
-  // Define two swipeable views (mobile only): Sidebar and Right (Chat or Posts)
+  // Define two swipeable views (mobile only): Sidebar and Right (Chat or Feature)
+  const getRightComponent = () => {
+    if (isPostsRoute) return <PostsView />;
+    if (isNoticesRoute) return <NoticeView />;
+    if (isAppsRoute) return <AppsView />;
+    if (isDonateRoute) return <DonateView />;
+    return <FeedView />;
+  };
+
   const views = [
     { name: 'Sidebar', component: <ChatsView /> },
-    { name: 'Right', component: isPostsRoute ? <PostsView /> : <FeedView /> },
+    { name: 'Right', component: getRightComponent() },
   ];
 
-  // On mobile, if we're on the Right view but no conversation is selected and not in posts route,
+  // On mobile, if we're on the Right view but no conversation is selected and not in feature route,
   // immediately bounce back to Sidebar (avoid staying on the placeholder)
   useEffect(() => {
     if (!isMobile) return;
-    if (!isPostsRoute && currentViewIndex === 1 && !(selectedUser || selectedGroup)) {
+    if (!isFeatureRoute && currentViewIndex === 1 && !(selectedUser || selectedGroup)) {
       setCurrentViewIndex(0);
     }
-  }, [isMobile, isPostsRoute, currentViewIndex, selectedUser, selectedGroup]);
+  }, [isMobile, isFeatureRoute, currentViewIndex, selectedUser, selectedGroup]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -198,7 +217,16 @@ function ChatPage() {
             onIndexChange={handleIndexChange}
             onSwipeDirection={(dir, idx) => {
               if (dir === 'left' && idx === 1) { navigate('/', { replace: true }); return 0; }
-              if (dir === 'right' && idx === 0) { navigate(lastRightView === 2 ? '/posts' : '/', { replace: true }); return 1; }
+              if (dir === 'right' && idx === 0) { 
+                const targetRoute = lastRightView === 2 ? (
+                  isPostsRoute ? '/posts' : 
+                  isNoticesRoute ? '/notices' : 
+                  isAppsRoute ? '/apps' : 
+                  isDonateRoute ? '/donate' : '/posts'
+                ) : '/';
+                navigate(targetRoute, { replace: true }); 
+                return 1; 
+              }
               return undefined; // do nothing
             }}
             allowMouseDrag={false}
@@ -214,7 +242,7 @@ function ChatPage() {
             </div>
             {/* Main content area - Takes remaining space */}
             <div className="flex-1 h-full overflow-hidden">
-              {isPostsRoute ? <PostsView /> : <FeedView />}
+              {getRightComponent()}
             </div>
           </div>
         )}

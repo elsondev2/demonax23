@@ -11,16 +11,20 @@ import {
   getInviteMeta,
   joinByInvite,
   revokeInvite,
+  getCommunityGroups,
+  joinCommunityGroup,
 } from "../controllers/group.controller.js";
 
 const router = express.Router();
 
 router.post("/create", protectRoute, createGroup);
 router.get("/", protectRoute, getGroups);
+router.get("/community", protectRoute, getCommunityGroups);
 router.get("/:id", protectRoute, getGroupById);
 router.put("/:id", protectRoute, updateGroup);
 router.delete("/:id", protectRoute, deleteGroup);
 router.post("/:id/leave", protectRoute, leaveGroup);
+router.post("/:id/join", protectRoute, joinCommunityGroup);
 
 // Invite links
 router.post("/:id/invite-links", protectRoute, createInviteLink);

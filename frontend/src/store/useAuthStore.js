@@ -39,7 +39,7 @@ export const useAuthStore = create((set, get) => ({
       set({ authUser: updatedUser });
 
       // Update user data across all stores
-      const chatStore = require("./useChatStore").useChatStore.getState();
+      const chatStore = useChatStore.getState();
 
       // Update in contacts list
       if (chatStore.allContacts) {
@@ -86,10 +86,11 @@ export const useAuthStore = create((set, get) => ({
         });
       }
 
-      toast.success("Profile updated");
+      toast.success("Profile updated successfully!");
       return { success: true };
     } catch (error) {
-      toast.error(error.response?.data?.message || "Profile update failed");
+      console.error("Profile update error:", error);
+      toast.error(error.response?.data?.message || "Unable to update profile");
       return { success: false, error };
     }
   },

@@ -551,6 +551,13 @@ export const useChatStore = create((set, get) => ({
     try {
       const res = await axiosInstance.get("/api/messages/contacts");
       set({ allContacts: res.data });
+      
+      // Preload contact avatars
+      const { imageCache } = await import('../utils/imageCache');
+      const avatarUrls = res.data
+        .map(contact => contact.profilePic)
+        .filter(url => url && url !== '/avatar.png');
+      imageCache.preloadBatch(avatarUrls).catch(() => {});
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to load contacts");
     } finally {
@@ -563,6 +570,13 @@ export const useChatStore = create((set, get) => ({
     try {
       const res = await axiosInstance.get("/api/messages/chats");
       set({ chats: res.data });
+      
+      // Preload chat avatars (both user and group pics)
+      const { imageCache } = await import('../utils/imageCache');
+      const avatarUrls = res.data
+        .map(chat => chat.isGroup ? chat.groupPic : chat.profilePic)
+        .filter(url => url && url !== '/avatar.png');
+      imageCache.preloadBatch(avatarUrls).catch(() => {});
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to load chats");
     } finally {
@@ -600,6 +614,16 @@ export const useChatStore = create((set, get) => ({
           hasMoreMessages: hasMore,
           isMessagesLoading: false
         });
+        
+        // Preload sender avatars from messages
+        const { imageCache } = await import('../utils/imageCache');
+        const avatarUrls = newMessages
+          .map(msg => {
+            const sender = typeof msg.senderId === 'object' ? msg.senderId : null;
+            return sender?.profilePic;
+          })
+          .filter(url => url && url !== '/avatar.png');
+        imageCache.preloadBatch(avatarUrls).catch(() => {});
       } else {
         // Additional pages - prepend older messages to the beginning
         const existingMessages = get().messages;
@@ -668,6 +692,16 @@ export const useChatStore = create((set, get) => ({
           hasMoreMessages: hasMore,
           isMessagesLoading: false
         });
+        
+        // Preload sender avatars from group messages
+        const { imageCache } = await import('../utils/imageCache');
+        const avatarUrls = newMessages
+          .map(msg => {
+            const sender = typeof msg.senderId === 'object' ? msg.senderId : null;
+            return sender?.profilePic;
+          })
+          .filter(url => url && url !== '/avatar.png');
+        imageCache.preloadBatch(avatarUrls).catch(() => {});
       } else {
         // Additional pages - prepend older messages to the beginning
         const existingMessages = get().messages;
@@ -839,7 +873,6 @@ export const useChatStore = create((set, get) => ({
   editMessage: async (messageId, newText) => {
     const { messages } = get();
 
-
     // Find the message being edited
     const messageIndex = messages.findIndex(msg => msg._id === messageId);
     if (messageIndex === -1) return;
@@ -859,37 +892,63 @@ export const useChatStore = create((set, get) => ({
 
     try {
       const res = await axiosInstance.put(`/api/messages/edit/${messageId}`, { text: newText });
-      // Update with the server response
-      const finalMessages = updatedMessages.map(msg =>
-        msg._id === messageId ? res.data : msg
-      );
-      set({ messages: finalMessages });
-      toast.success("Message updated successfully");
-
+      if (res.status === 200 && res.data) {
+        // Update with the server response
+        const finalMessages = updatedMessages.map(msg =>
+          msg._id === messageId ? res.data : msg
+        );
+        // Set lastRefreshTime to prevent auto-refresh from triggering after edit
+        set({ 
+          messages: finalMessages,
+          lastRefreshTime: Date.now() // Prevent message loss detection from triggering
+        });
+        toast.success("Message updated successfully");
+      }
       // No caching - real-time approach
     } catch (error) {
+      console.error("Edit message error:", error);
       // Revert the optimistic update on failure
       set({ messages: messages });
       toast.error(error.response?.data?.message || "Failed to update message");
+      throw error;
     }
   },
 
   deleteMessage: async (messageId) => {
     const { messages } = get();
+    
+    console.log('🗑️ Deleting message:', messageId, 'Current messages count:', messages.length);
 
     // Optimistically update the UI
     const updatedMessages = messages.filter(msg => msg._id !== messageId);
     set({ messages: updatedMessages });
+    
+    console.log('🗑️ After optimistic update, messages count:', updatedMessages.length);
 
     try {
-      await axiosInstance.delete(`/api/messages/delete/${messageId}`);
-      toast.success("Message deleted successfully");
-
+      const response = await axiosInstance.delete(`/api/messages/delete/${messageId}`);
+      if (response.status === 200) {
+        console.log('✅ Message deleted successfully from backend');
+        toast.success("Message deleted successfully");
+        
+        // Ensure the message stays deleted by setting it again
+        const currentMessages = get().messages;
+        const finalMessages = currentMessages.filter(msg => msg._id !== messageId);
+        
+        // Set lastRefreshTime to prevent auto-refresh from triggering after delete
+        set({ 
+          messages: finalMessages,
+          lastRefreshTime: Date.now() // Prevent message loss detection from triggering
+        });
+        console.log('🗑️ Final messages count:', finalMessages.length);
+      }
       // No caching - real-time approach
     } catch (error) {
+      console.error("❌ Delete message error:", error);
       // Revert the optimistic update on failure
       set({ messages: messages });
       toast.error(error.response?.data?.message || "Failed to delete message");
+      throw error;
     }
   },
 
@@ -1000,16 +1059,33 @@ export const useChatStore = create((set, get) => ({
       );
 
       if (isRelevantConversation) {
-        // Check for duplicates more thoroughly (including optimistic messages)
-        const messageExists = currentMessages.some(msg => {
-          // Check both real message ID and optimistic message content
-          return msg._id === newMessage._id ||
-            (msg.isOptimistic && msg.text === newMessage.text &&
-              Math.abs(new Date(msg.createdAt) - new Date(newMessage.createdAt)) < 5000);
-        });
+        // Check for duplicates - prioritize exact ID match, then check optimistic messages
+        const exactMatch = currentMessages.find(msg => msg._id === newMessage._id);
+        
+        if (exactMatch) {
+          console.log('⚠️ DM message already exists, skipping', { messageId: newMessage._id });
+        } else {
+          // Check if this is replacing an optimistic message
+          const optimisticIndex = currentMessages.findIndex(msg => 
+            msg.isOptimistic && 
+            msg.text === newMessage.text &&
+            Math.abs(new Date(msg.createdAt) - new Date(newMessage.createdAt)) < 5000
+          );
 
-        if (!messageExists) {
-          set({ messages: [...currentMessages, newMessage] });
+          if (optimisticIndex !== -1) {
+            // Replace optimistic message with real one
+            console.log('🔄 Replacing optimistic DM with real message', {
+              optimisticId: currentMessages[optimisticIndex]._id,
+              realId: newMessage._id
+            });
+            const updatedMessages = [...currentMessages];
+            updatedMessages[optimisticIndex] = { ...newMessage, status: 'sent' };
+            set({ messages: updatedMessages });
+          } else {
+            // Add new message
+            console.log('✅ Adding new DM to conversation', { messageId: newMessage._id });
+            set({ messages: [...currentMessages, newMessage] });
+          }
         }
       }
 
@@ -1084,47 +1160,48 @@ export const useChatStore = create((set, get) => ({
       );
 
       if (isRelevantGroupConversation) {
-        // Check for duplicates including optimistic messages
-        const messageExists = currentMessages.some(msg => {
-          const isDuplicate = msg._id === newMessage._id ||
-            (msg.isOptimistic && msg.text === newMessage.text &&
-              Math.abs(new Date(msg.createdAt) - new Date(newMessage.createdAt)) < 5000);
-          
-          if (isDuplicate) {
-            console.log('🔍 Found duplicate:', {
-              existingId: msg._id,
-              newId: newMessage._id,
-              isOptimistic: msg.isOptimistic,
-              textMatch: msg.text === newMessage.text
-            });
-          }
-          
-          return isDuplicate;
-        });
-
-        if (!messageExists) {
-          console.log('✅ Adding new group message to current conversation', {
+        // Check for duplicates - prioritize exact ID match, then check optimistic messages
+        const exactMatch = currentMessages.find(msg => msg._id === newMessage._id);
+        
+        if (exactMatch) {
+          console.log('⚠️ Exact message ID already exists, skipping', {
             messageId: newMessage._id,
-            text: newMessage.text?.substring(0, 50),
-            senderId: senderId,
-            currentMessageCount: currentMessages.length,
-            newMessageCount: currentMessages.length + 1,
-            currentConversationId,
-            messageGroupId: groupId
+            isOptimistic: exactMatch.isOptimistic
           });
-          
-          // Create a new array to ensure React detects the change
-          const updatedMessages = [...currentMessages, newMessage];
-          set({ messages: updatedMessages });
-          
-          console.log('✅ Messages state updated successfully, new count:', updatedMessages.length);
         } else {
-          console.log('⚠️ Group message already exists in conversation, skipping', {
-            messageId: newMessage._id,
-            text: newMessage.text?.substring(0, 50),
-            totalMessages: currentMessages.length,
-            lastFewIds: currentMessages.slice(-3).map(m => ({ id: m._id, isOptimistic: m.isOptimistic }))
-          });
+          // Check if this is replacing an optimistic message
+          const optimisticIndex = currentMessages.findIndex(msg => 
+            msg.isOptimistic && 
+            msg.text === newMessage.text &&
+            Math.abs(new Date(msg.createdAt) - new Date(newMessage.createdAt)) < 5000
+          );
+
+          if (optimisticIndex !== -1) {
+            // Replace optimistic message with real one
+            console.log('🔄 Replacing optimistic message with real message', {
+              optimisticId: currentMessages[optimisticIndex]._id,
+              realId: newMessage._id
+            });
+            const updatedMessages = [...currentMessages];
+            updatedMessages[optimisticIndex] = { ...newMessage, status: 'sent' };
+            set({ messages: updatedMessages });
+          } else {
+            // Add new message
+            console.log('✅ Adding new group message to current conversation', {
+              messageId: newMessage._id,
+              text: newMessage.text?.substring(0, 50),
+              senderId: senderId,
+              currentMessageCount: currentMessages.length,
+              newMessageCount: currentMessages.length + 1,
+              currentConversationId,
+              messageGroupId: groupId
+            });
+            
+            const updatedMessages = [...currentMessages, newMessage];
+            set({ messages: updatedMessages });
+            
+            console.log('✅ Messages state updated successfully, new count:', updatedMessages.length);
+          }
         }
 
         // Only play sound for messages from others in current group view
@@ -1147,14 +1224,52 @@ export const useChatStore = create((set, get) => ({
 
     // Listen for message updates
     socket.on("messageUpdated", (updatedMessage) => {
-      console.log("Received message update:", updatedMessage);
-      const currentMessages = get().messages;
+      console.log("📝 Received message update:", updatedMessage._id);
+      const currentState = get();
+      const { currentConversationId, currentConversationType, messages: currentMessages } = currentState;
+      const { authUser } = useAuthStore.getState();
 
-      // Update the message in place, preserving order
-      const updatedMessages = currentMessages.map(msg =>
-        msg._id === updatedMessage._id ? { ...msg, ...updatedMessage } : msg
-      );
-      set({ messages: updatedMessages });
+      let isRelevantConversation = false;
+
+      if (updatedMessage.groupId) {
+        // Group message - check if it's the current group
+        const groupId = typeof updatedMessage.groupId === 'object' ? updatedMessage.groupId._id : updatedMessage.groupId;
+        isRelevantConversation = (
+          currentConversationType === 'group' &&
+          currentConversationId === groupId
+        );
+      } else {
+        // DM message - check if it's part of current DM conversation
+        // For DMs, we need to check BOTH sender and receiver
+        const senderId = typeof updatedMessage.senderId === 'object' ? updatedMessage.senderId._id : updatedMessage.senderId;
+        const receiverId = typeof updatedMessage.receiverId === 'object' ? updatedMessage.receiverId._id : updatedMessage.receiverId;
+        
+        // The message is relevant if:
+        // 1. We're in a user conversation AND
+        // 2. The current conversation is with either the sender or receiver (excluding ourselves)
+        if (currentConversationType === 'user') {
+          // If I'm the sender, I'm chatting with the receiver
+          // If I'm the receiver, I'm chatting with the sender
+          const otherUserId = (senderId === authUser._id) ? receiverId : senderId;
+          isRelevantConversation = (currentConversationId === otherUserId);
+        }
+      }
+
+      if (isRelevantConversation) {
+        // Update the message in place, preserving order
+        const updatedMessages = currentMessages.map(msg =>
+          msg._id === updatedMessage._id ? { ...msg, ...updatedMessage, updatedAt: updatedMessage.updatedAt || new Date().toISOString() } : msg
+        );
+        set({ messages: updatedMessages });
+        console.log("✅ Message updated in current conversation");
+      } else {
+        console.log("ℹ️ Message update not relevant to current conversation", {
+          messageId: updatedMessage._id,
+          isGroup: !!updatedMessage.groupId,
+          currentConversationType,
+          currentConversationId
+        });
+      }
 
       // Also update the sidebar chat list if this is the last message
       const chatsNow = get().chats;
@@ -1201,10 +1316,20 @@ export const useChatStore = create((set, get) => ({
 
     // Listen for message deletions
     socket.on("messageDeleted", (deletedMessageId) => {
-      console.log("Received message deletion:", deletedMessageId);
+      console.log("🗑️ Received messageDeleted event:", deletedMessageId);
       const currentMessages = get().messages;
-      const updatedMessages = currentMessages.filter(msg => msg._id !== deletedMessageId);
-      set({ messages: updatedMessages });
+      
+      // Check if this message exists in current conversation
+      const messageToDelete = currentMessages.find(msg => msg._id === deletedMessageId);
+      
+      if (messageToDelete) {
+        console.log("📡 Deleting message from current conversation, before:", currentMessages.length);
+        const updatedMessages = currentMessages.filter(msg => msg._id !== deletedMessageId);
+        console.log("📡 After delete:", updatedMessages.length);
+        set({ messages: updatedMessages });
+      } else {
+        console.log("ℹ️ Deleted message not in current conversation, ignoring");
+      }
       // Real-time updates only
     });
 

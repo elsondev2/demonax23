@@ -2,9 +2,10 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { axiosInstance } from "../lib/axios";
 import { useAuthStore } from "../store/useAuthStore";
 import { useNavigate } from "react-router";
-import { LogOutIcon, Users, MessageSquare, Layers, Image, Trash2, Edit2, X, LayoutDashboard, Download, Search, FileText, Database, HardDrive } from "lucide-react";
+import { LogOutIcon, Users, MessageSquare, Layers, Image, Trash2, Edit2, X, LayoutDashboard, Download, Search, FileText, Database, HardDrive, Camera, Megaphone, Bell, Edit } from "lucide-react";
 import toast from "react-hot-toast";
 import Avatar from "../components/Avatar";
+import AnnouncementModal from "../components/AnnouncementModal";
 
 // Utility function to format file sizes
 function formatFileSize(bytes) {
@@ -25,6 +26,7 @@ export default function AdminPage() {
   const [users, setUsers] = useState([]);
   const [messages, setMessages] = useState([]);
   const [groups, setGroups] = useState([]);
+  const [communityGroups, setCommunityGroups] = useState([]);
   const [statuses, setStatuses] = useState([]);
   const [recentActivity, setRecentActivity] = useState([]);
 
@@ -49,6 +51,16 @@ export default function AdminPage() {
   const [postsTotal, setPostsTotal] = useState(0);
   const [postsPerPage, setPostsPerPage] = useState(50);
   const [postsVisibility, setPostsVisibility] = useState("");
+
+  const [announcements, setAnnouncements] = useState([]);
+  const [announcementForm, setAnnouncementForm] = useState({ title: '', content: '', priority: 'normal' });
+
+  // Modal states
+  const [isAnnouncementModalOpen, setIsAnnouncementModalOpen] = useState(false);
+  const [editingAnnouncement, setEditingAnnouncement] = useState(null);
+
+  const [followLeaderboard, setFollowLeaderboard] = useState([]);
+  const [followLeaderboardLimit, setFollowLeaderboardLimit] = useState(50);
 
   // Messages subviews
   const [messagesSubTab, setMessagesSubTab] = useState('all'); // 'all' | 'conversations'
@@ -183,13 +195,19 @@ export default function AdminPage() {
       } else if (activeTab === "statuses") {
         const res = await fetchCached('statuses', () => axiosInstance.get('/api/admin/statuses'), 30000);
         setStatuses(res.data || []);
+      } else if (activeTab === "announcements") {
+        const res = await fetchCached('announcements', () => axiosInstance.get('/api/notices/announcements'), 30000);
+        setAnnouncements(res.data || []);
+      } else if (activeTab === "follow-leaderboard") {
+        const res = await fetchCached(`follow_leaderboard_${followLeaderboardLimit}`, () => axiosInstance.get(`/api/admin/follow-leaderboard?limit=${followLeaderboardLimit}`), 30000);
+        setFollowLeaderboard(res.data || []);
       }
     } catch (error) {
       console.error('Load error:', error);
       toast.error("Failed to load data: " + (error.response?.data?.message || error.message));
     }
     setLoading(false);
-  }, [activeTab, messagesSubTab, messagesPage, messagesPerPage, messagesQ, conversationsPage, conversationsPerPage, onSelectConversation, groupsSubTab, groupsPage, groupsPerPage, groupsQ, groupConvPage, groupConvPerPage, onSelectGroupConversation, postsPage, postsPerPage, postsQ, postsVisibility, uploadsPage, uploadsPerPage, uploadsQ, fetchCached]);
+  }, [activeTab, messagesSubTab, messagesPage, messagesPerPage, messagesQ, conversationsPage, conversationsPerPage, onSelectConversation, groupsSubTab, groupsPage, groupsPerPage, groupsQ, groupConvPage, groupConvPerPage, onSelectGroupConversation, postsPage, postsPerPage, postsQ, postsVisibility, uploadsPage, uploadsPerPage, uploadsQ, followLeaderboardLimit, fetchCached]);
 
   useEffect(() => {
     if (!authUser) {
@@ -201,7 +219,7 @@ export default function AdminPage() {
       return;
     }
     loadData();
-  }, [authUser, navigate, activeTab, messagesSubTab, groupsSubTab, messagesPage, groupsPage, conversationsPage, groupConvPage, postsPage, uploadsPage, messagesPerPage, groupsPerPage, conversationsPerPage, groupConvPerPage, postsPerPage, uploadsPerPage, loadData]);
+  }, [authUser, navigate, activeTab, messagesSubTab, groupsSubTab, messagesPage, groupsPage, conversationsPage, groupConvPage, postsPage, uploadsPage, messagesPerPage, groupsPerPage, conversationsPerPage, groupConvPerPage, postsPerPage, uploadsPerPage, followLeaderboardLimit, loadData]);
 
 
 
@@ -263,7 +281,12 @@ export default function AdminPage() {
   const handleDelete = async () => {
     if (!deleteModal) return;
     try {
-      await axiosInstance.delete(`/api/admin/${deleteModal.type}/${deleteModal.id}`);
+      // Special handling for announcements
+      if (deleteModal.type === 'announcements') {
+        await axiosInstance.delete(`/api/notices/announcements/${deleteModal.id}`);
+      } else {
+        await axiosInstance.delete(`/api/admin/${deleteModal.type}/${deleteModal.id}`);
+      }
       toast.success(`${deleteModal.type.slice(0, -1)} deleted successfully`);
       setDeleteModal(null);
       loadData();
@@ -285,6 +308,22 @@ export default function AdminPage() {
     } catch {
       toast.error("Failed to update");
     }
+  };
+
+  const handleModalSuccess = (newAnnouncement) => {
+    // Refresh the announcements data
+    loadData();
+  };
+
+  const handleEditAnnouncement = (announcement) => {
+    setEditingAnnouncement(announcement);
+    setIsAnnouncementModalOpen(true);
+  };
+
+  const handleEditSuccess = (updatedAnnouncement) => {
+    // Refresh the announcements data
+    loadData();
+    setEditingAnnouncement(null);
   };
 
   if (!authUser) return null;
@@ -310,7 +349,10 @@ export default function AdminPage() {
     { id: "users", label: "Users", icon: Users },
     { id: "messages", label: "Messages", icon: MessageSquare },
     { id: "groups", label: "Groups", icon: Layers },
+    { id: "community", label: "Community", icon: Users },
     { id: "posts", label: "Posts", icon: FileText },
+    { id: "announcements", label: "Announcements", icon: Megaphone },
+    { id: "follow-leaderboard", label: "Follow Leaders", icon: Users },
     { id: "uploads", label: "Uploads", icon: Download },
     { id: "statuses", label: "Statuses", icon: Image },
   ];
@@ -327,9 +369,9 @@ export default function AdminPage() {
         </div>
         <div className="navbar-end">
           <div className="flex gap-1 md:gap-2">
-            <a 
-              href="https://justelson-help.vercel.app/" 
-              target="_blank" 
+            <a
+              href="https://justelson-help.vercel.app/"
+              target="_blank"
               rel="noopener noreferrer"
               className="btn btn-xs md:btn-sm btn-ghost gap-1 md:gap-2"
             >
@@ -427,6 +469,14 @@ export default function AdminPage() {
                   setGroupThreadQ={setGroupThreadQ}
                 />
               )}
+              {activeTab === "community" && (
+                <CommunityGroupsView
+                  communityGroups={communityGroups}
+                  setCommunityGroups={setCommunityGroups}
+                  loading={loading}
+                  onRefresh={loadData}
+                />
+              )}
               {activeTab === "posts" && (
                 <PostsView
                   posts={posts}
@@ -459,6 +509,25 @@ export default function AdminPage() {
                 />
               )}
               {activeTab === "statuses" && <StatusesView statuses={statuses} setDeleteModal={setDeleteModal} />}
+              {activeTab === "announcements" && (
+                <AnnouncementsView
+                  announcements={announcements}
+                  onRefresh={loadData}
+                  setDeleteModal={setDeleteModal}
+                  isAnnouncementModalOpen={isAnnouncementModalOpen}
+                  setIsAnnouncementModalOpen={setIsAnnouncementModalOpen}
+                  onEditAnnouncement={handleEditAnnouncement}
+                />
+              )}
+              {activeTab === "follow-leaderboard" && (
+                <FollowLeaderboardView
+                  leaderboard={followLeaderboard}
+                  limit={followLeaderboardLimit}
+                  setLimit={setFollowLeaderboardLimit}
+                  onRefresh={loadData}
+                  loading={loading}
+                />
+              )}
             </>
           )}
         </div>
@@ -473,6 +542,18 @@ export default function AdminPage() {
       {deleteModal && (
         <DeleteModal deleteModal={deleteModal} setDeleteModal={setDeleteModal} handleDelete={handleDelete} />
       )}
+
+      {/* Announcement Modal */}
+      <AnnouncementModal
+        isOpen={isAnnouncementModalOpen}
+        onClose={() => {
+          setIsAnnouncementModalOpen(false);
+          setEditingAnnouncement(null);
+        }}
+        onSuccess={editingAnnouncement ? handleEditSuccess : handleModalSuccess}
+        initialData={editingAnnouncement}
+        isEditing={!!editingAnnouncement}
+      />
     </div>
   );
 }
@@ -625,7 +706,9 @@ function DashboardView({ overview, users, messages, groups, statuses, recentActi
                     <div className="flex items-center gap-2">
                       <MessageSquare className="w-4 h-4 text-primary" />
                       <span className="text-xs">
-                        <strong>{activity.data.senderId?.fullName || 'Unknown'}</strong> sent a message
+                        <strong className={!activity.data.senderId?.fullName ? 'italic text-base-content/50' : ''}>
+                          {activity.data.senderId?.fullName || 'Deleted User'}
+                        </strong> sent a message
                       </span>
                     </div>
                   ) : (
@@ -962,8 +1045,12 @@ function MessagesView({ messagesSubTab, setMessagesSubTab, messages, conversatio
                           </div>
                         </div>
                       </td>
-                      <td className="font-medium">{msg.senderId?.fullName || 'Unknown'}</td>
-                      <td className="font-medium">{msg.receiverId?.fullName || 'Unknown'}</td>
+                      <td className={`font-medium ${!msg.senderId?.fullName ? 'italic text-base-content/50' : ''}`}>
+                        {msg.senderId?.fullName || 'Deleted User'}
+                      </td>
+                      <td className={`font-medium ${!msg.receiverId?.fullName ? 'italic text-base-content/50' : ''}`}>
+                        {msg.receiverId?.fullName || 'Deleted User'}
+                      </td>
                       <td className="max-w-md">
                         <div className="truncate">
                           {msg.text || msg.image ? (
@@ -1020,9 +1107,13 @@ function MessagesView({ messagesSubTab, setMessagesSubTab, messages, conversatio
                         </div>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate">{msg.senderId?.fullName || 'Unknown'}</div>
+                        <div className={`text-sm font-medium truncate ${!msg.senderId?.fullName ? 'italic text-base-content/50' : ''}`}>
+                          {msg.senderId?.fullName || 'Deleted User'}
+                        </div>
                         <div className="text-xs text-base-content/60">
-                          To: {msg.receiverId?.fullName || 'Unknown'}
+                          To: <span className={!msg.receiverId?.fullName ? 'italic text-base-content/50' : ''}>
+                            {msg.receiverId?.fullName || 'Deleted User'}
+                          </span>
                         </div>
                       </div>
                       <div className="text-xs text-base-content/60">
@@ -1090,15 +1181,15 @@ function MessagesView({ messagesSubTab, setMessagesSubTab, messages, conversatio
                     <button className="join-item btn btn-sm" onClick={() => setConvPage(p => p + 1)}>Next</button>
                   </div>
                 </div>
-
+                s
                 <div className="space-y-2">
                   {conversations.map((c, idx) => (
                     <button
                       key={idx}
                       className={`btn btn-ghost w-full justify-start p-3 h-auto ${selectedConversation &&
-                          ((selectedConversation.a === c.sender._id && selectedConversation.b === c.receiver._id) ||
-                            (selectedConversation.a === c.receiver._id && selectedConversation.b === c.sender._id))
-                          ? 'btn-active' : ''
+                        ((selectedConversation.a === c.sender._id && selectedConversation.b === c.receiver._id) ||
+                          (selectedConversation.a === c.receiver._id && selectedConversation.b === c.sender._id))
+                        ? 'btn-active' : ''
                         }`}
                       onClick={() => onSelectConversation(c.sender._id, c.receiver._id)}
                     >
@@ -1529,7 +1620,9 @@ function GroupsView({ groups, setEditModal, setDeleteModal, groupsSubTab, setGro
                               </div>
                             </div>
                           </td>
-                          <td className="font-medium">{msg.senderId?.fullName || 'Unknown'}</td>
+                          <td className={`font-medium ${!msg.senderId?.fullName ? 'italic text-base-content/50' : ''}`}>
+                            {msg.senderId?.fullName || 'Deleted User'}
+                          </td>
                           <td className="max-w-md">
                             <div className="truncate">
                               {msg.text || (msg.image ? (
@@ -1565,7 +1658,9 @@ function GroupsView({ groups, setEditModal, setDeleteModal, groupsSubTab, setGro
                             </div>
                           </div>
                           <div className="flex-1">
-                            <div className="text-sm font-medium">{msg.senderId?.fullName || 'Unknown'}</div>
+                            <div className={`text-sm font-medium ${!msg.senderId?.fullName ? 'italic text-base-content/50' : ''}`}>
+                              {msg.senderId?.fullName || 'Deleted User'}
+                            </div>
                             <div className="text-xs text-base-content/60">{new Date(msg.createdAt).toLocaleString()}</div>
                           </div>
                         </div>
@@ -1586,6 +1681,402 @@ function GroupsView({ groups, setEditModal, setDeleteModal, groupsSubTab, setGro
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Community Groups View
+function CommunityGroupsView({ communityGroups, setCommunityGroups, loading }) {
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingGroup, setEditingGroup] = useState(null);
+  const [newGroup, setNewGroup] = useState({ name: '', description: '', groupPic: null });
+  const [groupPicPreview, setGroupPicPreview] = useState(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const fetchCommunityGroups = useCallback(async () => {
+    try {
+      const res = await axiosInstance.get('/api/admin/community-groups');
+      setCommunityGroups(res.data || []);
+    } catch (err) {
+      console.error('Failed to fetch community groups:', err);
+    }
+  }, [setCommunityGroups]);
+
+  useEffect(() => {
+    fetchCommunityGroups();
+  }, [fetchCommunityGroups]);
+
+  const handleCreateGroup = async (e) => {
+    e.preventDefault();
+    if (!newGroup.name.trim()) {
+      toast.error('Group name is required');
+      return;
+    }
+
+    setIsCreating(true);
+    try {
+      await axiosInstance.post('/api/admin/community-groups', newGroup);
+      toast.success('Community group created!');
+      setShowCreateModal(false);
+      setNewGroup({ name: '', description: '', groupPic: null });
+      fetchCommunityGroups();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to create group');
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleEditGroup = (group) => {
+    setEditingGroup({
+      id: group._id,
+      name: group.name,
+      description: group.description || '',
+      groupPic: group.groupPic
+    });
+    setGroupPicPreview(group.groupPic);
+    setShowEditModal(true);
+  };
+
+  const handleUpdateGroup = async (e) => {
+    e.preventDefault();
+    if (!editingGroup.name.trim()) {
+      toast.error('Group name is required');
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      await axiosInstance.patch(`/api/admin/community-groups/${editingGroup.id}`, {
+        name: editingGroup.name,
+        description: editingGroup.description,
+        groupPic: editingGroup.groupPic
+      });
+      toast.success('Community group updated!');
+      setShowEditModal(false);
+      setEditingGroup(null);
+      setGroupPicPreview(null);
+      fetchCommunityGroups();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to update group');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleDeleteGroup = async (groupId) => {
+    if (!confirm('Delete this community group? All members will be removed.')) return;
+
+    try {
+      await axiosInstance.delete(`/api/admin/community-groups/${groupId}`);
+      toast.success('Group deleted');
+      fetchCommunityGroups();
+    } catch (err) {
+      console.error('Failed to delete group:', err);
+      toast.error('Failed to delete group');
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-xl font-bold">Community Groups</h2>
+          <p className="text-sm text-base-content/60">Public groups that all users can discover and join</p>
+        </div>
+        <button
+          className="btn btn-primary gap-2"
+          onClick={() => setShowCreateModal(true)}
+        >
+          <Users className="w-4 h-4" />
+          Create Community Group
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="text-center py-12">
+          <span className="loading loading-spinner loading-lg"></span>
+        </div>
+      ) : communityGroups.length === 0 ? (
+        <div className="text-center py-12 bg-base-200 rounded-lg">
+          <Users className="w-12 h-12 mx-auto text-base-content/30 mb-3" />
+          <p className="text-base-content/60">No community groups yet</p>
+          <button
+            className="btn btn-primary btn-sm mt-4"
+            onClick={() => setShowCreateModal(true)}
+          >
+            Create First Group
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {communityGroups.map((group) => (
+            <div key={group._id} className="card bg-base-200 shadow-lg">
+              <div className="card-body">
+                <div className="flex items-start gap-3">
+                  <div className="avatar">
+                    <div className="w-12 h-12 rounded-full">
+                      <img src={group.groupPic || '/avatar.png'} alt={group.name} />
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold truncate">{group.name}</h3>
+                    <p className="text-sm text-base-content/60 line-clamp-2">{group.description || 'No description'}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 text-sm text-base-content/60 mt-2">
+                  <span>{group.members?.length || 0} members</span>
+                  <span className="badge badge-success badge-sm">Public</span>
+                </div>
+
+                <div className="card-actions justify-end mt-4">
+                  <button
+                    className="btn btn-sm btn-ghost gap-1"
+                    onClick={() => handleEditGroup(group)}
+                  >
+                    <Edit2 className="w-4 h-4" />
+                    Edit
+                  </button>
+                  <button
+                    className="btn btn-sm btn-error btn-outline gap-1"
+                    onClick={() => handleDeleteGroup(group._id)}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Create Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-base-100 rounded-xl max-w-md w-full p-6">
+            <h3 className="text-xl font-bold mb-4">Create Community Group</h3>
+            <form onSubmit={handleCreateGroup} className="space-y-4">
+              {/* Group Picture Upload */}
+              <div className="flex flex-col items-center mb-4">
+                <div className="relative group">
+                  <div className="avatar">
+                    <div className="w-24 h-24 rounded-full ring ring-primary ring-offset-base-100 ring-offset-2">
+                      {groupPicPreview ? (
+                        <img src={groupPicPreview} alt="Group preview" />
+                      ) : (
+                        <div className="bg-primary/20 w-full h-full flex items-center justify-center">
+                          <Users className="w-10 h-10 text-primary" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <label className="absolute inset-0 bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer rounded-full transition-opacity">
+                    <div className="text-center">
+                      <Camera className="w-5 h-5 mx-auto mb-1" />
+                      <div className="text-xs">Upload</div>
+                    </div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+
+                        // Validate file size (max 5MB)
+                        if (file.size > 5 * 1024 * 1024) {
+                          toast.error('Image must be less than 5MB');
+                          return;
+                        }
+
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          const base64 = reader.result;
+                          setGroupPicPreview(base64);
+                          setNewGroup({ ...newGroup, groupPic: base64 });
+                        };
+                        reader.readAsDataURL(file);
+                      }}
+                    />
+                  </label>
+                </div>
+                <p className="text-xs text-base-content/60 mt-2">Click to upload group picture</p>
+              </div>
+
+              <div>
+                <label className="label">
+                  <span className="label-text">Group Name *</span>
+                </label>
+                <input
+                  type="text"
+                  className="input input-bordered w-full"
+                  value={newGroup.name}
+                  onChange={(e) => setNewGroup({ ...newGroup, name: e.target.value })}
+                  placeholder="e.g., General Discussion"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="label">
+                  <span className="label-text">Description</span>
+                </label>
+                <textarea
+                  className="textarea textarea-bordered w-full"
+                  rows="3"
+                  value={newGroup.description}
+                  onChange={(e) => setNewGroup({ ...newGroup, description: e.target.value })}
+                  placeholder="What is this group about?"
+                />
+              </div>
+
+              <div className="flex gap-3 justify-end">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    setNewGroup({ name: '', description: '', groupPic: null });
+                    setGroupPicPreview(null);
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={isCreating}
+                >
+                  {isCreating ? (
+                    <>
+                      <span className="loading loading-spinner loading-sm"></span>
+                      Creating...
+                    </>
+                  ) : (
+                    'Create Group'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {showEditModal && editingGroup && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-base-100 rounded-xl max-w-md w-full p-6">
+            <h3 className="text-xl font-bold mb-4">Edit Community Group</h3>
+            <form onSubmit={handleUpdateGroup} className="space-y-4">
+              {/* Group Picture Upload */}
+              <div className="flex flex-col items-center mb-4">
+                <div className="relative group">
+                  <div className="avatar">
+                    <div className="w-24 h-24 rounded-full ring ring-primary ring-offset-base-100 ring-offset-2">
+                      {groupPicPreview ? (
+                        <img src={groupPicPreview} alt="Group preview" />
+                      ) : (
+                        <div className="bg-primary/20 w-full h-full flex items-center justify-center">
+                          <Users className="w-10 h-10 text-primary" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <label className="absolute inset-0 bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer rounded-full transition-opacity">
+                    <div className="text-center">
+                      <Camera className="w-5 h-5 mx-auto mb-1" />
+                      <div className="text-xs">Upload</div>
+                    </div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+
+                        // Validate file size (max 5MB)
+                        if (file.size > 5 * 1024 * 1024) {
+                          toast.error('Image must be less than 5MB');
+                          return;
+                        }
+
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          const base64 = reader.result;
+                          setGroupPicPreview(base64);
+                          setEditingGroup({ ...editingGroup, groupPic: base64 });
+                        };
+                        reader.readAsDataURL(file);
+                      }}
+                    />
+                  </label>
+                </div>
+                <p className="text-xs text-base-content/60 mt-2">Click to upload group picture</p>
+              </div>
+
+              <div>
+                <label className="label">
+                  <span className="label-text">Group Name *</span>
+                </label>
+                <input
+                  type="text"
+                  className="input input-bordered w-full"
+                  value={editingGroup.name}
+                  onChange={(e) => setEditingGroup({ ...editingGroup, name: e.target.value })}
+                  placeholder="e.g., General Discussion"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="label">
+                  <span className="label-text">Description</span>
+                </label>
+                <textarea
+                  className="textarea textarea-bordered w-full"
+                  rows="3"
+                  value={editingGroup.description}
+                  onChange={(e) => setEditingGroup({ ...editingGroup, description: e.target.value })}
+                  placeholder="What is this group about?"
+                />
+              </div>
+
+              <div className="flex gap-3 justify-end">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditingGroup(null);
+                    setGroupPicPreview(null);
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={isUpdating}
+                >
+                  {isUpdating ? (
+                    <>
+                      <span className="loading loading-spinner loading-sm"></span>
+                      Updating...
+                    </>
+                  ) : (
+                    'Update Group'
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -2070,7 +2561,9 @@ function StatusesView({ statuses, setDeleteModal }) {
 
                     <div className="flex-1">
                       <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
-                        <h3 className="font-semibold text-sm md:text-base truncate">{status.userId?.fullName || 'Unknown User'}</h3>
+                        <h3 className={`font-semibold text-sm md:text-base truncate ${!status.userId?.fullName ? 'italic text-base-content/50' : ''}`}>
+                          {status.userId?.fullName || 'Deleted User'}
+                        </h3>
                         <div className={`badge badge-sm md:badge-lg ${status.mediaType === 'image' ? 'badge-secondary' :
                           status.mediaType === 'video' ? 'badge-accent' : 'badge-ghost'
                           }`}>
@@ -2654,5 +3147,239 @@ function DeleteModal({ deleteModal, setDeleteModal, handleDelete }) {
         <button onClick={() => setDeleteModal(null)}>close</button>
       </form>
     </dialog>
+  );
+}
+
+
+// Announcements View
+function AnnouncementsView({ announcements, onRefresh, setDeleteModal, isAnnouncementModalOpen, setIsAnnouncementModalOpen, onEditAnnouncement }) {
+  const handleModalSuccess = (newAnnouncement) => {
+    // Refresh the announcements list
+    onRefresh();
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Header Section */}
+      <div className="card bg-base-100 shadow">
+        <div className="card-body p-4 md:p-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <h2 className="text-base md:text-lg font-semibold">Announcements Management</h2>
+              <p className="text-sm text-base-content/60 hidden sm:block">Create and manage announcements for users</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="stats shadow">
+                <div className="stat py-2 px-3">
+                  <div className="stat-title text-xs">Total</div>
+                  <div className="stat-value text-sm md:text-lg text-primary">{announcements.length}</div>
+                </div>
+              </div>
+              <button
+                className="btn btn-primary gap-2"
+                onClick={() => setIsAnnouncementModalOpen(true)}
+              >
+                <Megaphone className="w-4 h-4" />
+                <span className="hidden sm:inline">New Announcement</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Announcements List */}
+      <div className="space-y-3">
+        {announcements.length === 0 ? (
+          <div className="card bg-base-100 shadow">
+            <div className="card-body text-center py-12">
+              <Megaphone className="w-16 h-16 mx-auto mb-4 text-base-content/30" />
+              <p className="text-base-content/60">No announcements yet</p>
+            </div>
+          </div>
+        ) : (
+          announcements.map((announcement) => (
+            <div key={announcement._id} className="card bg-base-100 shadow hover:shadow-lg transition-shadow">
+              <div className="card-body p-4 md:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-2">
+                      <h3 className="font-semibold text-base md:text-lg">{announcement.title}</h3>
+                      {announcement.priority === 'high' && (
+                        <span className="badge badge-warning badge-sm">High Priority</span>
+                      )}
+                      {announcement.priority === 'urgent' && (
+                        <span className="badge badge-error badge-sm">Urgent</span>
+                      )}
+                    </div>
+                    <p className="text-sm text-base-content/80 whitespace-pre-wrap mb-3">
+                      {announcement.content}
+                    </p>
+                    <div className="text-xs text-base-content/60">
+                      Posted {new Date(announcement.createdAt).toLocaleDateString()} at {new Date(announcement.createdAt).toLocaleTimeString()}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      className="btn btn-xs md:btn-sm btn-outline"
+                      onClick={() => onEditAnnouncement(announcement)}
+                    >
+                      <Edit className="w-3 h-3 md:w-4 md:h-4" />
+                      <span className="text-xs md:text-sm">Edit</span>
+                    </button>
+                    <button
+                      className="btn btn-xs md:btn-sm btn-error btn-outline"
+                      onClick={() => setDeleteModal({ type: 'announcements', id: announcement._id, name: announcement.title })}
+                    >
+                      <Trash2 className="w-3 h-3 md:w-4 md:h-4" />
+                      <span className="text-xs md:text-sm">Delete</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+
+// Follow Leaderboard View
+function FollowLeaderboardView({ leaderboard, limit, setLimit, onRefresh, loading }) {
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="card bg-base-100 shadow">
+        <div className="card-body p-4 md:p-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h2 className="text-base md:text-lg font-semibold">Follow Leaderboard</h2>
+              <p className="text-sm text-base-content/60">Top users by follower count</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <select
+                className="select select-bordered select-sm"
+                value={limit}
+                onChange={(e) => setLimit(Number(e.target.value))}
+              >
+                <option value={10}>Top 10</option>
+                <option value={25}>Top 25</option>
+                <option value={50}>Top 50</option>
+                <option value={100}>Top 100</option>
+              </select>
+              <button className="btn btn-sm btn-outline" onClick={onRefresh}>
+                Refresh
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Leaderboard */}
+      <div className="card bg-base-100 shadow">
+        <div className="card-body p-0">
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <span className="loading loading-spinner loading-lg"></span>
+            </div>
+          ) : leaderboard.length === 0 ? (
+            <div className="text-center py-12 text-base-content/60">
+              <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p>No users found</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="table table-zebra">
+                <thead>
+                  <tr>
+                    <th className="text-xs md:text-sm">Rank</th>
+                    <th className="text-xs md:text-sm">User</th>
+                    <th className="text-xs md:text-sm">Email</th>
+                    <th className="text-xs md:text-sm">Username</th>
+                    <th className="text-xs md:text-sm text-right">Followers</th>
+                    <th className="text-xs md:text-sm text-right">Following</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {leaderboard.map((user, index) => (
+                    <tr key={user._id} className="hover">
+                      <td className="font-semibold">
+                        <div className="flex items-center gap-2">
+                          {index === 0 && <span className="text-2xl">🥇</span>}
+                          {index === 1 && <span className="text-2xl">🥈</span>}
+                          {index === 2 && <span className="text-2xl">🥉</span>}
+                          {index > 2 && <span className="text-base-content/60">#{index + 1}</span>}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="flex items-center gap-3">
+                          <Avatar
+                            src={user.profilePic}
+                            name={user.fullName}
+                            alt={user.fullName}
+                            size="w-10 h-10"
+                          />
+                          <div>
+                            <div className="font-semibold text-sm">{user.fullName}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="text-xs md:text-sm text-base-content/70">{user.email}</td>
+                      <td className="text-xs md:text-sm">
+                        <span className="badge badge-ghost badge-sm">@{user.username}</span>
+                      </td>
+                      <td className="text-right">
+                        <span className="badge badge-primary badge-lg font-semibold">
+                          {user.followersCount}
+                        </span>
+                      </td>
+                      <td className="text-right">
+                        <span className="badge badge-ghost badge-lg">
+                          {user.followingCount}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Stats Summary */}
+      {leaderboard.length > 0 && (
+        <div className="card bg-base-100 shadow">
+          <div className="card-body p-4 md:p-6">
+            <h3 className="font-semibold mb-3">Summary</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="stat bg-base-200 rounded-lg p-3">
+                <div className="stat-title text-xs">Total Users</div>
+                <div className="stat-value text-lg">{leaderboard.length}</div>
+              </div>
+              <div className="stat bg-base-200 rounded-lg p-3">
+                <div className="stat-title text-xs">Total Followers</div>
+                <div className="stat-value text-lg">
+                  {leaderboard.reduce((sum, u) => sum + u.followersCount, 0)}
+                </div>
+              </div>
+              <div className="stat bg-base-200 rounded-lg p-3">
+                <div className="stat-title text-xs">Avg Followers</div>
+                <div className="stat-value text-lg">
+                  {Math.round(leaderboard.reduce((sum, u) => sum + u.followersCount, 0) / leaderboard.length)}
+                </div>
+              </div>
+              <div className="stat bg-base-200 rounded-lg p-3">
+                <div className="stat-title text-xs">Top User</div>
+                <div className="stat-value text-lg text-primary">
+                  {leaderboard[0]?.followersCount || 0}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

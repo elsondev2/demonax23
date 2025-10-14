@@ -207,6 +207,25 @@ export const deleteUser = async (req, res) => {
     const { id } = req.params;
     const user = await User.findByIdAndDelete(id);
     if (!user) return res.status(404).json({ message: "User not found" });
+    
+    // Delete all posts created by this user
+    try {
+      const Post = (await import('../models/Post.js')).default;
+      const deletedPosts = await Post.deleteMany({ postedBy: id });
+      console.log(`Deleted ${deletedPosts.deletedCount} posts from user ${id}`);
+    } catch (postErr) {
+      console.error('Failed to delete user posts:', postErr);
+    }
+    
+    // Delete all statuses created by this user
+    try {
+      const Status = (await import('../models/Status.js')).default;
+      const deletedStatuses = await Status.deleteMany({ userId: id });
+      console.log(`Deleted ${deletedStatuses.deletedCount} statuses from user ${id}`);
+    } catch (statusErr) {
+      console.error('Failed to delete user statuses:', statusErr);
+    }
+    
     res.json({ message: 'User deleted successfully' });
     cacheInvalidate('admin:');
   } catch (e) {
@@ -753,5 +772,168 @@ export const deleteReply = async (req, res) => {
     cacheInvalidate('admin:');
   } catch (e) {
     res.status(500).json({ message: "Failed to delete reply" });
+  }
+};
+
+// Community Groups Management
+export const listCommunityGroups = async (req, res) => {
+  try {
+    const groups = await Group.find({ isCommunity: true })
+      .populate('createdBy', 'fullName email profilePic')
+      .populate('members', 'fullName email profilePic')
+      .sort({ createdAt: -1 });
+    
+    res.json(groups);
+  } catch (e) {
+    console.error('Error listing community groups:', e);
+    res.status(500).json({ message: "Failed to fetch community groups" });
+  }
+};
+
+export const createCommunityGroup = async (req, res) => {
+  try {
+    const { name, description, groupPic } = req.body;
+    
+    if (!name || !name.trim()) {
+      return res.status(400).json({ message: "Group name is required" });
+    }
+
+    // Check if community group with same name exists
+    const existingGroup = await Group.findOne({ 
+      name: name.trim(), 
+      isCommunity: true 
+    });
+    
+    if (existingGroup) {
+      return res.status(400).json({ message: "A community group with this name already exists" });
+    }
+
+    const newGroup = await Group.create({
+      name: name.trim(),
+      description: description?.trim() || '',
+      groupPic: groupPic || null,
+      isCommunity: true,
+      createdBy: req.user._id,
+      members: [req.user._id],
+      admin: req.user._id,
+      admins: [req.user._id]
+    });
+
+    await newGroup.populate('createdBy', 'fullName email profilePic');
+    await newGroup.populate('members', 'fullName email profilePic');
+
+    res.status(201).json(newGroup);
+    cacheInvalidate('admin:');
+  } catch (e) {
+    console.error('Error creating community group:', e);
+    res.status(500).json({ message: "Failed to create community group" });
+  }
+};
+
+export const updateCommunityGroup = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description, groupPic } = req.body;
+    
+    const group = await Group.findOne({ _id: id, isCommunity: true });
+    if (!group) {
+      return res.status(404).json({ message: "Community group not found" });
+    }
+
+    // Check if name is being changed and if it conflicts with another community group
+    if (name && name.trim() !== group.name) {
+      const existingGroup = await Group.findOne({ 
+        name: name.trim(), 
+        isCommunity: true,
+        _id: { $ne: id }
+      });
+      
+      if (existingGroup) {
+        return res.status(400).json({ message: "A community group with this name already exists" });
+      }
+      group.name = name.trim();
+    }
+
+    if (description !== undefined) {
+      group.description = description?.trim() || '';
+    }
+
+    if (groupPic !== undefined) {
+      group.groupPic = groupPic;
+    }
+
+    await group.save();
+    await group.populate('createdBy', 'fullName email profilePic');
+    await group.populate('members', 'fullName email profilePic');
+
+    res.json(group);
+    cacheInvalidate('admin:');
+  } catch (e) {
+    console.error('Error updating community group:', e);
+    res.status(500).json({ message: "Failed to update community group" });
+  }
+};
+
+export const deleteCommunityGroup = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const group = await Group.findOne({ _id: id, isCommunity: true });
+    if (!group) {
+      return res.status(404).json({ message: "Community group not found" });
+    }
+
+    // Delete group picture from storage if exists
+    if (group.groupPic) {
+      try {
+        await removeFromSupabase(group.groupPic);
+      } catch (err) {
+        console.error('Error removing group picture:', err);
+      }
+    }
+
+    // Delete all messages in this group
+    await Message.deleteMany({ groupId: id });
+
+    // Delete the group
+    await Group.findByIdAndDelete(id);
+
+    res.json({ message: 'Community group deleted successfully' });
+    cacheInvalidate('admin:');
+  } catch (e) {
+    console.error('Error deleting community group:', e);
+    res.status(500).json({ message: "Failed to delete community group" });
+  }
+};
+
+// Follow Leaderboard
+export const getFollowLeaderboard = async (req, res) => {
+  try {
+    const { limit = 50 } = req.query;
+    
+    // Get users sorted by follower count
+    const users = await User.find({})
+      .select('fullName email username profilePic followers following')
+      .sort({ 'followers': -1 })
+      .limit(parseInt(limit));
+
+    // Map to include counts
+    const leaderboard = users.map(user => ({
+      _id: user._id,
+      fullName: user.fullName,
+      email: user.email,
+      username: user.username,
+      profilePic: user.profilePic,
+      followersCount: user.followers.length,
+      followingCount: user.following.length,
+    }));
+
+    // Sort by followers count descending
+    leaderboard.sort((a, b) => b.followersCount - a.followersCount);
+
+    res.json(leaderboard);
+  } catch (e) {
+    console.error('Error getting follow leaderboard:', e);
+    res.status(500).json({ message: "Failed to fetch follow leaderboard" });
   }
 };

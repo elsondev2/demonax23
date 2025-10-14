@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAuthStore } from "../store/useAuthStore";
 import { MailIcon, LockIcon, EyeIcon, EyeOffIcon, ArrowRightIcon, UserIcon } from "lucide-react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import GoogleSignIn from "../components/GoogleSignIn";
 import AppLogo from "../components/AppLogo";
 import QuickThemeToggle from "../components/QuickThemeToggle";
@@ -11,10 +11,14 @@ function LoginPageNew() {
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const { login, isLoggingIn } = useAuthStore();
+  const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    login(formData);
+    const result = await login(formData);
+    if (result?.success) {
+      navigate("/chat");
+    }
   };
 
   return (
@@ -155,7 +159,7 @@ function LoginPageNew() {
             <div className="space-y-4">
               <div className="p-4 bg-base-200/30 rounded-2xl border border-base-300/30">
                 <div className="flex justify-center">
-                  <GoogleSignIn />
+                  <GoogleSignIn onSuccess={() => navigate("/chat")} />
                 </div>
               </div>
             </div>

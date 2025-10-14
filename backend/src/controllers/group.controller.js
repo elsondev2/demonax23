@@ -11,7 +11,7 @@ export const createGroup = async (req, res) => {
     const { name, description, members, groupPic, admin: adminFromClient } = req.body;
     let admin = req.user._id;
     // Allow creator to set a different admin among selected members
-    if (adminFromClient && Array.isArray(members) && members.map(m=>m.toString()).includes(adminFromClient.toString())) {
+    if (adminFromClient && Array.isArray(members) && members.map(m => m.toString()).includes(adminFromClient.toString())) {
       admin = adminFromClient;
     }
 
@@ -188,7 +188,7 @@ export const getGroups = async (req, res) => {
         .sort({ createdAt: -1 })
         .populate("senderId", "fullName profilePic"); // Populate sender info
       const unreadCount = await Message.countDocuments({ groupId: group._id, readBy: { $nin: [userId] } });
-      
+
       return {
         ...group.toObject(),
         lastMessage: lastMessage?.text || null,
@@ -242,12 +242,12 @@ export const updateGroup = async (req, res) => {
       if (validMembers.length !== members.length) {
         return res.status(400).json({ message: "Some members do not exist" });
       }
-      
+
       // Ensure admin is part of the group
       if (!members.includes(userId.toString())) {
         members.push(userId.toString());
       }
-      
+
       group.members = members;
     }
 
@@ -370,6 +370,77 @@ export const leaveGroup = async (req, res) => {
     res.status(200).json({ message: "Left group successfully" });
   } catch (error) {
     console.log("Error in leaveGroup controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Community Groups
+export const getCommunityGroups = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    // Find all community groups
+    let groups = await Group.find({ isCommunity: true })
+      .populate("members admin createdBy", "fullName profilePic")
+      .sort({ createdAt: -1 });
+
+    // For each group, get the last message and unread count
+    groups = await Promise.all(groups.map(async (group) => {
+      const lastMessage = await Message.findOne({ groupId: group._id })
+        .sort({ createdAt: -1 })
+        .populate("senderId", "fullName profilePic");
+      const unreadCount = await Message.countDocuments({ groupId: group._id, readBy: { $nin: [userId] } });
+      const isMember = group.members.some(m => m._id.toString() === userId.toString());
+
+      return {
+        ...group.toObject(),
+        lastMessage: lastMessage?.text || null,
+        lastMessageTime: lastMessage?.createdAt || null,
+        lastMessageSenderId: lastMessage?.senderId || null,
+        unreadCount,
+        isMember,
+      };
+    }));
+
+    res.status(200).json(groups);
+  } catch (error) {
+    console.log("Error in getCommunityGroups controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const joinCommunityGroup = async (req, res) => {
+  try {
+    const { id: groupId } = req.params;
+    const userId = req.user._id;
+
+    const group = await Group.findOne({ _id: groupId, isCommunity: true });
+
+    if (!group) {
+      return res.status(404).json({ message: "Community group not found" });
+    }
+
+    // Check if user is already a member
+    if (group.members.includes(userId)) {
+      return res.status(400).json({ message: "You are already a member of this group" });
+    }
+
+    // Add user to members
+    group.members.push(userId);
+    await group.save();
+    await group.populate("members admin createdBy", "fullName profilePic");
+
+    // Notify all group members about the new member
+    group.members.forEach(member => {
+      const memberSocketId = getReceiverSocketId(member._id.toString());
+      if (memberSocketId) {
+        io.to(memberSocketId).emit("groupUpdated", group);
+      }
+    });
+
+    res.status(200).json(group);
+  } catch (error) {
+    console.log("Error in joinCommunityGroup controller: ", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };

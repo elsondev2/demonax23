@@ -5,8 +5,10 @@ import { useAuthStore } from "./useAuthStore";
 
 const useGroupStore = create((set, get) => ({
   groups: [],
+  communityGroups: [],
   selectedGroup: null,
   isGroupsLoading: false,
+  isCommunityGroupsLoading: false,
   isGroupMessagesLoading: false,
 
   setSelectedGroup: (group) => set({ selectedGroup: group }),
@@ -32,6 +34,32 @@ const useGroupStore = create((set, get) => ({
       toast.error(error.response?.data?.message || "Failed to fetch groups");
     } finally {
       set({ isGroupsLoading: false });
+    }
+  },
+
+  getCommunityGroups: async () => {
+    set({ isCommunityGroupsLoading: true });
+    try {
+      const res = await axiosInstance.get("/api/groups/community");
+      set({ communityGroups: res.data });
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to fetch community groups");
+    } finally {
+      set({ isCommunityGroupsLoading: false });
+    }
+  },
+
+  joinCommunityGroup: async (groupId) => {
+    try {
+      const res = await axiosInstance.post(`/api/groups/${groupId}/join`);
+      // Refresh community groups and regular groups
+      await get().getCommunityGroups();
+      await get().getGroups();
+      toast.success("Joined community group successfully");
+      return res.data;
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to join community group");
+      throw error;
     }
   },
 
@@ -134,31 +162,15 @@ const useGroupStore = create((set, get) => ({
       return;
     }
 
-    socket.on("newGroupMessage", (newMessage) => {
-      const { selectedGroup } = get();
-      const { authUser } = useAuthStore.getState();
-      const isFromMe = ((newMessage?.senderId?._id || newMessage?.senderId) === authUser?._id);
-
-      // Update groups collection: last message preview/time/sender and unread count when appropriate
-      set((state) => ({
-        groups: state.groups.map((group) => {
-          if (group._id !== (newMessage.groupId?._id || newMessage.groupId)) return group;
-          const preview = newMessage.text || (newMessage.audio ? '🎤 Voice message' : (Array.isArray(newMessage.attachments) && newMessage.attachments.length>0 ? '📎 Attachment' : newMessage.image ? '🖼 Photo' : ''));
-          const shouldIncUnread = !isFromMe && (!selectedGroup || selectedGroup._id !== group._id);
-          return {
-            ...group,
-            lastMessage: preview || group.lastMessage,
-            lastMessageTime: newMessage.createdAt || group.lastMessageTime,
-            lastMessageSenderId: newMessage.senderId || group.lastMessageSenderId,
-            unreadCount: shouldIncUnread ? ((group.unreadCount || 0) + 1) : group.unreadCount,
-          };
-        })
-      }));
-    });
+    // NOTE: newGroupMessage is handled by useChatStore to avoid duplicate subscriptions
+    // This store only handles group metadata updates
 
     socket.on("groupUpdated", (updatedGroup) => {
       set((state) => ({
         groups: state.groups.map((group) =>
+          group._id === updatedGroup._id ? updatedGroup : group
+        ),
+        communityGroups: state.communityGroups.map((group) =>
           group._id === updatedGroup._id ? updatedGroup : group
         ),
         selectedGroup:
@@ -171,6 +183,7 @@ const useGroupStore = create((set, get) => ({
     socket.on("groupDeleted", (groupId) => {
       set((state) => ({
         groups: state.groups.filter((group) => group._id !== groupId),
+        communityGroups: state.communityGroups.filter((group) => group._id !== groupId),
         selectedGroup:
           state.selectedGroup && state.selectedGroup._id === groupId
             ? null
@@ -197,7 +210,7 @@ const useGroupStore = create((set, get) => ({
   unsubscribeFromGroupMessages: () => {
     const socket = useAuthStore.getState().socket;
     if (socket) {
-      socket.off("newGroupMessage");
+      // NOTE: newGroupMessage is handled by useChatStore, don't unsubscribe here
       socket.off("groupUpdated");
       socket.off("groupDeleted");
       socket.off("userLeftGroup");

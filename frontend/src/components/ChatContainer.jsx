@@ -52,7 +52,7 @@ function ChatContainer() {
   const [newMessageCount, setNewMessageCount] = useState(0);
 
   // Message rendering diagnostics
-  const { renderingStats, forceCheck } = useMessageRenderingDiagnostics(messagesContainerRef);
+  const {  forceCheck } = useMessageRenderingDiagnostics(messagesContainerRef);
 
   // Check socket connection periodically (reduced frequency)
   useEffect(() => {
@@ -83,9 +83,9 @@ function ChatContainer() {
     setHasInteractedWithInput(false);
     hasScrolledToTodayRef.current = false;
 
-    console.log('ChatContainer: Selected chat changed:', { 
-      selectedUserId, 
-      selectedGroupId 
+    console.log('ChatContainer: Selected chat changed:', {
+      selectedUserId,
+      selectedGroupId
     });
 
     const loadMessages = async () => {
@@ -93,17 +93,17 @@ function ChatContainer() {
         if (selectedUserId) {
           console.log('Loading messages for user:', selectedUserId);
           await getMessagesByUserId(selectedUserId, 1, 50);
-          // Scroll to latest message after loading
-          setTimeout(() => { 
-            messageEndRef.current?.scrollIntoView({ behavior: "auto" }); 
-          }, 100);
+          // Scroll to latest message instantly after loading
+          requestAnimationFrame(() => {
+            messageEndRef.current?.scrollIntoView({ behavior: "instant", block: "end" });
+          });
         } else if (selectedGroupId) {
           console.log('Loading messages for group:', selectedGroupId);
           await getGroupMessages(selectedGroupId, 1, 50);
-          // Scroll to latest message after loading
-          setTimeout(() => { 
-            messageEndRef.current?.scrollIntoView({ behavior: "auto" }); 
-          }, 100);
+          // Scroll to latest message instantly after loading
+          requestAnimationFrame(() => {
+            messageEndRef.current?.scrollIntoView({ behavior: "instant", block: "end" });
+          });
         }
       } catch (error) {
         console.error('Failed to load messages in ChatContainer:', error);
@@ -117,7 +117,7 @@ function ChatContainer() {
   }, [selectedUserId, selectedGroupId, getMessagesByUserId, getGroupMessages]);
 
   // Enhanced loading states for better UX
-  
+
   const showMessages = !isMessagesLoading && messages.length > 0;
 
   // Auto-detect message loss after messages are loaded
@@ -144,14 +144,16 @@ function ChatContainer() {
       };
     }
   }, [isMessagesLoading, selectedUserId, selectedGroupId, detectAndRecoverMessageLoss, forceCheck]);
-  
+
 
   useEffect(() => {
     if (!messagesContainerRef.current) return;
 
     if (previousMessageCountRef.current === 0 && messages.length > 0) {
-      // initial load: jump to bottom
-      setTimeout(() => { messageEndRef.current?.scrollIntoView({ behavior: "auto" }); }, 50);
+      // initial load: jump to bottom instantly
+      requestAnimationFrame(() => {
+        messageEndRef.current?.scrollIntoView({ behavior: "instant", block: "end" });
+      });
     } else if (messages.length > previousMessageCountRef.current && previousMessageCountRef.current > 0) {
       // new message received: smart auto-scroll logic
       const lastMessage = messages[messages.length - 1];
@@ -274,7 +276,7 @@ function ChatContainer() {
 
     // Use all messages for rendering
     const arr = messages;
-     // Disable today-specific logic since we're showing all messages
+    // Disable today-specific logic since we're showing all messages
 
     // Compute unread boundary using chat unreadCount
     let unreadCount = 0;
@@ -320,8 +322,11 @@ function ChatContainer() {
 
       // Mark the very first message in the conversation
       const isTodayFirstMsg = i === 0;
+      
+      // Mark if message is unread
+      const isUnread = showUnreadSeparator && i >= firstUnreadIndex;
 
-      items.push({ type: 'message', message: m, groupPosition: pos, isTodayFirst: isTodayFirstMsg });
+      items.push({ type: 'message', message: m, groupPosition: pos, isTodayFirst: isTodayFirstMsg, isUnread });
     }
     return items;
   };
@@ -410,6 +415,7 @@ function ChatContainer() {
                   onUserClick={handleUserClick}
                   onQuote={handleQuote}
                   groupPosition={it.groupPosition}
+                  isUnread={it.isUnread}
                   showNameTag
                 />
               )

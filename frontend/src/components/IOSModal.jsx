@@ -143,7 +143,7 @@ const IOSModal = ({ isOpen, onClose, children, className = "" }) => {
   if (!isMobile) {
     return createPortal(
       <div
-        className={`fixed inset-0 z-50 flex items-center justify-center transition-all duration-500 ease-out ${isAnimating && !isClosing ? 'bg-black/50 backdrop-blur-sm' : 'bg-black/0 backdrop-blur-none'
+        className={`fixed inset-0 z-[60] flex items-center justify-center transition-all duration-500 ease-out ${isAnimating && !isClosing ? 'bg-black/50 backdrop-blur-sm' : 'bg-black/0 backdrop-blur-none'
           }`}
         onClick={handleBackdropClick}
         style={{
@@ -173,7 +173,7 @@ const IOSModal = ({ isOpen, onClose, children, className = "" }) => {
   // On mobile, use iOS-style slide up animation
   return createPortal(
     <div
-      className={`fixed inset-0 z-50 flex items-end justify-center transition-all duration-300 ${isAnimating ? 'bg-black/50 backdrop-blur-sm' : 'bg-transparent'
+      className={`fixed inset-0 z-[60] flex items-end justify-center transition-all duration-300 ${isAnimating ? 'bg-black/50 backdrop-blur-sm' : 'bg-transparent'
         }`}
       onClick={handleBackdropClick}
     >

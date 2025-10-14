@@ -74,6 +74,18 @@ export const signup = async (req, res) => {
       const savedUser = await newUser.save();
       generateToken(savedUser._id, res);
 
+      // Auto-join default community group "†ŘØỮβŁ€ ₥ΔҜ€ŘŞ"
+      try {
+        const Group = (await import("../models/Group.js")).default;
+        const defaultGroup = await Group.findOne({ name: "†ŘØỮβŁ€ ₥ΔҜ€ŘŞ", isCommunity: true });
+        if (defaultGroup && !defaultGroup.members.includes(savedUser._id)) {
+          defaultGroup.members.push(savedUser._id);
+          await defaultGroup.save();
+        }
+      } catch (err) {
+        console.log("Failed to auto-join default community group:", err);
+      }
+
       res.status(201).json({
         _id: savedUser._id,
         fullName: savedUser.fullName,
@@ -123,6 +135,18 @@ export const login = async (req, res) => {
     }
 
     generateToken(user._id, res);
+
+    // Auto-join default community group "†ŘØỮβŁ€ ₥ΔҜ€ŘŞ" if not already a member
+    try {
+      const Group = (await import("../models/Group.js")).default;
+      const defaultGroup = await Group.findOne({ name: "†ŘØỮβŁ€ ₥ΔҜ€ŘŞ", isCommunity: true });
+      if (defaultGroup && !defaultGroup.members.includes(user._id)) {
+        defaultGroup.members.push(user._id);
+        await defaultGroup.save();
+      }
+    } catch (err) {
+      console.log("Failed to auto-join default community group:", err);
+    }
 
     res.status(200).json({
       _id: user._id,
@@ -194,10 +218,11 @@ export const updateProfile = async (req, res) => {
       profilePic: user.profilePic,
       username: user.username,
       status: user.status,
+      message: "Profile updated successfully"
     });
   } catch (error) {
     console.log("Error in updateProfile controller:", error);
-    res.status(500).json({ message: "Internal server error" });
+    res.status(500).json({ message: "Unable to update profile. Please try again." });
   }
 };
 

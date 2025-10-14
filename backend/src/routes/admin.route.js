@@ -1,11 +1,11 @@
 import express from "express";
 import { protectRoute } from "../middleware/auth.middleware.js";
 import { requireAdmin } from "../middleware/admin.middleware.js";
-import { 
-  adminLogin, 
-  getOverview, 
-  listUsers, 
-  updateUser, 
+import {
+  adminLogin,
+  getOverview,
+  listUsers,
+  updateUser,
   deleteUser,
   listMessages,
   deleteMessage,
@@ -24,7 +24,12 @@ import {
   listPosts,
   deletePost,
   deleteComment,
-  deleteReply
+  deleteReply,
+  listCommunityGroups,
+  createCommunityGroup,
+  updateCommunityGroup,
+  deleteCommunityGroup,
+  getFollowLeaderboard
 } from "../controllers/admin.controller.js";
 
 const router = express.Router();
@@ -67,5 +72,14 @@ router.get("/posts", protectRoute, requireAdmin, listPosts);
 router.delete("/posts/:id", protectRoute, requireAdmin, deletePost);
 router.delete("/posts/:postId/comments/:commentId", protectRoute, requireAdmin, deleteComment);
 router.delete("/posts/:postId/comments/:commentId/replies/:replyId", protectRoute, requireAdmin, deleteReply);
+
+// Community Groups Management
+router.get("/community-groups", protectRoute, requireAdmin, listCommunityGroups);
+router.post("/community-groups", protectRoute, requireAdmin, createCommunityGroup);
+router.patch("/community-groups/:id", protectRoute, requireAdmin, updateCommunityGroup);
+router.delete("/community-groups/:id", protectRoute, requireAdmin, deleteCommunityGroup);
+
+// Follow Leaderboard
+router.get("/follow-leaderboard", protectRoute, requireAdmin, getFollowLeaderboard);
 
 export default router;

@@ -20,3 +20,20 @@ export const protectRoute = async (req, res, next) => {
     res.status(500).json({ message: "Internal server error" });
   }
 };
+
+export const adminRoute = async (req, res, next) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ message: "Unauthorized - No user found" });
+    }
+    
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: "Forbidden - Admin access required" });
+    }
+    
+    next();
+  } catch (error) {
+    console.log("Error in adminRoute middleware:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};

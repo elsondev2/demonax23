@@ -1,0 +1,114 @@
+TEXT INPUT STYLING GUIDE
+========================
+
+PROBLEM SOLVED
+--------------
+Text inputs looked like dark images in desktop view.
+Now they have a clean, professional appearance.
+
+NEW STANDARD INPUT CLASSES
+---------------------------
+
+For ALL text inputs:
+  input input-bordered 
+  bg-base-100 
+  focus:bg-base-100 
+  focus:outline-none 
+  focus:ring-2 
+  focus:ring-primary/20 
+  focus:border-primary
+
+For ALL textareas:
+  textarea textarea-bordered 
+  bg-base-100 
+  focus:bg-base-100 
+  focus:outline-none 
+  focus:ring-2 
+  focus:ring-primary/20 
+  focus:border-primary 
+  resize-none
+
+For ALL select dropdowns:
+  select select-bordered 
+  bg-base-100 
+  focus:bg-base-100 
+  focus:outline-none 
+  focus:ring-2 
+  focus:ring-primary/20 
+  focus:border-primary
+
+For ALL labels:
+  label-text font-semibold
+
+VISUAL APPEARANCE
+-----------------
+
+Normal State:
+┌─────────────────────────────────┐
+│ Clean white/base background     │
+│ Subtle border                   │
+│ Readable text                   │
+└─────────────────────────────────┘
+
+Focus State:
+┌═════════════════════════════════┐ ← Blue ring (2px)
+║ ┌─────────────────────────────┐ ║
+║ │ Clean white/base background │ ║
+║ │ Primary color border        │ ║
+║ │ Cursor blinking             │ ║
+║ └─────────────────────────────┘ ║
+└═════════════════════════════════┘
+
+APPS VIEW REDESIGN
+==================
+
+OLD DESIGN (Colorful):
+┌──────────────────┐
+│ 🟢 Spotify       │ ← Green gradient
+│ Listen to music  │
+│ [Coming Soon]    │
+└──────────────────┘
+
+NEW DESIGN (Professional):
+┌──────────────────┐
+│ ⚪ Spotify       │ ← Neutral gray
+│ Listen to music  │
+│ [Coming Soon]    │
+└──────────────────┘
+
+COLOR CHANGES
+-------------
+Before: Bright gradients (green, red, blue)
+After:  Neutral bg-base-300 with base-content icons
+
+UPDATED FILES
+=============
+✅ frontend/src/components/DonateView.jsx
+✅ frontend/src/components/AppsView.jsx
+✅ frontend/src/pages/AdminPage.jsx
+
+QUICK REFERENCE
+===============
+
+Copy this for new inputs:
+
+<input
+  type="text"
+  className="input input-bordered bg-base-100 focus:bg-base-100 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+  placeholder="Enter text..."
+/>
+
+<textarea
+  className="textarea textarea-bordered bg-base-100 focus:bg-base-100 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
+  placeholder="Enter text..."
+></textarea>
+
+<select
+  className="select select-bordered bg-base-100 focus:bg-base-100 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+>
+  <option>Option 1</option>
+</select>
+
+<label className="label">
+  <span className="label-text font-semibold">Label Text</span>
+</label>

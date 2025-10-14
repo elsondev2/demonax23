@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAuthStore } from "../store/useAuthStore";
 import { UserIcon, AtSignIcon, MailIcon, LockIcon, EyeIcon, EyeOffIcon, ArrowRightIcon, CameraIcon } from "lucide-react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import GoogleSignIn from "../components/GoogleSignIn";
 import Avatar from "../components/Avatar";
 import AppLogo from "../components/AppLogo";
@@ -21,6 +21,7 @@ function SignUpPageNew() {
   const [currentStep, setCurrentStep] = useState(1);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const { signup, isSigningUp } = useAuthStore();
+  const navigate = useNavigate();
 
   const handleImageSelect = (e) => {
     const file = e.target.files[0];
@@ -61,6 +62,7 @@ function SignUpPageNew() {
     });
 
     // Try both FormData and JSON approaches
+    let result;
     if (formData.profilePic) {
       // Use FormData for file upload
       const submitData = new FormData();
@@ -71,7 +73,7 @@ function SignUpPageNew() {
       submitData.append('profilePic', formData.profilePic);
 
       console.log('Using FormData with file upload');
-      const result = await signup(submitData);
+      result = await signup(submitData);
       console.log('Signup result:', result);
     } else {
       // Use JSON for no file upload
@@ -83,11 +85,13 @@ function SignUpPageNew() {
       };
 
       console.log('Using JSON without file upload');
-      const result = await signup(submitData);
+      result = await signup(submitData);
       console.log('Signup result:', result);
     }
 
-
+    if (result?.success) {
+      navigate("/chat");
+    }
   };
 
   const nextStep = () => {
@@ -285,6 +289,8 @@ function SignUpPageNew() {
                             setPreviewUrl(claims.picture);
                           }
                         } catch { /* empty */ }
+                        // Navigate to chat after successful Google sign up
+                        navigate("/chat");
                       }} />
                     </div>
                   </div>

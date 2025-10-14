@@ -3,7 +3,7 @@ import { useChatStore } from "../store/useChatStore";
 import { useCallStore } from "../store/useCallStore";
 import { useEffect, useState } from "react";
 import { useAuthStore } from "../store/useAuthStore";
-import { generateAvatarSVG } from "../lib/avatarUtils";
+
 import Avatar from "./Avatar";
 
 function ChatHeader({ onGroupInfoClick, onUserInfoClick }) {
@@ -45,7 +45,7 @@ function ChatHeader({ onGroupInfoClick, onUserInfoClick }) {
 
   // Get display information
   const getDisplayName = () => {
-    if (selectedUser) return selectedUser.fullName;
+    if (selectedUser) return selectedUser.fullName || 'Deleted User';
     if (selectedGroup) return selectedGroup.name;
     return "";
   };

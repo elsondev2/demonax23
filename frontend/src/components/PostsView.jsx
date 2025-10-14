@@ -8,6 +8,7 @@ import { useChatStore } from "../store/useChatStore";
 import { ChevronRight, ChevronLeft, Download, FileIcon, ImageIcon, Plus, Search, Trash2, X, Menu, Heart, MessageCircle, Eye, ChevronDown, ChevronUp, Edit2, MoreVertical } from "lucide-react";
 import IOSModal from "./IOSModal";
 import Avatar from "./Avatar";
+import FollowButton from "./FollowButton";
 
 function PostsBackground() {
   const { chatBackground } = useChatStore();
@@ -1184,9 +1185,10 @@ export default function PostsView() {
 
         const res = await axiosInstance.get(`/api/posts/feed?${params.toString()}`);
         clearInterval(progressInterval);
-        setLoadingProgress(90);
 
         if (!cancelled) {
+          setLoadingProgress(90);
+
           // Cache the posts
           const newCachedPosts = new Map(cachedPosts);
           res.data.forEach(post => {
@@ -1197,12 +1199,14 @@ export default function PostsView() {
           setFeed(prev => skip === 0 ? res.data : [...prev, ...res.data]);
           setHasMore(res.data.length === limit);
 
+          // Complete the progress
+          setLoadingProgress(100);
+
           // Preload next 5 posts in background
           if (res.data.length > 0) {
             preloadNextPosts(skip + limit);
           }
 
-          setLoadingProgress(100);
           setTimeout(() => setLoadingProgress(0), 500);
         }
       } catch (e) {
@@ -1581,6 +1585,7 @@ export default function PostsView() {
                     loading="lazy"
                   />
                   <div className="text-sm font-medium truncate">{post.postedBy?.fullName || 'User'}</div>
+                  <FollowButton userId={post.postedBy?._id} size="xs" className="ml-2" />
                   <div className="ml-auto text-xs text-base-content/60">{new Date(post.createdAt).toLocaleString([], { month: 'short', day: 'numeric' })}</div>
                 </div>
                 <div className="font-medium truncate">{post.title || 'Untitled'}</div>

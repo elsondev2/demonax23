@@ -1,0 +1,136 @@
+DARK INPUT STYLING - QUICK REFERENCE
+====================================
+
+NEW STANDARD (Matching Image Style)
+------------------------------------
+
+For ALL text inputs:
+  input input-bordered 
+  bg-base-300/50 
+  border-base-content/10 
+  focus:bg-base-300/70 
+  focus:outline-none 
+  focus:border-base-content/20 
+  placeholder:text-base-content/40
+
+For ALL textareas:
+  textarea textarea-bordered 
+  bg-base-300/50 
+  border-base-content/10 
+  focus:bg-base-300/70 
+  focus:outline-none 
+  focus:border-base-content/20 
+  placeholder:text-base-content/40 
+  resize-none
+
+For ALL select dropdowns:
+  select select-bordered 
+  bg-base-300/50 
+  border-base-content/10 
+  focus:bg-base-300/70 
+  focus:outline-none 
+  focus:border-base-content/20
+
+For ALL labels:
+  label-text 
+  font-semibold 
+  text-base-content/70
+
+VISUAL APPEARANCE
+-----------------
+
+Normal State:
+┌─────────────────────────────────┐
+│ Dark semi-transparent background│
+│ Subtle border (barely visible) │
+│ Muted placeholder text          │
+└─────────────────────────────────┘
+
+Focus State:
+┌─────────────────────────────────┐
+│ Slightly lighter background     │
+│ More visible border             │
+│ Active cursor                   │
+└─────────────────────────────────┘
+
+FOLLOW BUTTON PLACEMENT
+=======================
+
+PostsView (Next to username):
+[Avatar] Username [Follow] Date
+
+NoticeView Rankings (Next to stats):
+#1 [Avatar] Username    123 Followers [Follow] ↑
+
+Code Pattern:
+{user._id !== authUser?._id && (
+  <button className="btn btn-primary btn-xs">Follow</button>
+)}
+
+CONSISTENT CARD STYLING
+========================
+
+All Pages Use:
+  card bg-base-200 
+  border border-base-300 
+  hover:border-base-content/20 
+  shadow-sm 
+  hover:shadow-md 
+  transition-all
+
+COPY-PASTE TEMPLATES
+====================
+
+Text Input:
+<input
+  type="text"
+  className="input input-bordered bg-base-300/50 border-base-content/10 focus:bg-base-300/70 focus:outline-none focus:border-base-content/20 placeholder:text-base-content/40"
+  placeholder="Enter text..."
+/>
+
+Textarea:
+<textarea
+  className="textarea textarea-bordered bg-base-300/50 border-base-content/10 focus:bg-base-300/70 focus:outline-none focus:border-base-content/20 placeholder:text-base-content/40 resize-none"
+  placeholder="Enter text..."
+></textarea>
+
+Select:
+<select
+  className="select select-bordered bg-base-300/50 border-base-content/10 focus:bg-base-300/70 focus:outline-none focus:border-base-content/20"
+>
+  <option>Option 1</option>
+</select>
+
+Label:
+<label className="label">
+  <span className="label-text font-semibold text-base-content/70">Label Text</span>
+</label>
+
+Follow Button:
+{user._id !== authUser?._id && (
+  <button className="btn btn-primary btn-xs">Follow</button>
+)}
+
+Card:
+<div className="card bg-base-200 border border-base-300 hover:border-base-content/20 shadow-sm hover:shadow-md transition-all">
+  <div className="card-body p-5">
+    {/* Content */}
+  </div>
+</div>
+
+UPDATED FILES
+=============
+✅ PostsView.jsx - Follow button added
+✅ NoticeView.jsx - Follow button + consistent styling
+✅ DonateView.jsx - Dark inputs
+✅ AppsView.jsx - Dark inputs
+✅ AdminPage.jsx - Dark inputs
+
+COLOR BREAKDOWN
+===============
+bg-base-300/50     = Dark background at 50% opacity
+border-base-content/10 = Very subtle border
+focus:bg-base-300/70   = Slightly lighter on focus
+focus:border-base-content/20 = More visible border on focus
+placeholder:text-base-content/40 = Muted placeholder
+text-base-content/70 = Slightly dimmed label text

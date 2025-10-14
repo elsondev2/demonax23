@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { imageCache } from '../utils/imageCache';
 
 function Avatar({
   src,
@@ -13,6 +14,19 @@ function Avatar({
   loading = 'lazy'
 }) {
   const [imageError, setImageError] = useState(false);
+  const [, setImageLoaded] = useState(false);
+
+  // Preload image when src changes
+  useEffect(() => {
+    if (src && src !== '/avatar.png') {
+      setImageLoaded(false);
+      setImageError(false);
+      
+      imageCache.preload(src)
+        .then(() => setImageLoaded(true))
+        .catch(() => setImageError(true));
+    }
+  }, [src]);
 
   // Generate initials from name
   const getInitials = (fullName) => {

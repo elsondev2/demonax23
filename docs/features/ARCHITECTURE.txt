@@ -1,0 +1,101 @@
+THREE NEW FEATURES ARCHITECTURE
+================================
+
+USER INTERFACE (Frontend)
+│
+├── ChatsView (Sidebar)
+│   └── Three-Dot Menu Button (⋮)
+│       ├── Notice Board → /notices
+│       ├── Apps → /apps
+│       └── Donate → /donate
+│
+├── FEATURE 1: Notice Board (/notices)
+│   ├── NoticeView.jsx
+│   ├── Tabs:
+│   │   ├── Announcements Tab
+│   │   │   └── Display admin announcements
+│   │   └── Rankings Tab
+│   │       └── Display user rankings by followers
+│   └── API Calls:
+│       ├── GET /api/notices/announcements
+│       └── GET /api/notices/rankings
+│
+├── FEATURE 2: Apps (/apps)
+│   ├── AppsView.jsx
+│   ├── Template Apps:
+│   │   ├── Spotify (Coming Soon)
+│   │   ├── YouTube (Coming Soon)
+│   │   └── Discord (Coming Soon)
+│   └── Features:
+│       ├── View app cards
+│       ├── Request new apps
+│       └── Click to open (when active)
+│
+└── FEATURE 3: Donate (/donate)
+    ├── DonateView.jsx
+    ├── Tabs:
+    │   ├── Donate Tab
+    │   │   ├── Preset amounts
+    │   │   ├── Custom amount
+    │   │   └── Optional message
+    │   └── Request Feature Tab
+    │       ├── Submit feature requests
+    │       └── View popular requests
+    └── Status: Template (Payment integration pending)
+
+BACKEND API
+│
+├── Notice Board Routes (/api/notices)
+│   ├── GET /announcements (Protected)
+│   ├── POST /announcements (Admin Only)
+│   ├── DELETE /announcements/:id (Admin Only)
+│   └── GET /rankings (Protected)
+│
+├── Controllers (notices.controller.js)
+│   ├── getAnnouncements()
+│   ├── createAnnouncement()
+│   ├── deleteAnnouncement()
+│   └── getRankings()
+│
+└── Models
+    └── Announcement (announcement.model.js)
+        ├── title: String
+        ├── content: String
+        ├── priority: Enum (normal, high, urgent)
+        ├── createdBy: ObjectId (User)
+        └── timestamps: true
+
+ADMIN PANEL
+│
+└── Announcements Tab
+    ├── Create new announcements
+    ├── View all announcements
+    ├── Delete announcements
+    └── Set priority levels
+
+NAVIGATION FLOW
+│
+User clicks three-dot menu
+    ↓
+Menu opens with 3 options
+    ↓
+User selects feature
+    ↓
+Navigate to feature route
+    ↓
+Feature view loads
+    ↓
+API calls fetch data
+    ↓
+Display content to user
+
+MOBILE SUPPORT
+│
+├── Swipe Navigation
+│   ├── Swipe right: Open feature
+│   └── Swipe left: Return to sidebar
+│
+└── Responsive Design
+    ├── Touch-friendly buttons
+    ├── Mobile-optimized layouts
+    └── Proper overflow handling

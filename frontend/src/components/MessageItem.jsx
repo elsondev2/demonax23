@@ -1,18 +1,20 @@
 import { useState, useEffect, useRef } from "react";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
-import { AlertCircle, RotateCcw, Edit, Trash2, Quote, FileText, Play, Pause, Volume2 } from "lucide-react";
+import { AlertCircle, RotateCcw, Edit, Trash2, Quote, FileText, Play, Pause, Volume2, MoreVertical, Phone, Video } from "lucide-react";
 import useLongPress from "../hooks/useLongPress";
 
-const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selectedGroup, groupPosition }) => {
+const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selectedGroup, groupPosition, isUnread }) => {
   const { authUser } = useAuthStore();
   const { sendMessage } = useChatStore();
 
   const [showContextMenu, setShowContextMenu] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
   const messageRef = useRef(null);
+  const dropdownRef = useRef(null);
 
-  const senderId = typeof message.senderId === 'object' ? message.senderId._id : message.senderId;
-  const senderObj = typeof message.senderId === 'object' ? message.senderId : null;
+  const senderId = typeof message.senderId === 'object' && message.senderId ? message.senderId._id : message.senderId;
+  const senderObj = typeof message.senderId === 'object' && message.senderId ? message.senderId : null;
   const isOwnMessage = senderId === authUser?._id;
 
   // Get sender info
@@ -22,9 +24,13 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
     if (selectedUser) return { name: selectedUser.fullName, avatar: selectedUser.profilePic };
     if (selectedGroup && Array.isArray(selectedGroup.members)) {
       const member = selectedGroup.members.find(m => m._id === senderId);
-      return { name: member?.fullName || 'Unknown', avatar: member?.profilePic };
+      if (member) {
+        return { name: member.fullName, avatar: member.profilePic };
+      }
+      // If member not found in group, they might be deleted
+      return { name: 'Deleted User', avatar: null, isDeleted: true };
     }
-    return { name: 'Unknown', avatar: null };
+    return { name: 'Deleted User', avatar: null, isDeleted: true };
   };
 
   const senderInfo = getSenderInfo();
@@ -62,15 +68,31 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
     // when we get the response from the server
   };
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowDropdown(false);
+      }
+    };
+
+    if (showDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showDropdown]);
+
   const handleEditClick = (e) => {
     e.stopPropagation();
     setShowContextMenu(false);
+    setShowDropdown(false);
     onEdit(message);
   };
 
   const handleDeleteClick = (e) => {
     e.stopPropagation();
     setShowContextMenu(false);
+    setShowDropdown(false);
     onDelete(message._id);
   };
 
@@ -195,22 +217,19 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
     const progressPercentage = duration ? (currentTime / duration) * 100 : 0;
 
     return (
-      <div className={`flex items-center gap-2 p-3 rounded-lg max-w-sm w-full sm:max-w-xs ${
-        isOwnMessage
-          ? 'bg-primary/10 border border-primary/20'
-          : 'bg-base-300/30 border border-base-300/50'
-      }`}>
+      <div className={`flex items-center gap-2 p-3 rounded-lg max-w-sm w-full sm:max-w-xs ${isOwnMessage
+        ? 'bg-primary/10 border border-primary/20'
+        : 'bg-base-300/30 border border-base-300/50'
+        }`}>
         {/* Play/Pause Button */}
         <button
           onClick={togglePlayPause}
           disabled={isLoading}
-          className={`btn btn-circle flex-shrink-0 min-h-[44px] w-11 h-11 sm:w-10 sm:h-10 ${
-            isLoading ? 'opacity-50 cursor-not-allowed' : ''
-          } ${
-            isOwnMessage
+          className={`btn btn-circle flex-shrink-0 min-h-[44px] w-11 h-11 sm:w-10 sm:h-10 ${isLoading ? 'opacity-50 cursor-not-allowed' : ''
+            } ${isOwnMessage
               ? 'bg-primary hover:bg-primary/80 text-primary-content'
               : 'bg-base-content/10 hover:bg-base-content/20 text-base-content'
-          }`}
+            }`}
         >
           {isLoading ? (
             <div className="loading loading-spinner loading-xs" />
@@ -228,9 +247,8 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
             {waveformBars.map((height, i) => (
               <div
                 key={i}
-                className={`w-0.5 bg-current rounded-full transition-all duration-300 ${
-                  isOwnMessage ? 'text-primary/60' : 'text-base-content/40'
-                } ${isPlaying ? 'animate-pulse' : ''}`}
+                className={`w-0.5 bg-current rounded-full transition-all duration-300 ${isOwnMessage ? 'text-primary/60' : 'text-base-content/40'
+                  } ${isPlaying ? 'animate-pulse' : ''}`}
                 style={{
                   height: `${height}px`,
                   animationDelay: `${i * 100}ms`
@@ -242,25 +260,22 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
           {/* Progress Bar */}
           <div className="w-12 bg-base-300/50 rounded-full h-1 relative overflow-hidden">
             <div
-              className={`h-full rounded-full transition-all duration-200 ${
-                isOwnMessage ? 'bg-primary' : 'bg-base-content/60'
-              }`}
+              className={`h-full rounded-full transition-all duration-200 ${isOwnMessage ? 'bg-primary' : 'bg-base-content/60'
+                }`}
               style={{ width: `${progressPercentage}%` }}
             />
           </div>
 
           {/* Time Display */}
-          <div className={`text-xs font-mono min-w-[40px] text-center sm:min-w-[35px] ${
-            isOwnMessage ? 'text-primary-content/70' : 'text-base-content/60'
-          }`}>
+          <div className={`text-xs font-mono min-w-[40px] text-center sm:min-w-[35px] ${isOwnMessage ? 'text-primary-content/70' : 'text-base-content/60'
+            }`}>
             {formatTime(currentTime)} / {formatTime(duration)}
           </div>
         </div>
 
         {/* Audio Icon */}
-        <div className={`flex-shrink-0 ${
-          isOwnMessage ? 'text-primary-content/70' : 'text-base-content/60'
-        }`}>
+        <div className={`flex-shrink-0 ${isOwnMessage ? 'text-primary-content/70' : 'text-base-content/60'
+          }`}>
           <Volume2 className="w-4 h-4" />
         </div>
 
@@ -278,7 +293,7 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
   };
 
   return (
-    <div 
+    <div
       className={`px-4 py-1 ${showAvatar ? 'mt-2' : 'mt-0.5'} group relative message-item`}
       data-message-id={message._id}
       role="listitem"
@@ -303,17 +318,78 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
         {/* Message bubble */}
         <div
           ref={messageRef}
-          className={`max-w-[70%] min-w-[100px] rounded-lg px-3 py-2 relative ${isOwnMessage
-              ? 'bg-primary text-primary-content ml-auto'
+          className={`max-w-[70%] min-w-[100px] rounded-lg px-3 py-2 pr-9 relative group ${isOwnMessage
+            ? 'bg-primary text-primary-content ml-auto'
+            : isUnread && !isOwnMessage
+              ? 'bg-accent/30 text-base-content border-l-4 border-accent shadow-md'
               : 'bg-base-200 text-base-content'
             }`}
           {...longPressEvents}
         >
+          {/* Three-dot menu button - Always visible */}
+          <div className="absolute top-1 right-1" ref={dropdownRef}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowDropdown(!showDropdown);
+              }}
+              className={`btn btn-xs btn-circle btn-ghost min-h-0 h-6 w-6 transition-all ${isOwnMessage
+                ? 'text-primary-content/70 hover:text-primary-content hover:bg-white/25 hover:shadow-md active:bg-white/30'
+                : 'text-base-content/60 hover:text-base-content hover:bg-base-300 hover:shadow-sm active:bg-base-300/80'
+                }`}
+              title="Message options"
+            >
+              <MoreVertical className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Dropdown menu */}
+            {showDropdown && (
+              <div className={`absolute ${isOwnMessage ? 'right-0' : 'left-0'} top-7 bg-base-100 border border-base-300 rounded-md shadow-lg py-1 min-w-[110px] z-50`}>
+                {/* Quote option - available for all messages */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowDropdown(false);
+                    onQuote?.(message);
+                  }}
+                  className="w-full px-3 py-1.5 text-left text-sm hover:bg-base-200 flex items-center gap-2 text-base-content transition-colors"
+                >
+                  <Quote className="w-3.5 h-3.5" />
+                  <span>Quote</span>
+                </button>
+
+                {/* Edit option - only for own messages with text */}
+                {isOwnMessage && message.text && (
+                  <button
+                    onClick={handleEditClick}
+                    className="w-full px-3 py-1.5 text-left text-sm hover:bg-base-200 flex items-center gap-2 text-base-content transition-colors"
+                  >
+                    <Edit className="w-3.5 h-3.5" />
+                    <span>Edit</span>
+                  </button>
+                )}
+
+                {/* Delete option - only for own messages */}
+                {isOwnMessage && (
+                  <button
+                    onClick={handleDeleteClick}
+                    className="w-full px-3 py-1.5 text-left text-sm hover:bg-error/10 flex items-center gap-2 text-error transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Sender name for group chats (received messages only) */}
           {!isOwnMessage && selectedGroup && showAvatar && (
             <div className="text-xs font-semibold mb-1 opacity-70">
-              {senderInfo.name}
-              {message.isGroupAdmin && (
+              <span className={senderInfo.isDeleted ? 'italic text-base-content/50' : ''}>
+                {senderInfo.name}
+              </span>
+              {message.isGroupAdmin && !senderInfo.isDeleted && (
                 <span className="ml-1 text-xs bg-primary/20 text-primary px-1 py-0.5 rounded">
                   Admin
                 </span>
@@ -336,8 +412,8 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
               }
               return (
                 <div className={`border-l-4 pl-3 py-2 mb-2 rounded-r-md ${isOwnMessage
-                    ? 'bg-primary-content/10 border-primary-content/30'
-                    : 'bg-base-300/20 border-base-content/30'
+                  ? 'bg-primary-content/10 border-primary-content/30'
+                  : 'bg-base-300/20 border-base-content/30'
                   }`}>
                   <div className={`text-xs font-medium mb-1 ${isOwnMessage ? 'text-primary-content/70' : 'text-base-content/60'
                     }`}>
@@ -355,7 +431,28 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
             {message.text && (
               <div className={`whitespace-pre-wrap break-words text-sm leading-relaxed ${isOwnMessage ? 'text-primary-content' : 'text-base-content'
                 }`}>
-                {message.text}
+                {(() => {
+                  // Replace [CALL_ICON] with actual icon
+                  if (message.text.includes('[CALL_ICON]')) {
+                    const isVideo = message.text.toLowerCase().includes('video');
+                    const isDeclined = message.text.toLowerCase().includes('declined');
+                    const textWithoutIcon = message.text.replace('[CALL_ICON]', '').trim();
+
+                    return (
+                      <div className={`flex items-center gap-2 ${isDeclined ? 'opacity-70' : ''}`}>
+                        <div className={`p-2 rounded-full ${isOwnMessage ? 'bg-primary-content/20' : 'bg-primary/20'}`}>
+                          {isVideo ? (
+                            <Video className={`w-4 h-4 ${isOwnMessage ? 'text-primary-content' : 'text-primary'}`} />
+                          ) : (
+                            <Phone className={`w-4 h-4 ${isOwnMessage ? 'text-primary-content' : 'text-primary'}`} />
+                          )}
+                        </div>
+                        <span>{textWithoutIcon}</span>
+                      </div>
+                    );
+                  }
+                  return message.text;
+                })()}
               </div>
             )}
 

@@ -689,3 +689,49 @@ body {
   padding-left: 0.5rem;
   padding-right: 0.5rem;
 }
+/* T
+hin scrollbar styles - nearly invisible */
+.thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(128, 128, 128, 0.2) transparent;
+}
+
+.thin-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(128, 128, 128, 0.2);
+  border-radius: 10px;
+  transition: background-color 0.2s ease;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(128, 128, 128, 0.4);
+}
+
+/* Hide scrollbar on mobile */
+@media (max-width: 768px) {
+  .thin-scrollbar::-webkit-scrollbar {
+    width: 2px;
+  }
+  
+  .thin-scrollbar {
+    scrollbar-width: thin;
+  }
+}
+
+/* Hide scrollbar on tabs */
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tabs {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

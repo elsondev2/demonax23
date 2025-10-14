@@ -167,7 +167,8 @@ export const sendMessage = async (req, res) => {
       // Populate sender details
       await newMessage.populate("senderId", "fullName profilePic");
 
-      // Emit the message to all group members EXCEPT the sender to avoid duplicates on sender side
+      // Emit the message to ALL group members INCLUDING the sender
+      // This ensures the sender sees the message even if optimistic update fails
       const adminId = group.admin.toString();
       const payload = newMessage.toObject();
       payload.isGroupAdmin = senderId.toString() === adminId;
@@ -181,14 +182,9 @@ export const sendMessage = async (req, res) => {
       
       let emittedCount = 0;
       group.members.forEach(memberId => {
-        if (memberId.toString() === senderId.toString()) {
-          console.log('  ⏭️  Skipping sender:', memberId.toString());
-          return;
-        }
         const memberSocketId = getReceiverSocketId(memberId);
         if (memberSocketId) {
           console.log('  ✅ Emitting to member:', memberId.toString(), 'socketId:', memberSocketId);
-          console.log('  📤 Payload:', { messageId: payload._id, text: payload.text?.substring(0, 50), groupId: payload.groupId });
           io.to(memberSocketId).emit("newGroupMessage", payload);
           emittedCount++;
         } else {
@@ -196,7 +192,7 @@ export const sendMessage = async (req, res) => {
         }
       });
       
-      console.log(`📤 Emitted newGroupMessage to ${emittedCount}/${group.members.length - 1} members (excluding sender)`);
+      console.log(`📤 Emitted newGroupMessage to ${emittedCount}/${group.members.length} members (including sender)`);
     } else {
       // Individual message (existing functionality)
       if (senderId.equals(receiverId)) {
@@ -241,10 +237,18 @@ export const sendMessage = async (req, res) => {
 
       await newMessage.save();
 
-      // Emit to receiver only. Sender updates UI locally to avoid duplicate delivery/race conditions
+      // Emit to both receiver and sender for consistency
+      // This ensures message appears even if optimistic update fails
       const receiverSocketId = getReceiverSocketId(receiverId);
+      const senderSocketId = getReceiverSocketId(senderId);
+      
       if (receiverSocketId) {
         io.to(receiverSocketId).emit("newMessage", newMessage);
+        console.log("📤 Emitted newMessage to receiver");
+      }
+      if (senderSocketId) {
+        io.to(senderSocketId).emit("newMessage", newMessage);
+        console.log("📤 Emitted newMessage to sender");
       }
     }
 
@@ -277,27 +281,42 @@ export const editMessage = async (req, res) => {
     // Update the message text
     message.text = text;
     message.updatedAt = new Date();
-    await message.save();
+    const savedMessage = await message.save();
     
-    // Emit the updated message to the other user (sender has optimistic update)
-    const receiverSocketId = getReceiverSocketId(message.receiverId);
-    const senderSocketId = getReceiverSocketId(message.senderId);
-
+    if (!savedMessage) {
+      console.log("❌ Failed to save updated message:", messageId);
+      return res.status(500).json({ error: "Failed to update message" });
+    }
+    
+    console.log("✅ Message updated in database:", messageId, "Group:", !!message.groupId);
+    
+    // Emit the updated message to relevant users
     if (message.groupId) {
-      // For group messages, emit to all group members
+      // For group messages, emit to ALL group members (including sender for consistency)
       const group = await Group.findById(message.groupId);
       if (group) {
+        let emittedCount = 0;
         group.members.forEach(memberId => {
           const memberSocketId = getReceiverSocketId(memberId);
           if (memberSocketId) {
             io.to(memberSocketId).emit("messageUpdated", message);
+            emittedCount++;
           }
         });
+        console.log("📡 Emitted messageUpdated to", emittedCount, "group members");
       }
     } else {
-      // For individual messages, emit only to receiver
+      // For individual messages, emit to both sender and receiver
+      const receiverSocketId = getReceiverSocketId(message.receiverId);
+      const senderSocketId = getReceiverSocketId(message.senderId);
+      
       if (receiverSocketId) {
         io.to(receiverSocketId).emit("messageUpdated", message);
+        console.log("📡 Emitted messageUpdated to receiver");
+      }
+      if (senderSocketId) {
+        io.to(senderSocketId).emit("messageUpdated", message);
+        console.log("📡 Emitted messageUpdated to sender");
       }
     }
 
@@ -380,28 +399,43 @@ export const deleteMessage = async (req, res) => {
       if (message.audio?.storageKey) { try { await removeFromSupabase(message.audio.storageKey); } catch {} }
     } catch {}
 
-    // Delete the message
-    await Message.findByIdAndDelete(messageId);
+    // Delete the message from database
+    const deletedMessage = await Message.findByIdAndDelete(messageId);
     
-    // Emit the deleted message ID to the other user (sender has optimistic update)
-    const receiverSocketId = getReceiverSocketId(message.receiverId);
-    const senderSocketId = getReceiverSocketId(message.senderId);
-
+    if (!deletedMessage) {
+      console.log("❌ Failed to delete message from database:", messageId);
+      return res.status(500).json({ error: "Failed to delete message from database" });
+    }
+    
+    console.log("✅ Message deleted from database:", messageId, "Group:", !!message.groupId);
+    
+    // Emit the deleted message ID to relevant users
     if (message.groupId) {
-      // For group messages, emit to all group members
+      // For group messages, emit to ALL group members (including sender for consistency)
       const group = await Group.findById(message.groupId);
       if (group) {
+        let emittedCount = 0;
         group.members.forEach(memberId => {
           const memberSocketId = getReceiverSocketId(memberId);
           if (memberSocketId) {
             io.to(memberSocketId).emit("messageDeleted", messageId);
+            emittedCount++;
           }
         });
+        console.log("📡 Emitted messageDeleted to", emittedCount, "group members");
       }
     } else {
-      // For individual messages, emit only to receiver
+      // For individual messages, emit to both sender and receiver
+      const receiverSocketId = getReceiverSocketId(message.receiverId);
+      const senderSocketId = getReceiverSocketId(message.senderId);
+      
       if (receiverSocketId) {
         io.to(receiverSocketId).emit("messageDeleted", messageId);
+        console.log("📡 Emitted messageDeleted to receiver");
+      }
+      if (senderSocketId) {
+        io.to(senderSocketId).emit("messageDeleted", messageId);
+        console.log("📡 Emitted messageDeleted to sender");
       }
     }
 
