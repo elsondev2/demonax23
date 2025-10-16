@@ -5,20 +5,20 @@ import { ENV } from "../lib/env.js";
 import { uploadBase64ImageToSupabase } from "../lib/supabase.js";
 
 export const signup = async (req, res) => {
-   // Handle both FormData (with file) and JSON (without file)
-   let fullName, email, password, usernameRaw, profilePic;
+  // Handle both FormData (with file) and JSON (without file)
+  let fullName, email, password, usernameRaw, profilePic;
 
-   if (req.file) {
-     // FormData with file upload
-     fullName = req.body.fullName;
-     email = req.body.email;
-     password = req.body.password;
-     usernameRaw = req.body.username;
-     profilePic = req.file ? req.file.buffer.toString('base64') : null;
-   } else {
-     // Regular JSON request
-     ({ fullName, email, password, username: usernameRaw, profilePic } = req.body);
-   }
+  if (req.file) {
+    // FormData with file upload
+    fullName = req.body.fullName;
+    email = req.body.email;
+    password = req.body.password;
+    usernameRaw = req.body.username;
+    profilePic = req.file ? req.file.buffer.toString('base64') : null;
+  } else {
+    // Regular JSON request
+    ({ fullName, email, password, username: usernameRaw, profilePic } = req.body);
+  }
 
   try {
     if (!fullName || !email || !password) {
@@ -93,7 +93,7 @@ export const signup = async (req, res) => {
       }
 
       const savedUser = await newUser.save();
-      generateToken(savedUser._id, res);
+      const token = generateToken(savedUser._id, res);
 
       // Auto-join default community group "†ŘØỮβŁ€ ₥ΔҜ€ŘŞ"
       try {
@@ -113,6 +113,7 @@ export const signup = async (req, res) => {
         email: savedUser.email,
         username: savedUser.username,
         profilePic: savedUser.profilePic,
+        token, // Include token in response for cross-origin requests
       });
     } else {
       res.status(400).json({ message: "Invalid user data" });
@@ -155,7 +156,7 @@ export const login = async (req, res) => {
       }
     }
 
-    generateToken(user._id, res);
+    const token = generateToken(user._id, res);
 
     // Auto-join default community group "†ŘØỮβŁ€ ₥ΔҜ€ŘŞ" if not already a member
     try {
@@ -175,6 +176,7 @@ export const login = async (req, res) => {
       email: user.email,
       username: user.username,
       profilePic: user.profilePic,
+      token, // Include token in response for cross-origin requests
     });
   } catch (error) {
     console.log("Error in login controller:", error);
@@ -184,7 +186,7 @@ export const login = async (req, res) => {
 
 export const logout = async (req, res) => {
   try {
-    res.cookie("jwt", "", { 
+    res.cookie("jwt", "", {
       maxAge: 0,
       sameSite: ENV.NODE_ENV === "production" ? "none" : "lax",
       secure: ENV.NODE_ENV === "production" ? true : false
@@ -278,7 +280,7 @@ export const uploadBackground = async (req, res) => {
 export const googleAuth = async (req, res) => {
   try {
     const { credential, createAccount } = req.body;
-    
+
     if (!credential) {
       return res.status(400).json({ message: "Google credential is required" });
     }
@@ -286,7 +288,7 @@ export const googleAuth = async (req, res) => {
     // Verify the Google JWT token
     const { OAuth2Client } = await import('google-auth-library');
     const client = new OAuth2Client(ENV.GOOGLE_CLIENT_ID);
-    
+
     let payload;
     try {
       const ticket = await client.verifyIdToken({
@@ -324,7 +326,7 @@ export const googleAuth = async (req, res) => {
         // If not explicitly creating account, return error
         return res.status(404).json({ message: "No account found with this Google account. Please sign up first." });
       }
-      
+
       // Create new account
       // Generate unique username from name/email
       let username = name.toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 20) || "user";
@@ -348,7 +350,7 @@ export const googleAuth = async (req, res) => {
     }
 
     // Generate JWT token and set cookie
-    generateToken(user._id, res);
+    const token = generateToken(user._id, res);
 
     // Return user data
     res.status(200).json({
@@ -358,6 +360,7 @@ export const googleAuth = async (req, res) => {
       username: user.username,
       profilePic: user.profilePic,
       role: user.role || "user",
+      token, // Include token in response for cross-origin requests
     });
 
   } catch (error) {

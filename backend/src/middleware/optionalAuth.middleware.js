@@ -4,7 +4,14 @@ import { ENV } from "../lib/env.js";
 
 export const optionalAuth = async (req, res, next) => {
   try {
-    const token = req.cookies.jwt;
+    // Check Authorization header first, then fall back to cookies
+    let token = req.cookies.jwt;
+    
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    }
+    
     if (token) {
       const decoded = jwt.verify(token, ENV.JWT_SECRET);
       if (decoded) {

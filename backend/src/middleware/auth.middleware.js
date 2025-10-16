@@ -4,7 +4,14 @@ import { ENV } from "../lib/env.js";
 
 export const protectRoute = async (req, res, next) => {
   try {
-    const token = req.cookies.jwt;
+    // Check Authorization header first (for cross-origin), then fall back to cookies
+    let token = req.cookies.jwt;
+    
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7); // Remove 'Bearer ' prefix
+    }
+    
     if (!token) return res.status(401).json({ message: "Unauthorized - No token provided" });
 
     const decoded = jwt.verify(token, ENV.JWT_SECRET);

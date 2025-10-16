@@ -10,9 +10,14 @@ export const axiosInstance = axios.create({
   withCredentials: true, // this is required for authentication cookies
 });
 
-// Add a request interceptor to handle connection errors gracefully
+// Add a request interceptor to add Authorization header and handle errors
 axiosInstance.interceptors.request.use(
   (config) => {
+    // Get token from localStorage and add to Authorization header
+    const token = localStorage.getItem('jwt-token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
     return config;
   },
   (error) => {

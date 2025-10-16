@@ -102,6 +102,12 @@ export const useAuthStore = create((set, get) => ({
         credential: idToken,
         createAccount
       });
+      
+      // Store token in localStorage for Authorization header
+      if (res.data.token) {
+        localStorage.setItem("jwt-token", res.data.token);
+      }
+      
       localStorage.setItem("chat-user", JSON.stringify(res.data));
       set({ authUser: res.data });
       get().connectSocket();
@@ -128,6 +134,12 @@ export const useAuthStore = create((set, get) => ({
   loginUser: async (userData) => {
     try {
       const res = await axiosInstance.post("/api/auth/login", userData);
+      
+      // Store token in localStorage for Authorization header
+      if (res.data.token) {
+        localStorage.setItem("jwt-token", res.data.token);
+      }
+      
       localStorage.setItem("chat-user", JSON.stringify(res.data));
       set({ authUser: res.data });
 
@@ -159,6 +171,12 @@ export const useAuthStore = create((set, get) => ({
       } : {};
 
       const res = await axiosInstance.post("/api/auth/signup", userData, config);
+      
+      // Store token in localStorage for Authorization header
+      if (res.data.token) {
+        localStorage.setItem("jwt-token", res.data.token);
+      }
+      
       localStorage.setItem("chat-user", JSON.stringify(res.data));
       set({ authUser: res.data });
 
@@ -190,6 +208,7 @@ export const useAuthStore = create((set, get) => ({
 
       await axiosInstance.post("/api/auth/logout");
       localStorage.removeItem("chat-user");
+      localStorage.removeItem("jwt-token"); // Clear the JWT token
 
       // Disconnect socket
       if (get().socket) {
