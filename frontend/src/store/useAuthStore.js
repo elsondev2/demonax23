@@ -387,7 +387,7 @@ export const useAuthStore = create((set, get) => ({
       import("./useChatStore").then(async mod => {
         const chatStore = mod.useChatStore.getState();
         try { await chatStore.getMyChatPartners(); } catch { }
-        try { await chatStore.getAllContacts(); } catch { }
+        try { await chatStore.getAllContacts(); } catch { /* empty */ }
         const imgs = [];
         (chatStore.chats || []).forEach(c => {
           if (c.isGroup && c.groupPic) imgs.push(c.groupPic);

@@ -13,6 +13,7 @@ import AppsView from "../components/AppsView";
 import DonateView from "../components/DonateView";
 import CallModal from "../components/CallModal";
 import CallScreen from "../components/CallScreen";
+import SocketStatusIndicator from "../components/SocketStatusIndicator";
 import { useCallStore } from "../store/useCallStore";
 
 
@@ -48,7 +49,7 @@ function ChatPage() {
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
-  
+
   // Determine initial view index based on route (mobile only)
   const getInitialIndex = () => {
     if (isFeatureRoute) return 1; // Right view when directly on feature routes
@@ -81,7 +82,7 @@ function ChatPage() {
       const connectTimeout = setTimeout(() => {
         connectSocket();
       }, 100);
-      
+
       return () => {
         clearTimeout(connectTimeout);
       };
@@ -91,7 +92,7 @@ function ChatPage() {
   // Keep stable reference for refreshing chat list
   const getMyChatPartnersRef = useRef();
   const callSystemInitializedRef = useRef(false);
-  
+
   useEffect(() => {
     getMyChatPartnersRef.current = getMyChatPartners;
   }, [getMyChatPartners]);
@@ -116,7 +117,7 @@ function ChatPage() {
 
       // Initialize call system when socket is ready
       const callSystemInitialized = useCallStore.getState().initializeCallSystem();
-      
+
       if (callSystemInitialized) {
         callSystemInitializedRef.current = true;
       } else {
@@ -224,15 +225,15 @@ function ChatPage() {
             onIndexChange={handleIndexChange}
             onSwipeDirection={(dir, idx) => {
               if (dir === 'left' && idx === 1) { navigate('/', { replace: true }); return 0; }
-              if (dir === 'right' && idx === 0) { 
+              if (dir === 'right' && idx === 0) {
                 const targetRoute = lastRightView === 2 ? (
-                  isPostsRoute ? '/posts' : 
-                  isNoticesRoute ? '/notices' : 
-                  isAppsRoute ? '/apps' : 
-                  isDonateRoute ? '/donate' : '/posts'
+                  isPostsRoute ? '/posts' :
+                    isNoticesRoute ? '/notices' :
+                      isAppsRoute ? '/apps' :
+                        isDonateRoute ? '/donate' : '/posts'
                 ) : '/';
-                navigate(targetRoute, { replace: true }); 
-                return 1; 
+                navigate(targetRoute, { replace: true });
+                return 1;
               }
               return undefined; // do nothing
             }}
@@ -258,6 +259,9 @@ function ChatPage() {
       {/* Call Components - Render globally */}
       <CallModal />
       <CallScreen />
+
+      {/* Socket Status Indicator - Shows when disconnected */}
+      <SocketStatusIndicator />
     </div>
   );
 }
