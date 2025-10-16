@@ -125,6 +125,13 @@ function ChatPage() {
           useCallStore.getState().initializeCallSystem();
         }, 1000);
       }
+
+      // CRITICAL: Subscribe to real-time message updates
+      const chatStore = useChatStore.getState();
+      if (chatStore.subscribeToMessages) {
+        console.log('🔔 Setting up real-time message subscriptions');
+        chatStore.subscribeToMessages();
+      }
     }
   }, [socket, socket?.connected]); // Re-run when socket connects
 

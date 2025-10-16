@@ -160,10 +160,10 @@ export const useChatStore = create((set, get) => ({
       return;
     }
 
-    // COOLDOWN CHECK: Prevent rapid refreshes (minimum 2 minutes between refreshes)
+    // COOLDOWN CHECK: Prevent rapid refreshes (minimum 30 seconds between refreshes)
     const now = Date.now();
     const timeSinceLastRefresh = lastRefreshTime ? now - lastRefreshTime : Infinity;
-    const cooldownPeriod = 2 * 60 * 1000; // 2 minutes
+    const cooldownPeriod = 30 * 1000; // 30 seconds (reduced from 2 minutes)
 
     if (timeSinceLastRefresh < cooldownPeriod) {
       console.log('⏰ REFRESH COOLDOWN ACTIVE - Skipping refresh attempt:', {
@@ -968,30 +968,38 @@ export const useChatStore = create((set, get) => ({
       console.warn("Failed to unsubscribe from messages:", error);
     }
 
-    console.log("✅ Subscribing to socket events (including group messages)...");
+    console.log("🔔 SUBSCRIBING TO REAL-TIME SOCKET EVENTS (including group messages)...");
     console.log("📡 Socket ID:", socket.id);
     console.log("📡 Socket connected:", socket.connected);
     console.log("📡 Auth user:", authUser?._id);
+    console.log("📡 Timestamp:", new Date().toISOString());
 
     // Add error handler for socket disconnection
     socket.on('disconnect', () => {
-      console.log('Socket disconnected, marking as unsubscribed');
+      console.log('🔌 Socket disconnected, marking as unsubscribed');
       set({ isSubscribed: false });
     });
 
     socket.on('connect', () => {
-      console.log('Socket reconnected, resubscribing to messages');
+      console.log('🔌 Socket reconnected, resubscribing to messages');
       // Resubscribe after reconnection
+      set({ isSubscribed: false }); // Reset flag
       setTimeout(() => {
         if (socket.connected) {
           get().subscribeToMessages();
         }
-      }, 1000);
+      }, 500);
     });
 
     // Handle individual messages
     socket.on("newMessage", (newMessage) => {
-      console.log("Received new message:", newMessage);
+      console.log("🔔 RECEIVED NEW MESSAGE (1:1):", {
+        messageId: newMessage._id,
+        from: newMessage.senderId,
+        to: newMessage.receiverId,
+        text: newMessage.text?.substring(0, 50),
+        timestamp: new Date().toISOString()
+      });
       const { selectedUser } = get();
       const chatsSnapshot = get().chats;
 
@@ -1094,7 +1102,13 @@ export const useChatStore = create((set, get) => ({
 
     // Handle group messages
     socket.on("newGroupMessage", (newMessage) => {
-      console.log("🔔🔔🔔 RAW newGroupMessage event received:", newMessage);
+      console.log("🔔 RECEIVED NEW GROUP MESSAGE:", {
+        messageId: newMessage._id,
+        groupId: newMessage.groupId,
+        from: newMessage.senderId?._id || newMessage.senderId,
+        text: newMessage.text?.substring(0, 50),
+        timestamp: new Date().toISOString()
+      });
       console.log("🔔 Socket ID:", socket.id);
       console.log("🔔 Socket connected:", socket.connected);
       
@@ -1468,9 +1482,11 @@ export const useChatStore = create((set, get) => ({
     // Note: Call events are now handled in useCallStore.initializeCallSystem()
     // All call-related socket listeners are set up there to avoid conflicts
 
-    console.log("✅ Subscribed to all socket events (including newGroupMessage for live updates)");
+    console.log("✅ SUCCESSFULLY SUBSCRIBED TO ALL REAL-TIME SOCKET EVENTS");
+    console.log("📡 Socket ID:", socket.id);
     console.log("📡 Registered socket listeners:", socket.eventNames());
-    set({ isSubscribed: true });
+    console.log("📡 Subscription timestamp:", new Date().toISOString());
+    set({ isSubscribed: true, currentSocketId: socket.id });
   },
 
   // Validate and repair chat state if needed

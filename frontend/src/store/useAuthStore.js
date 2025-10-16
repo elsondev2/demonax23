@@ -308,9 +308,16 @@ export const useAuthStore = create((set, get) => ({
           get().connectSocket();
         }, reconnectInterval);
       } else {
-        // Max reconnect attempts reached
+        // Max reconnect attempts reached - but keep trying with exponential backoff
         set({ isConnecting: false });
-        toast.error("Could not connect to chat server. Please try again later.");
+        console.warn("Max reconnect attempts reached, will retry in 30 seconds");
+        
+        // Continue trying with longer intervals
+        setTimeout(() => {
+          console.log("Retrying socket connection after cooldown period");
+          set({ reconnectAttempts: 0 }); // Reset counter
+          get().connectSocket();
+        }, 30000); // 30 seconds
       }
     });
 
