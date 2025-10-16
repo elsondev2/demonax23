@@ -111,7 +111,7 @@ const AnnouncementModal = ({ isOpen, onClose, onSuccess, initialData = null, isE
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/60 backdrop-blur-sm"
@@ -119,178 +119,188 @@ const AnnouncementModal = ({ isOpen, onClose, onSuccess, initialData = null, isE
       />
 
       {/* Modal */}
-      <div className="flex min-h-full items-center justify-center p-4">
-        <div
-          ref={modalRef}
-          className="relative w-full max-w-2xl bg-base-100 rounded-2xl shadow-2xl"
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-base-300">
-            <div>
-              <h2 className="text-xl font-bold text-base-content">
-                {isEditing ? 'Edit Announcement' : 'Create Announcement'}
-              </h2>
-            </div>
-
-            <button
-              onClick={() => onClose?.()}
-              disabled={isSubmitting}
-              className="btn btn-sm btn-ghost btn-circle"
-              title="Close modal (Esc)"
-            >
-              <X className="w-4 h-4" />
-            </button>
+      <div
+        ref={modalRef}
+        className="relative w-full max-w-3xl bg-base-100 rounded-2xl shadow-2xl max-h-[90vh] flex flex-col"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-base-300 flex-shrink-0">
+          <div>
+            <h2 className="text-2xl font-bold text-base-content">
+              {isEditing ? 'Edit Announcement' : 'Create New Announcement'}
+            </h2>
+            <p className="text-sm text-base-content/60 mt-1">
+              {isEditing ? 'Update your announcement details' : 'Share important information with your users'}
+            </p>
           </div>
 
-          {/* Content */}
-          <div className="p-6">
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Title Field */}
-              <div className="form-control">
-                <label className="label pb-2">
-                  <span className="label-text font-semibold text-base">
-                    Title
-                  </span>
-                </label>
-                <input
-                  ref={titleInputRef}
-                  type="text"
-                  value={formData.title}
-                  onChange={(e) => handleInputChange('title', e.target.value)}
-                  className="input input-bordered focus:input-primary w-full"
-                  placeholder="Enter announcement title..."
-                  disabled={isSubmitting}
-                />
-              </div>
+          <button
+            onClick={() => onClose?.()}
+            disabled={isSubmitting}
+            className="btn btn-sm btn-ghost btn-circle"
+            title="Close modal (Esc)"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
-              {/* Content Field */}
-              <div className="form-control">
-                <label className="label pb-2">
-                  <span className="label-text font-semibold text-base">
-                    Content
-                  </span>
-                </label>
-                <textarea
-                  value={formData.content}
-                  onChange={(e) => handleInputChange('content', e.target.value)}
-                  className="textarea textarea-bordered focus:textarea-primary resize-none w-full"
-                  placeholder="Write your announcement content..."
-                  rows={6}
-                  disabled={isSubmitting}
-                />
-              </div>
+        {/* Content - Scrollable */}
+        <div className="p-6 overflow-y-auto flex-1">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Title Field */}
+            <div className="form-control">
+              <label className="label pb-1">
+                <span className="label-text font-semibold">
+                  Announcement Title
+                </span>
+                <span className="label-text-alt text-error">*</span>
+              </label>
+              <input
+                ref={titleInputRef}
+                type="text"
+                value={formData.title}
+                onChange={(e) => handleInputChange('title', e.target.value)}
+                className="input input-bordered focus:input-primary w-full"
+                placeholder="e.g., System Maintenance Notice"
+                disabled={isSubmitting}
+                required
+              />
+            </div>
 
-              {/* Priority Selection */}
-              <div className="form-control">
-                <label className="label pb-2">
-                  <span className="label-text font-semibold text-base">
-                    Priority Level
-                  </span>
-                </label>
-                <div className="grid grid-cols-3 gap-3">
-                  <label className={`flex flex-col items-center gap-2 p-3 border-2 rounded-lg cursor-pointer transition-all hover:bg-base-200 ${
-                    formData.priority === 'info' ? 'border-primary bg-primary/10' : 'border-base-300'
+            {/* Content Field */}
+            <div className="form-control">
+              <label className="label pb-1">
+                <span className="label-text font-semibold">
+                  Message Content
+                </span>
+                <span className="label-text-alt text-error">*</span>
+              </label>
+              <textarea
+                value={formData.content}
+                onChange={(e) => handleInputChange('content', e.target.value)}
+                className="textarea textarea-bordered focus:textarea-primary resize-none w-full"
+                placeholder="Write your announcement message here..."
+                rows={4}
+                disabled={isSubmitting}
+                required
+              />
+            </div>
+
+            {/* Priority Selection */}
+            <div className="form-control">
+              <label className="label pb-1">
+                <span className="label-text font-semibold">
+                  Priority Level
+                </span>
+              </label>
+              <div className="grid grid-cols-3 gap-3">
+                <label className={`flex flex-col items-center gap-2 p-4 border-2 rounded-xl cursor-pointer transition-all hover:scale-105 ${formData.priority === 'info' ? 'border-primary bg-primary/10 shadow-lg' : 'border-base-300 hover:border-primary/50'
                   }`}>
-                    <input
-                      type="radio"
-                      name="priority"
-                      value="info"
-                      checked={formData.priority === 'info'}
-                      onChange={(e) => handleInputChange('priority', e.target.value)}
-                      className="sr-only"
-                      disabled={isSubmitting}
-                    />
-                    <Info className={`w-5 h-5 ${formData.priority === 'info' ? 'text-primary' : 'text-base-content/60'}`} />
-                    <span className={`text-sm font-medium ${formData.priority === 'info' ? 'text-primary' : 'text-base-content/70'}`}>
-                      Info
-                    </span>
-                  </label>
-
-                  <label className={`flex flex-col items-center gap-2 p-3 border-2 rounded-lg cursor-pointer transition-all hover:bg-base-200 ${
-                    formData.priority === 'warning' ? 'border-warning bg-warning/10' : 'border-base-300'
-                  }`}>
-                    <input
-                      type="radio"
-                      name="priority"
-                      value="warning"
-                      checked={formData.priority === 'warning'}
-                      onChange={(e) => handleInputChange('priority', e.target.value)}
-                      className="sr-only"
-                      disabled={isSubmitting}
-                    />
-                    <AlertTriangle className={`w-5 h-5 ${formData.priority === 'warning' ? 'text-warning' : 'text-base-content/60'}`} />
-                    <span className={`text-sm font-medium ${formData.priority === 'warning' ? 'text-warning' : 'text-base-content/70'}`}>
-                      Warning
-                    </span>
-                  </label>
-
-                  <label className={`flex flex-col items-center gap-2 p-3 border-2 rounded-lg cursor-pointer transition-all hover:bg-base-200 ${
-                    formData.priority === 'alert' ? 'border-error bg-error/10' : 'border-base-300'
-                  }`}>
-                    <input
-                      type="radio"
-                      name="priority"
-                      value="alert"
-                      checked={formData.priority === 'alert'}
-                      onChange={(e) => handleInputChange('priority', e.target.value)}
-                      className="sr-only"
-                      disabled={isSubmitting}
-                    />
-                    <AlertCircle className={`w-5 h-5 ${formData.priority === 'alert' ? 'text-error' : 'text-base-content/60'}`} />
-                    <span className={`text-sm font-medium ${formData.priority === 'alert' ? 'text-error' : 'text-base-content/70'}`}>
-                      Alert
-                    </span>
-                  </label>
-                </div>
-              </div>
-
-              {/* Banner Image Upload */}
-              <div className="form-control">
-                <label className="label pb-2">
-                  <span className="label-text font-semibold text-base">
-                    Banner Image (Optional)
+                  <input
+                    type="radio"
+                    name="priority"
+                    value="info"
+                    checked={formData.priority === 'info'}
+                    onChange={(e) => handleInputChange('priority', e.target.value)}
+                    className="sr-only"
+                    disabled={isSubmitting}
+                  />
+                  <Info className={`w-6 h-6 ${formData.priority === 'info' ? 'text-primary' : 'text-base-content/60'}`} />
+                  <span className={`text-sm font-semibold ${formData.priority === 'info' ? 'text-primary' : 'text-base-content/70'}`}>
+                    Info
                   </span>
+                  <span className="text-xs text-base-content/50">General updates</span>
                 </label>
+
+                <label className={`flex flex-col items-center gap-2 p-4 border-2 rounded-xl cursor-pointer transition-all hover:scale-105 ${formData.priority === 'warning' ? 'border-warning bg-warning/10 shadow-lg' : 'border-base-300 hover:border-warning/50'
+                  }`}>
+                  <input
+                    type="radio"
+                    name="priority"
+                    value="warning"
+                    checked={formData.priority === 'warning'}
+                    onChange={(e) => handleInputChange('priority', e.target.value)}
+                    className="sr-only"
+                    disabled={isSubmitting}
+                  />
+                  <AlertTriangle className={`w-6 h-6 ${formData.priority === 'warning' ? 'text-warning' : 'text-base-content/60'}`} />
+                  <span className={`text-sm font-semibold ${formData.priority === 'warning' ? 'text-warning' : 'text-base-content/70'}`}>
+                    Warning
+                  </span>
+                  <span className="text-xs text-base-content/50">Important notice</span>
+                </label>
+
+                <label className={`flex flex-col items-center gap-2 p-4 border-2 rounded-xl cursor-pointer transition-all hover:scale-105 ${formData.priority === 'alert' ? 'border-error bg-error/10 shadow-lg' : 'border-base-300 hover:border-error/50'
+                  }`}>
+                  <input
+                    type="radio"
+                    name="priority"
+                    value="alert"
+                    checked={formData.priority === 'alert'}
+                    onChange={(e) => handleInputChange('priority', e.target.value)}
+                    className="sr-only"
+                    disabled={isSubmitting}
+                  />
+                  <AlertCircle className={`w-6 h-6 ${formData.priority === 'alert' ? 'text-error' : 'text-base-content/60'}`} />
+                  <span className={`text-sm font-semibold ${formData.priority === 'alert' ? 'text-error' : 'text-base-content/70'}`}>
+                    Alert
+                  </span>
+                  <span className="text-xs text-base-content/50">Urgent action</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Banner Image Upload */}
+            <div className="form-control">
+              <label className="label pb-1">
+                <span className="label-text font-semibold">
+                  Banner Image
+                </span>
+                <span className="label-text-alt text-base-content/60">Optional</span>
+              </label>
+              <div className="bg-base-200 rounded-xl p-4">
                 <ImageUpload
                   onImageSelect={(file) => handleInputChange('bannerImage', file)}
                   onImageRemove={() => handleInputChange('bannerImage', null)}
                   currentImage={formData.bannerImage}
-                  maxSize={5 * 1024 * 1024} // 5MB for banner images
+                  maxSize={5 * 1024 * 1024}
                   acceptedTypes={['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']}
                 />
+                <p className="text-xs text-base-content/60 mt-2">
+                  Recommended: 1200x400px, Max 5MB
+                </p>
               </div>
+            </div>
 
-              {/* Form Actions */}
-              <div className="flex gap-4 pt-6 border-t border-base-300">
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="btn btn-primary flex-1 gap-2"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      <span>{isEditing ? 'Updating...' : 'Creating...'}</span>
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="w-5 h-5" />
-                      <span>{isEditing ? 'Update' : 'Create'}</span>
-                    </>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => onClose?.()}
-                  disabled={isSubmitting}
-                  className="btn btn-ghost btn-outline"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
+            {/* Form Actions */}
+            <div className="flex gap-3 pt-4">
+              <button
+                type="button"
+                onClick={() => onClose?.()}
+                disabled={isSubmitting}
+                className="btn btn-ghost flex-1"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="btn btn-primary flex-1 gap-2"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>{isEditing ? 'Updating...' : 'Creating...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-5 h-5" />
+                    <span>{isEditing ? 'Update Announcement' : 'Create Announcement'}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>

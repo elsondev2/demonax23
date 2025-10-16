@@ -53,6 +53,10 @@ function SignUpPageNew() {
       console.error('Password is required');
       return;
     }
+    if (!agreedToTerms) {
+      console.error('You must agree to the terms and conditions');
+      return;
+    }
 
     console.log('Submitting signup data:', {
       fullName: formData.fullName,
@@ -360,6 +364,8 @@ function SignUpPageNew() {
                       />
                       <span className="label-text text-sm">
                         I agree to the{" "}
+                        <Link to="/eula" className="link link-primary">EULA</Link>
+                        {", "}
                         <Link to="/terms" className="link link-primary">Terms of Service</Link>
                         {" "}and{" "}
                         <Link to="/privacy" className="link link-primary">Privacy Policy</Link>
@@ -421,6 +427,7 @@ function SignUpPageNew() {
             {/* Terms */}
             <div className="text-xs text-center text-base-content/50 pt-3">
               By creating an account, you agree to our{" "}
+              <Link to="/eula" className="link link-hover">EULA</Link>,{" "}
               <Link to="/terms" className="link link-hover">Terms of Service</Link> and{" "}
               <Link to="/privacy" className="link link-hover">Privacy Policy</Link>
             </div>

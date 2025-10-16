@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import { useAuthStore } from "../store/useAuthStore";
 import { useChatStore } from "../store/useChatStore";
 import IOSModal from "./IOSModal";
+import Avatar from "./Avatar";
 
 const AccountSettingsModal = ({ isOpen, onClose }) => {
   const { authUser, updateProfile } = useAuthStore();
@@ -85,22 +86,23 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
           {/* Profile Picture Section */}
           <div className="flex flex-col items-center gap-4 p-6 bg-base-200/30 rounded-xl">
             <div className="relative group">
-              <div className="avatar">
+              <div className="relative">
                 <div className="w-32 h-32 rounded-full ring ring-primary ring-offset-base-100 ring-offset-2">
-                  <img 
-                    src={previewUrl} 
-                    alt="Profile" 
-                    onError={(e) => { e.target.src = "/avatar.png"; }}
+                  <Avatar
+                    src={previewUrl}
+                    name={authUser?.fullName}
+                    size="w-32 h-32"
+                    className="rounded-full"
                   />
                 </div>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="absolute bottom-0 right-0 btn btn-circle btn-primary btn-sm shadow-lg"
+                  type="button"
+                >
+                  <Camera className="w-4 h-4" />
+                </button>
               </div>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="absolute bottom-0 right-0 btn btn-circle btn-primary btn-sm shadow-lg"
-                type="button"
-              >
-                <Camera className="w-4 h-4" />
-              </button>
               <input
                 ref={fileInputRef}
                 type="file"

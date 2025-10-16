@@ -5,7 +5,20 @@ import { ENV } from "../lib/env.js";
 import { uploadBase64ImageToSupabase } from "../lib/supabase.js";
 
 export const signup = async (req, res) => {
-  const { fullName, email, password, username: usernameRaw, profilePic } = req.body;
+   // Handle both FormData (with file) and JSON (without file)
+   let fullName, email, password, usernameRaw, profilePic;
+
+   if (req.file) {
+     // FormData with file upload
+     fullName = req.body.fullName;
+     email = req.body.email;
+     password = req.body.password;
+     usernameRaw = req.body.username;
+     profilePic = req.file ? req.file.buffer.toString('base64') : null;
+   } else {
+     // Regular JSON request
+     ({ fullName, email, password, username: usernameRaw, profilePic } = req.body);
+   }
 
   try {
     if (!fullName || !email || !password) {
@@ -59,11 +72,19 @@ export const signup = async (req, res) => {
       // Optional profilePic during signup
       if (profilePic) {
         try {
-          if (typeof profilePic === "string" && profilePic.startsWith("data:image")) {
+          if (req.file) {
+            // File upload - convert buffer to base64 and upload to Supabase
+            const { uploadBase64ImageToSupabase } = await import("../lib/supabase.js");
+            const base64Image = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+            const uploaded = await uploadBase64ImageToSupabase({ base64: base64Image, folder: "profiles" });
+            newUser.profilePic = uploaded.url;
+          } else if (typeof profilePic === "string" && profilePic.startsWith("data:image")) {
+            // Base64 string from JSON request
             const { uploadBase64ImageToSupabase } = await import("../lib/supabase.js");
             const uploaded = await uploadBase64ImageToSupabase({ base64: profilePic, folder: "profiles" });
             newUser.profilePic = uploaded.url;
           } else if (typeof profilePic === "string") {
+            // Regular URL
             newUser.profilePic = profilePic;
           }
         } catch (e) {

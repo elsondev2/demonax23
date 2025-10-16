@@ -311,7 +311,7 @@ export const useAuthStore = create((set, get) => ({
       set({ onlineUsers: users });
     });
 
-    set({ socket: newSocket });
+
   },
 
   reestablishSubscriptions: () => {

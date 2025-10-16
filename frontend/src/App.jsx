@@ -7,17 +7,18 @@ import AdminPage from "./pages/AdminPage";
 import AdminLoginPageNew from "./pages/AdminLoginPageNew";
 import TermsOfServicePage from "./pages/TermsOfServicePage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
+import Eulapage from "./pages/Eulapage";
 import LandingPage from "./pages/LandingPage";
 import { useAuthStore } from "./store/useAuthStore";
 import { useEffect } from "react";
 import PageLoader from "./components/PageLoader";
 import ThemeProvider from "./components/ThemeProvider";
 import AppearanceModal from "./components/AppearanceModal";
-import ThemeLoadingBar from "./components/ThemeLoadingBar";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AnnouncementBanner from "./components/AnnouncementBanner";
 
 import { Toaster } from "react-hot-toast";
+import { SocketProvider } from "./contexts/SocketContext.jsx";
 
 function AppContent() {
   const location = useLocation();
@@ -41,72 +42,75 @@ function AppContent() {
   }, [containerClass, isLandingPage]);
 
   return (
-    <div className={containerClass}>
-      {!isLandingPage && authUser && <AnnouncementBanner />}
-      <Routes>
-        <Route path="/" element={authUser ? <Navigate to="/chat" replace /> : <LandingPage />} />
-        <Route path="/chat" element={
-          <ProtectedRoute>
-            <ChatPage />
-          </ProtectedRoute>
-        } />
-        <Route path="/logintowoof" element={authUser ? <Navigate to="/chat" replace /> : <LoginPageNew />} />
-        <Route path="/login" element={authUser ? <Navigate to="/chat" replace /> : <LoginPageNew />} />
-        <Route path="/signin" element={authUser ? <Navigate to="/chat" replace /> : <LoginPageNew />} />
-        <Route path="/signup" element={authUser ? <Navigate to="/chat" replace /> : <SignUpPageNew />} />
-        <Route path="/register" element={authUser ? <Navigate to="/chat" replace /> : <SignUpPageNew />} />
-        <Route path="/join/:token" element={
-          <ProtectedRoute>
-            <JoinGroupPage />
-          </ProtectedRoute>
-        } />
-        <Route path="/admin/login" element={<AdminLoginPageNew />} />
-        <Route path="/admin" element={
-          <ProtectedRoute>
-            <AdminPage />
-          </ProtectedRoute>
-        } />
-        <Route path="/posts" element={
-          <ProtectedRoute redirectTo="/login">
-            <ChatPage />
-          </ProtectedRoute>
-        } />
-        <Route path="/posts/public" element={
-          <ProtectedRoute redirectTo="/login">
-            <ChatPage />
-          </ProtectedRoute>
-        } />
-        <Route path="/posts/mine" element={
-          <ProtectedRoute redirectTo="/login">
-            <ChatPage />
-          </ProtectedRoute>
-        } />
-        <Route path="/notices" element={
-          <ProtectedRoute redirectTo="/login">
-            <ChatPage />
-          </ProtectedRoute>
-        } />
-        <Route path="/apps" element={
-          <ProtectedRoute redirectTo="/login">
-            <ChatPage />
-          </ProtectedRoute>
-        } />
-        <Route path="/donate" element={
-          <ProtectedRoute redirectTo="/login">
-            <ChatPage />
-          </ProtectedRoute>
-        } />
-        <Route path="/terms" element={<TermsOfServicePage />} />
-        <Route path="/privacy" element={<PrivacyPolicyPage />} />
-      </Routes>
+    <SocketProvider>
+      <div className={containerClass}>
+        {!isLandingPage && authUser && <AnnouncementBanner />}
+        <Routes>
+          <Route path="/" element={authUser ? <Navigate to="/chat" replace /> : <LandingPage />} />
+          <Route path="/chat" element={
+            <ProtectedRoute>
+              <ChatPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/logintowoof" element={authUser ? <Navigate to="/chat" replace /> : <LoginPageNew />} />
+          <Route path="/login" element={authUser ? <Navigate to="/chat" replace /> : <LoginPageNew />} />
+          <Route path="/signin" element={authUser ? <Navigate to="/chat" replace /> : <LoginPageNew />} />
+          <Route path="/signup" element={authUser ? <Navigate to="/chat" replace /> : <SignUpPageNew />} />
+          <Route path="/register" element={authUser ? <Navigate to="/chat" replace /> : <SignUpPageNew />} />
+          <Route path="/join/:token" element={
+            <ProtectedRoute>
+              <JoinGroupPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/login" element={<AdminLoginPageNew />} />
+          <Route path="/admin" element={
+            <ProtectedRoute>
+              <AdminPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/posts" element={
+            <ProtectedRoute redirectTo="/login">
+              <ChatPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/posts/public" element={
+            <ProtectedRoute redirectTo="/login">
+              <ChatPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/posts/mine" element={
+            <ProtectedRoute redirectTo="/login">
+              <ChatPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/notices" element={
+            <ProtectedRoute redirectTo="/login">
+              <ChatPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/apps" element={
+            <ProtectedRoute redirectTo="/login">
+              <ChatPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/donate" element={
+            <ProtectedRoute redirectTo="/login">
+              <ChatPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/terms" element={<TermsOfServicePage />} />
+          <Route path="/privacy" element={<PrivacyPolicyPage />} />
+          <Route path="/eula" element={<Eulapage />} />
+        </Routes>
 
-      {!isLandingPage && (
-        <>
-          <Toaster />
-          <AppearanceModal />
-        </>
-      )}
-    </div>
+        {!isLandingPage && (
+          <>
+            <Toaster />
+            <AppearanceModal />
+          </>
+        )}
+      </div>
+    </SocketProvider>
   );
 }
 
@@ -121,7 +125,6 @@ function App() {
 
   return (
     <ThemeProvider>
-      <ThemeLoadingBar />
       <AppContent />
     </ThemeProvider>
   );

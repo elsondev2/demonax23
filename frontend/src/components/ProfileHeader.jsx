@@ -7,6 +7,7 @@ import AccountSettingsModal from "./AccountSettingsModal";
 import FriendsModal from "./FriendsModal";
 import SoundSettingsModal from "./SoundSettingsModal";
 import useFriendStore from "../store/useFriendStore";
+import Avatar from "./Avatar";
 import { UsersIcon } from "lucide-react";
 
 const mouseClickSound = new Audio("/sounds/mouse-click.mp3");
@@ -49,22 +50,21 @@ function ProfileHeader() {
       <div className="navbar-start">
         <div className="flex items-center gap-3">
           {/* AVATAR */}
-          <div className="avatar online">
-            <button
-              className="size-14 md:size-16 rounded-full relative group ring-2 ring-primary/50 ring-offset-2 ring-offset-base-200"
-              onClick={() => fileInputRef.current.click()}
-            >
-              <div className="absolute inset-0 rounded-full overflow-hidden">
-                <img
-                  src={selectedImg || authUser.profilePic || "/avatar.png"}
-                  alt="User image"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <div className="absolute inset-0 bg-base-300/80 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-full">
+          <div className="relative">
+            <div className="relative rounded-full ring-2 ring-primary/50 ring-offset-2 ring-offset-base-200">
+              <Avatar
+                src={selectedImg || authUser.profilePic}
+                name={authUser.fullName}
+                size="size-14 md:size-16"
+                className="rounded-full"
+                onClick={() => fileInputRef.current.click()}
+                showOnlineStatus={true}
+                isOnline={true}
+              />
+              <div className="absolute inset-0 rounded-full bg-base-300/80 opacity-0 hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer" onClick={() => fileInputRef.current.click()}>
                 <span className="text-base-content text-xs">Change</span>
               </div>
-            </button>
+            </div>
 
             <input
               type="file"

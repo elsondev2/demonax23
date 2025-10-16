@@ -44,9 +44,9 @@ function AdminLoginPage() {
     <div className="w-full min-h-screen flex items-center justify-center p-4 bg-base-300">
       <div className="relative w-full max-w-6xl min-h-screen md:min-h-[800px] md:h-[800px] h-auto">
         <BorderAnimatedContainer>
-<div className="w-full h-full flex flex-col md:flex-row-reverse">
-{/* FORM COLUMN - RIGHT (refined typography) */}
-<div className="md:w-1/2 p-8 flex items-center justify-center md:border-l border-slate-600/30 min-h-screen md:min-h-0 h-full overflow-y-auto">
+          <div className="w-full h-full flex flex-col md:flex-row-reverse">
+            {/* FORM COLUMN - RIGHT (refined typography) */}
+            <div className="md:w-1/2 p-8 flex items-center justify-center md:border-l border-slate-600/30 min-h-screen md:min-h-0 h-full overflow-y-auto">
               <div className="w-full max-w-md">
                 <div className="mb-6 text-sm text-base-content/70">
                   Not an admin? <button onClick={() => navigate('/login')} className="link link-hover">Go to user sign in</button>

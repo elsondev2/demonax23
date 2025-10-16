@@ -16,9 +16,13 @@ import postsRoutes from "./routes/posts.route.js";
 import adminRoutes from "./routes/admin.route.js";
 import noticesRoutes from "./routes/notices.route.js";
 import followRoutes from "./routes/follow.route.js";
+import donationRoutes from "./routes/donation.route.js";
+import featureRequestRoutes from "./routes/featureRequest.route.js";
+import mentionRoutes from "./routes/mention.route.js";
 import { app, server } from "./lib/socket.js";
 import { startStatusCleanupJob } from "./lib/statusCleanup.js";
 import { startPostCleanupJob } from "./lib/postCleanup.js";
+import { initFeatureRequestCleanup } from "./lib/featureRequestCleanup.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config();
@@ -69,6 +73,9 @@ app.use("/api/posts", postsRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/notices", noticesRoutes);
 app.use("/api/follow", followRoutes);
+app.use("/api/donations", donationRoutes);
+app.use("/api/feature-requests", featureRequestRoutes);
+app.use("/api/mentions", mentionRoutes);
 
 if (ENV.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "../frontend/dist")));
@@ -81,7 +88,8 @@ if (ENV.NODE_ENV === "production") {
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   connectDB();
-  // Start periodic cleanup for expired statuses and posts
+  // Start periodic cleanup for expired statuses, posts, and denied feature requests
   try { startStatusCleanupJob(); } catch (e) { console.log('Failed to start status cleanup job:', e?.message); }
   try { startPostCleanupJob(); } catch (e) { console.log('Failed to start post cleanup job:', e?.message); }
+  try { initFeatureRequestCleanup(); } catch (e) { console.log('Failed to start feature request cleanup job:', e?.message); }
 });

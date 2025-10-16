@@ -3,6 +3,7 @@ import Group from "../models/Group.js";
 import Message from "../models/Message.js";
 import Status from "../models/Status.js";
 import Post from "../models/Post.js";
+import Donation from "../models/Donation.js";
 import { generateToken } from "../lib/utils.js";
 import { cacheWrap, cacheInvalidate } from "../lib/cache.js";
 import { removeFromSupabase } from "../lib/supabase.js";
@@ -57,13 +58,16 @@ export const adminLogin = async (req, res) => {
 
 export const getOverview = async (_req, res) => {
   try {
-    const [users, groups, messages, statuses, dbStats] = await cacheWrap('admin:overview', 30000, async () => {
+    const [users, groups, messages, statuses, donations, dbStats] = await cacheWrap('admin:overview', 30000, async () => {
       const [userCount, groupCount, messageCount, statusCount] = await Promise.all([
         User.countDocuments({}),
         Group.countDocuments({}),
         Message.countDocuments({}),
         Status.countDocuments({ expiresAt: { $gt: new Date() } }),
       ]);
+
+      // Get donation statistics
+      const donationStats = await Donation.getStats();
 
       // Get database size information
       let databaseSize = 0;
@@ -158,7 +162,7 @@ export const getOverview = async (_req, res) => {
         console.warn('Could not estimate storage size:', error.message);
       }
 
-      return [userCount, groupCount, messageCount, statusCount, { databaseSize, storageSize }];
+      return [userCount, groupCount, messageCount, statusCount, donationStats, { databaseSize, storageSize }];
     });
 
     res.json({
@@ -166,6 +170,7 @@ export const getOverview = async (_req, res) => {
       groups,
       messages,
       activeStatuses: statuses,
+      donations,
       databaseSize: dbStats.databaseSize,
       storageSize: dbStats.storageSize
     });

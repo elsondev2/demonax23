@@ -193,6 +193,8 @@ function TermsOfServicePage() {
                 </div>
               </div>
               <div className="flex flex-col md:flex-row items-center md:items-start gap-2 md:gap-4 text-xs text-base-content/60">
+                <Link to="/eula" className="link link-hover">EULA</Link>
+                <span className="hidden md:inline">•</span>
                 <Link to="/privacy" className="link link-hover">Privacy Policy</Link>
                 <span className="hidden md:inline">•</span>
                 <a href="https://justelson-help.vercel.app/" target="_blank" rel="noopener noreferrer" className="link link-hover">Support</a>

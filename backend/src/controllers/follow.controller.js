@@ -30,11 +30,20 @@ export const followUser = async (req, res) => {
     userToFollow.followers.push(currentUserId);
     await userToFollow.save();
 
-    // Emit socket event for live updates
-    io.to(userId).emit("newFollower", {
+    // Emit socket events for live updates
+    io.emit("newFollower", {
+      userId: userId,
       followerId: currentUserId,
       followerName: currentUser.fullName,
       followerPic: currentUser.profilePic,
+    });
+
+    // Emit followUpdate event for rankings
+    io.emit("followUpdate", {
+      userId: userId,
+      followerId: currentUserId,
+      action: "follow",
+      timestamp: new Date(),
     });
 
     res.status(200).json({
@@ -81,9 +90,18 @@ export const unfollowUser = async (req, res) => {
     );
     await userToUnfollow.save();
 
-    // Emit socket event for live updates
-    io.to(userId).emit("followerRemoved", {
+    // Emit socket events for live updates
+    io.emit("followerRemoved", {
+      userId: userId,
       followerId: currentUserId,
+    });
+
+    // Emit unfollowUpdate event for rankings
+    io.emit("unfollowUpdate", {
+      userId: userId,
+      followerId: currentUserId,
+      action: "unfollow",
+      timestamp: new Date(),
     });
 
     res.status(200).json({

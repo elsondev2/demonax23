@@ -3,10 +3,9 @@ import { axiosInstance } from "../lib/axios";
 import { useAuthStore } from "../store/useAuthStore";
 import { ImageIcon, FileIcon, Trash2, Download, UploadCloud, Search, HomeIcon, User2, Heart } from "lucide-react";
 import StatusTab from "../components/StatusTab";
+import CaptionMaker from "../components/caption/CaptionMaker";
 
-function fileIconFor(contentType = "") {
-  return contentType.startsWith("image/") ? <ImageIcon className="w-5 h-5"/> : <FileIcon className="w-5 h-5"/>;
-}
+
 
 
 
@@ -27,13 +26,13 @@ export default function PostsPage() {
   const [skip, setSkip] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => { fetchFeed(); }, [typeFilter, limit, skip]);
+  useEffect(() => { fetchFeed(); }, [typeFilter, limit, skip, fetchFeed]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return feed;
     return feed.filter(p => {
-      const hay = `${p.title || ''} ${p.caption || ''} ${(p.items||[]).map(i=>i.filename||'').join(' ')}`.toLowerCase();
+      const hay = `${p.title || ''} ${p.caption || ''} ${(p.items || []).map(i => i.filename || '').join(' ')}`.toLowerCase();
       return hay.includes(q);
     });
   }, [query, feed]);
@@ -80,11 +79,11 @@ export default function PostsPage() {
       if (caption) formData.append('caption', caption);
       formData.append('visibility', visibility);
       files.forEach(f => formData.append('files', f));
-      
+
       await axiosInstance.post('/api/posts', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      
+
       setFiles([]);
       setPreviews([]);
       setTitle('');
@@ -131,13 +130,13 @@ export default function PostsPage() {
       {/* Header */}
       <div className="px-4 py-3 border-b border-base-300 bg-base-100 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Heart className="w-5 h-5 text-primary"/>
+          <Heart className="w-5 h-5 text-primary" />
           <h1 className="font-semibold text-lg">Cassisiacum</h1>
         </div>
         <div className="flex items-center gap-2">
-          <button className={`btn btn-sm ${activeTab==='home'?'btn-primary':''}`} onClick={()=>setActiveTab('home')}><HomeIcon className="w-4 h-4 mr-1"/>Home</button>
-          <button className={`btn btn-sm ${activeTab==='profile'?'btn-primary':''}`} onClick={()=>setActiveTab('profile')}><User2 className="w-4 h-4 mr-1"/>My Profile</button>
-          <button className={`btn btn-sm ${activeTab==='status'?'btn-primary':''}`} onClick={()=>setActiveTab('status')}>Status</button>
+          <button className={`btn btn-sm ${activeTab === 'home' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('home')}><HomeIcon className="w-4 h-4 mr-1" />Home</button>
+          <button className={`btn btn-sm ${activeTab === 'profile' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('profile')}><User2 className="w-4 h-4 mr-1" />My Profile</button>
+          <button className={`btn btn-sm ${activeTab === 'status' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('status')}>Status</button>
         </div>
       </div>
 
@@ -150,7 +149,7 @@ export default function PostsPage() {
               <div className="flex items-center justify-between mb-3">
                 <div className="font-medium">Create a post</div>
                 <div className="flex items-center gap-2">
-                  <select className="select select-bordered select-sm" value={visibility} onChange={e=>setVisibility(e.target.value)}>
+                  <select className="select select-bordered select-sm" value={visibility} onChange={e => setVisibility(e.target.value)}>
                     <option value="members">Members</option>
                     <option value="public">Public</option>
                   </select>
@@ -159,17 +158,30 @@ export default function PostsPage() {
                       <span className="loading loading-spinner loading-xs"></span>
                     ) : (
                       <>
-                        <UploadCloud className="w-4 h-4 mr-1"/>
+                        <UploadCloud className="w-4 h-4 mr-1" />
                         Post
                       </>
                     )}
                   </button>
                 </div>
               </div>
-              <input className="input input-bordered w-full mb-2" placeholder="Title (optional)" value={title} onChange={e=>setTitle(e.target.value)} />
-              <textarea className="textarea textarea-bordered w-full mb-3" rows={2} placeholder="Say something..." value={caption} onChange={e=>setCaption(e.target.value)} />
+              <input className="input input-bordered w-full mb-2" placeholder="Title (optional)" value={title} onChange={e => setTitle(e.target.value)} />
+              
+              <div className="mb-3">
+                <label className="label">
+                  <span className="label-text">Caption</span>
+                </label>
+                <CaptionMaker
+                  mode="advanced"
+                  context="post"
+                  initialValue={caption}
+                  onSave={(captionData) => setCaption(captionData.text)}
+                  placeholder="Write your post caption..."
+                  allowedFormats={['bold', 'italic', 'emoji', 'mention', 'hashtag']}
+                />
+              </div>
 
-              <div onDrop={onDrop} onDragOver={(e)=>e.preventDefault()} className="border-2 border-dashed rounded-xl p-6 text-center bg-base-200/60">
+              <div onDrop={onDrop} onDragOver={(e) => e.preventDefault()} className="border-2 border-dashed rounded-xl p-6 text-center bg-base-200/60">
                 <div className="mb-2">Drag & drop up to 10 files (images or docs) here</div>
                 <input type="file" multiple onChange={onBrowse} className="file-input file-input-bordered" />
               </div>
@@ -186,7 +198,7 @@ export default function PostsPage() {
                           <div className="text-xs mt-1">{files[idx]?.name || 'File'}</div>
                         </div>
                       )}
-                      <button className="btn btn-xs btn-error absolute top-1 right-1" onClick={()=>removeFile(idx)}>Remove</button>
+                      <button className="btn btn-xs btn-error absolute top-1 right-1" onClick={() => removeFile(idx)}>Remove</button>
                     </div>
                   ))}
                 </div>
@@ -197,24 +209,24 @@ export default function PostsPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="join">
-                  <button className={`btn btn-sm join-item ${typeFilter===''?'btn-primary':''}`} onClick={()=>setTypeFilter('')}>All</button>
-                  <button className={`btn btn-sm join-item ${typeFilter==='images'?'btn-primary':''}`} onClick={()=>setTypeFilter('images')}>Images</button>
-                  <button className={`btn btn-sm join-item ${typeFilter==='docs'?'btn-primary':''}`} onClick={()=>setTypeFilter('docs')}>Docs</button>
+                  <button className={`btn btn-sm join-item ${typeFilter === '' ? 'btn-primary' : ''}`} onClick={() => setTypeFilter('')}>All</button>
+                  <button className={`btn btn-sm join-item ${typeFilter === 'images' ? 'btn-primary' : ''}`} onClick={() => setTypeFilter('images')}>Images</button>
+                  <button className={`btn btn-sm join-item ${typeFilter === 'docs' ? 'btn-primary' : ''}`} onClick={() => setTypeFilter('docs')}>Docs</button>
                 </div>
                 <div className="relative">
-                  <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-base-content/50"/>
-                  <input className="input input-bordered input-sm pl-7" placeholder="Search caption, filename" value={query} onChange={e=>setQuery(e.target.value)} />
+                  <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-base-content/50" />
+                  <input className="input input-bordered input-sm pl-7" placeholder="Search caption, filename" value={query} onChange={e => setQuery(e.target.value)} />
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <select className="select select-bordered select-sm" value={limit} onChange={e=>setLimit(parseInt(e.target.value)||50)}>
+                <select className="select select-bordered select-sm" value={limit} onChange={e => setLimit(parseInt(e.target.value) || 50)}>
                   <option value={50}>50</option>
                   <option value={75}>75</option>
                   <option value={100}>100</option>
                 </select>
                 <div className="join">
-                  <button className="btn btn-sm join-item" onClick={()=>setSkip(Math.max(0, skip - limit))} disabled={skip===0}>Prev</button>
-                  <button className="btn btn-sm join-item" onClick={()=>setSkip(skip + limit)}>Next</button>
+                  <button className="btn btn-sm join-item" onClick={() => setSkip(Math.max(0, skip - limit))} disabled={skip === 0}>Prev</button>
+                  <button className="btn btn-sm join-item" onClick={() => setSkip(skip + limit)}>Next</button>
                 </div>
               </div>
             </div>
@@ -231,7 +243,7 @@ export default function PostsPage() {
                   <div key={post._id} className="bg-base-100 border border-base-300 rounded-xl overflow-hidden hover:shadow-lg transition-shadow">
                     <div className="aspect-square bg-base-200 flex items-center justify-center">
                       {post.items?.[0]?.contentType?.startsWith('image/') ? (
-                        <img src={post.items[0].url} alt={post.title||'Post'} className="w-full h-full object-cover"/>
+                        <img src={post.items[0].url} alt={post.title || 'Post'} className="w-full h-full object-cover" />
                       ) : (
                         <div className="text-base-content/60 flex flex-col items-center">
                           <FileIcon className="w-12 h-12" />
@@ -248,20 +260,20 @@ export default function PostsPage() {
                             </div>
                           </div>
                           <div className="text-sm font-medium truncate">{post.postedBy?.fullName || 'User'}</div>
-                          <div className="ml-auto text-xs text-base-content/60">{new Date(post.createdAt).toLocaleString([], { month:'short', day:'numeric' })}</div>
+                          <div className="ml-auto text-xs text-base-content/60">{new Date(post.createdAt).toLocaleString([], { month: 'short', day: 'numeric' })}</div>
                         </div>
                       </div>
                       <div className="font-medium truncate">{post.title || 'Untitled'}</div>
                       <div className="text-sm text-base-content/70 line-clamp-2">{post.caption}</div>
                       <div className="mt-2 flex items-center gap-2 flex-wrap">
-                        {(post.items||[]).slice(0,3).map((it,idx)=> (
+                        {(post.items || []).slice(0, 3).map((it, idx) => (
                           <div key={idx} className="badge badge-outline badge-xs">{it.filename}</div>
                         ))}
-                        {post.items?.length > 3 && <div className="badge badge-outline badge-xs">+{post.items.length-3}</div>}
+                        {post.items?.length > 3 && <div className="badge badge-outline badge-xs">+{post.items.length - 3}</div>}
                       </div>
                       {(post.postedBy?._id || post.postedBy) === authUser?._id && (
                         <div className="mt-2 flex gap-1">
-                          <button className="btn btn-xs btn-error" onClick={()=>deletePost(post._id)}><Trash2 className="w-3 h-3"/></button>
+                          <button className="btn btn-xs btn-error" onClick={() => deletePost(post._id)}><Trash2 className="w-3 h-3" /></button>
                         </div>
                       )}
                     </div>

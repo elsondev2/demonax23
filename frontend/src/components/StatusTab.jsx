@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import useStatusStore from "../store/useStatusStore";
 import { useAuthStore } from "../store/useAuthStore";
 import Avatar from "./Avatar";
+import CaptionMaker from "./caption/CaptionMaker";
 
 function StatusAvatar({ user, onClick }) {
   const name = user?.fullName || user?.name || 'User';
@@ -153,7 +154,19 @@ function StatusComposerModal({ open, onClose }) {
             <img src={preview} alt="preview" className="w-full rounded mb-2 max-h-72 object-contain" />
           )
         )}
-        <input className="input input-bordered w-full mb-2" placeholder="Caption (optional)" value={caption} onChange={e=>setCaption(e.target.value)} />
+        <div className="mb-2">
+          <label className="label">
+            <span className="label-text">Caption (optional)</span>
+          </label>
+          <CaptionMaker
+            mode="quick"
+            context="status"
+            initialValue={caption}
+            onSave={(captionData) => setCaption(captionData.text)}
+            placeholder="Add a caption..."
+            allowedFormats={['emoji', 'mention']}
+          />
+        </div>
         <select className="select select-bordered w-full mb-4" value={audience} onChange={e=>setAudience(e.target.value)}>
           <option value="contacts">Contacts</option>
           <option value="public">Public</option>

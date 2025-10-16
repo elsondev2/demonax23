@@ -4,7 +4,67 @@ import { axiosInstance } from "../lib/axios";
 import { useAuthStore } from "../store/useAuthStore";
 import toast from "react-hot-toast";
 
-export default function FollowButton({ userId, size = "sm", className = "" }) {
+// Follower Count Display Component
+export function FollowerCount({ userId, className = "" }) {
+  const [followerCount, setFollowerCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  const fetchFollowerCount = async () => {
+    try {
+      const res = await axiosInstance.get(`/api/follow/stats/${userId}`);
+      setFollowerCount(res.data.followersCount);
+    } catch (error) {
+      console.error("Error fetching follower count:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (userId) {
+      fetchFollowerCount();
+    }
+  }, [userId]);
+
+  // Listen for real-time follower updates
+  useEffect(() => {
+    const { socket } = useAuthStore.getState();
+
+    const handleNewFollower = (data) => {
+      if (data.userId === userId) {
+        setFollowerCount(prev => prev + 1);
+      }
+    };
+
+    const handleFollowerRemoved = (data) => {
+      if (data.userId === userId) {
+        setFollowerCount(prev => Math.max(0, prev - 1));
+      }
+    };
+
+    if (socket) {
+      socket.on("newFollower", handleNewFollower);
+      socket.on("followerRemoved", handleFollowerRemoved);
+
+      return () => {
+        socket.off("newFollower", handleNewFollower);
+        socket.off("followerRemoved", handleFollowerRemoved);
+      };
+    }
+  }, [userId]);
+
+  if (loading) {
+    return <span className={`text-sm text-base-content/60 ${className}`}>...</span>;
+  }
+
+  return (
+    <span className={`text-sm text-base-content/60 ${className}`}>
+      {followerCount} {followerCount === 1 ? 'follower' : 'followers'}
+    </span>
+  );
+}
+
+export default function FollowButton({ userId, size = "sm", className = "", onFollowChange }) {
   const { authUser } = useAuthStore();
   const [isFollowing, setIsFollowing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -14,6 +74,35 @@ export default function FollowButton({ userId, size = "sm", className = "" }) {
       checkFollowStatus();
     }
   }, [userId, authUser?._id]);
+
+  // Listen for real-time follower updates
+  useEffect(() => {
+    const { socket } = useAuthStore.getState();
+
+    const handleNewFollower = (data) => {
+      if (data.followerId === authUser?._id && data.userId === userId) {
+        setIsFollowing(true);
+        onFollowChange?.(true);
+      }
+    };
+
+    const handleFollowerRemoved = (data) => {
+      if (data.followerId === authUser?._id && data.userId === userId) {
+        setIsFollowing(false);
+        onFollowChange?.(false);
+      }
+    };
+
+    if (socket) {
+      socket.on("newFollower", handleNewFollower);
+      socket.on("followerRemoved", handleFollowerRemoved);
+
+      return () => {
+        socket.off("newFollower", handleNewFollower);
+        socket.off("followerRemoved", handleFollowerRemoved);
+      };
+    }
+  }, [userId, authUser?._id, onFollowChange]);
 
   const checkFollowStatus = async () => {
     try {

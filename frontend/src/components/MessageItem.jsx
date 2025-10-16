@@ -3,6 +3,7 @@ import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { AlertCircle, RotateCcw, Edit, Trash2, Quote, FileText, Play, Pause, Volume2, MoreVertical, Phone, Video } from "lucide-react";
 import useLongPress from "../hooks/useLongPress";
+import Avatar from "./Avatar";
 
 const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selectedGroup, groupPosition, isUnread }) => {
   const { authUser } = useAuthStore();
@@ -301,11 +302,12 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
       <div className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} items-end gap-2`}>
         {/* Avatar for received messages */}
         {!isOwnMessage && showAvatar && (
-          <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 mb-1">
-            <img
-              src={senderInfo.avatar || '/avatar.png'}
-              alt={senderInfo.name}
-              className="w-full h-full object-cover"
+          <div className="flex-shrink-0 mb-1">
+            <Avatar
+              src={senderInfo.avatar}
+              name={senderInfo.name}
+              size="w-8 h-8"
+              className="rounded-full"
             />
           </div>
         )}
@@ -560,11 +562,12 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
 
         {/* Avatar for sent messages (optional, usually not shown) */}
         {isOwnMessage && showAvatar && false && (
-          <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 mb-1">
-            <img
-              src={senderInfo.avatar || '/avatar.png'}
-              alt={senderInfo.name}
-              className="w-full h-full object-cover"
+          <div className="flex-shrink-0 mb-1">
+            <Avatar
+              src={senderInfo.avatar}
+              name={senderInfo.name}
+              size="w-8 h-8"
+              className="rounded-full"
             />
           </div>
         )}

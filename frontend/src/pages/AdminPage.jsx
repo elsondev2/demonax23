@@ -2,10 +2,12 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { axiosInstance } from "../lib/axios";
 import { useAuthStore } from "../store/useAuthStore";
 import { useNavigate } from "react-router";
-import { LogOutIcon, Users, MessageSquare, Layers, Image, Trash2, Edit2, X, LayoutDashboard, Download, Search, FileText, Database, HardDrive, Camera, Megaphone, Bell, Edit } from "lucide-react";
+import { LogOutIcon, Users, MessageSquare, Layers, Image, Trash2, Edit2, X, LayoutDashboard, Download, Search, FileText, Database, HardDrive, Camera, Megaphone, Bell, Edit, MessageCircle, ThumbsUp, CheckCircle, XCircle, Clock, RefreshCw, Menu, Settings } from "lucide-react";
 import toast from "react-hot-toast";
 import Avatar from "../components/Avatar";
 import AnnouncementModal from "../components/AnnouncementModal";
+import AppearanceModal from "../components/AppearanceModal";
+import { useThemeStore } from "../store/useThemeStore";
 
 // Utility function to format file sizes
 function formatFileSize(bytes) {
@@ -17,9 +19,15 @@ function formatFileSize(bytes) {
 
 export default function AdminPage() {
   const { authUser, logout, socket } = useAuthStore();
+  const { openModal } = useThemeStore();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [loading, setLoading] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  
+  // Swipe gesture state
+  const [touchStart, setTouchStart] = useState(null);
+  const [touchEnd, setTouchEnd] = useState(null);
 
   // Data states
   const [overview, setOverview] = useState(null);
@@ -53,7 +61,6 @@ export default function AdminPage() {
   const [postsVisibility, setPostsVisibility] = useState("");
 
   const [announcements, setAnnouncements] = useState([]);
-  const [announcementForm, setAnnouncementForm] = useState({ title: '', content: '', priority: 'normal' });
 
   // Modal states
   const [isAnnouncementModalOpen, setIsAnnouncementModalOpen] = useState(false);
@@ -61,6 +68,10 @@ export default function AdminPage() {
 
   const [followLeaderboard, setFollowLeaderboard] = useState([]);
   const [followLeaderboardLimit, setFollowLeaderboardLimit] = useState(50);
+
+  // Feature requests state
+  const [featureRequests, setFeatureRequests] = useState([]);
+  const [featureRequestsLoading, setFeatureRequestsLoading] = useState(false);
 
   // Messages subviews
   const [messagesSubTab, setMessagesSubTab] = useState('all'); // 'all' | 'conversations'
@@ -201,6 +212,17 @@ export default function AdminPage() {
       } else if (activeTab === "follow-leaderboard") {
         const res = await fetchCached(`follow_leaderboard_${followLeaderboardLimit}`, () => axiosInstance.get(`/api/admin/follow-leaderboard?limit=${followLeaderboardLimit}`), 30000);
         setFollowLeaderboard(res.data || []);
+      } else if (activeTab === "feature-requests") {
+        setFeatureRequestsLoading(true);
+        try {
+          const res = await axiosInstance.get('/api/feature-requests/admin/all');
+          setFeatureRequests(res.data.requests || []);
+        } catch (error) {
+          console.error('Failed to load feature requests:', error);
+          toast.error('Failed to load feature requests');
+        } finally {
+          setFeatureRequestsLoading(false);
+        }
       }
     } catch (error) {
       console.error('Load error:', error);
@@ -241,6 +263,8 @@ export default function AdminPage() {
     socket.on('statusPosted', schedule);
     socket.on('messageUpdated', schedule);
     socket.on('profileUpdated', schedule);
+    socket.on('featureRequest:statusUpdated', schedule);
+    socket.on('featureRequest:deleted', schedule);
     return () => {
       socket.off('userUpdated', schedule);
       socket.off('newMessage', schedule);
@@ -249,6 +273,8 @@ export default function AdminPage() {
       socket.off('statusPosted', schedule);
       socket.off('messageUpdated', schedule);
       socket.off('profileUpdated', schedule);
+      socket.off('featureRequest:statusUpdated', schedule);
+      socket.off('featureRequest:deleted', schedule);
       if (t) clearTimeout(t);
     };
   }, [socket, activeTab, messagesSubTab, groupsSubTab, loadData]);
@@ -284,14 +310,19 @@ export default function AdminPage() {
       // Special handling for announcements
       if (deleteModal.type === 'announcements') {
         await axiosInstance.delete(`/api/notices/announcements/${deleteModal.id}`);
+      }
+      // Special handling for feature requests
+      else if (deleteModal.type === 'feature-requests') {
+        await axiosInstance.delete(`/api/feature-requests/admin/feature-requests/${deleteModal.id}`);
       } else {
         await axiosInstance.delete(`/api/admin/${deleteModal.type}/${deleteModal.id}`);
       }
       toast.success(`${deleteModal.type.slice(0, -1)} deleted successfully`);
       setDeleteModal(null);
       loadData();
-    } catch {
-      toast.error("Failed to delete");
+    } catch (error) {
+      console.error('Delete error:', error);
+      toast.error("Failed to delete: " + (error.response?.data?.message || error.message));
     }
   };
 
@@ -310,7 +341,7 @@ export default function AdminPage() {
     }
   };
 
-  const handleModalSuccess = (newAnnouncement) => {
+  const handleModalSuccess = () => {
     // Refresh the announcements data
     loadData();
   };
@@ -320,10 +351,40 @@ export default function AdminPage() {
     setIsAnnouncementModalOpen(true);
   };
 
-  const handleEditSuccess = (updatedAnnouncement) => {
+  const handleEditSuccess = () => {
     // Refresh the announcements data
     loadData();
     setEditingAnnouncement(null);
+  };
+
+  // Swipe gesture handlers
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+    
+    // Swipe from left edge to open sidebar
+    if (isRightSwipe && touchStart < 50 && !isSidebarOpen) {
+      setIsSidebarOpen(true);
+    }
+    
+    // Swipe left to close sidebar
+    if (isLeftSwipe && isSidebarOpen) {
+      setIsSidebarOpen(false);
+    }
   };
 
   if (!authUser) return null;
@@ -351,6 +412,7 @@ export default function AdminPage() {
     { id: "groups", label: "Groups", icon: Layers },
     { id: "community", label: "Community", icon: Users },
     { id: "posts", label: "Posts", icon: FileText },
+    { id: "feature-requests", label: "Feature Requests", icon: MessageCircle },
     { id: "announcements", label: "Announcements", icon: Megaphone },
     { id: "follow-leaderboard", label: "Follow Leaders", icon: Users },
     { id: "uploads", label: "Uploads", icon: Download },
@@ -358,178 +420,268 @@ export default function AdminPage() {
   ];
 
   return (
-    <div className="w-full h-screen bg-base-300 flex flex-col overflow-hidden">
-      {/* Fixed Header - DaisyUI navbar */}
-      <div className="navbar bg-base-100 border-b flex-shrink-0 min-h-fit py-2">
-        <div className="navbar-start flex-1">
-          <div className="flex-1 min-w-0">
-            <h1 className="text-lg md:text-2xl font-semibold text-base-content truncate">Admin Dashboard</h1>
-            <p className="text-xs md:text-sm text-base-content/60 mt-1 truncate">Logged in as: {authUser?.email}</p>
-          </div>
-        </div>
-        <div className="navbar-end">
-          <div className="flex gap-1 md:gap-2">
-            <a
-              href="https://justelson-help.vercel.app/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-xs md:btn-sm btn-ghost gap-1 md:gap-2"
+    <div 
+      className="w-full h-screen bg-base-300 flex overflow-hidden"
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    >
+      {/* Mobile Overlay */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <div className={`
+        fixed lg:relative inset-y-0 left-0 z-50
+        w-64 bg-base-100 border-r border-base-300 flex flex-col flex-shrink-0
+        transform transition-transform duration-300 ease-in-out
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      `}>
+        {/* Sidebar Header */}
+        <div className="p-4 border-b border-base-300">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold text-base-content">Admin Panel</h1>
+              <button
+                className="btn btn-xs btn-ghost btn-circle"
+                title="Appearance & Customization"
+                onClick={() => openModal()}
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+            </div>
+            {/* Close button for mobile */}
+            <button
+              className="btn btn-sm btn-ghost btn-circle lg:hidden"
+              onClick={() => setIsSidebarOpen(false)}
             >
-              <span className="hidden sm:inline">Support</span>
-            </a>
-            <button className="btn btn-xs md:btn-sm btn-ghost hidden sm:flex" onClick={() => navigate('/')}>Back to App</button>
-            <button className="btn btn-xs md:btn-sm btn-error gap-1 md:gap-2" onClick={() => { logout(); navigate('/admin/login'); }}>
-              <LogOutIcon className="w-3 h-3 md:w-4 md:h-4" />
-              <span className="hidden sm:inline">Logout</span>
+              <X className="w-4 h-4" />
             </button>
           </div>
+          <p className="text-xs text-base-content/60 mt-1">Logged in as: {authUser?.email}</p>
+        </div>
+
+        {/* Sidebar Navigation */}
+        <div className="flex-1 overflow-y-auto p-2">
+          <nav className="space-y-1">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    setActiveTab(tab.id);
+                    setIsSidebarOpen(false); // Close sidebar on mobile
+                  }}
+                  className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === tab.id
+                    ? "bg-primary text-primary-content"
+                    : "text-base-content hover:bg-base-200"
+                    }`}
+                >
+                  <Icon className="w-5 h-5 flex-shrink-0" />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* Sidebar Footer */}
+        <div className="p-4 border-t border-base-300 space-y-2">
+          <a
+            href="https://justelson-help.vercel.app/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-sm btn-ghost w-full justify-start gap-2"
+          >
+            <span className="text-xs">Support</span>
+          </a>
+          <button className="btn btn-sm btn-ghost w-full justify-start gap-2" onClick={() => navigate('/')}>
+            <span className="text-xs">Back to App</span>
+          </button>
+          <button
+            className="btn btn-sm btn-error w-full justify-start gap-2"
+            onClick={() => { logout(); navigate('/admin/login'); }}
+          >
+            <LogOutIcon className="w-4 h-4" />
+            <span className="text-xs">Logout</span>
+          </button>
         </div>
       </div>
 
-      {/* Fixed Tabs - DaisyUI tabs */}
-      <div className="bg-base-100 border-b flex-shrink-0">
-        <div className="tabs tabs-bordered max-w-7xl mx-auto px-2 md:px-4 overflow-x-auto">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            return (
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Top Header Bar */}
+        <div className="bg-base-100 border-b border-base-300 px-3 md:px-6 py-3 flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {/* Mobile Menu Button */}
               <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`tab tab-bordered flex items-center gap-1 md:gap-2 whitespace-nowrap min-w-fit px-2 md:px-4 py-3 text-xs md:text-sm ${activeTab === tab.id ? "tab-active" : ""
-                  }`}
+                className="btn btn-sm btn-ghost btn-circle lg:hidden"
+                onClick={() => setIsSidebarOpen(true)}
+                title="Open Menu"
               >
-                <Icon className="w-3 h-3 md:w-4 md:h-4 flex-shrink-0" />
-                <span className="hidden sm:inline md:inline">{tab.label}</span>
+                <Menu className="w-5 h-5" />
               </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Scrollable Content */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-7xl mx-auto p-3 md:p-6">
-          {loading ? (
-            <div className="flex justify-center py-12">
-              <span className="loading loading-spinner loading-lg"></span>
+              
+              <div>
+                <h2 className="text-base md:text-lg font-semibold text-base-content">
+                  {tabs.find(tab => tab.id === activeTab)?.label || 'Dashboard'}
+                </h2>
+                <p className="text-xs md:text-sm text-base-content/60 hidden sm:block">
+                  Manage and monitor your application
+                </p>
+              </div>
             </div>
-          ) : (
-            <>
-              {activeTab === "dashboard" && <DashboardView overview={overview} users={users} messages={messages} groups={groups} statuses={statuses} recentActivity={recentActivity} />}
-              {activeTab === "users" && <UsersView users={users} setEditModal={setEditModal} setDeleteModal={setDeleteModal} />}
-              {activeTab === "messages" && (
-                <MessagesView
-                  messagesSubTab={messagesSubTab}
-                  setMessagesSubTab={setMessagesSubTab}
-                  messages={messages}
-                  conversations={conversations}
-                  selectedConversation={selectedConversation}
-                  threadMessages={threadMessages}
-                  onSelectConversation={onSelectConversation}
-                  setEditModal={setEditModal}
-                  setDeleteModal={setDeleteModal}
-                  q={messagesQ}
-                  setQ={setMessagesQ}
-                  page={messagesPage}
-                  setPage={setMessagesPage}
-                  perPage={messagesPerPage}
-                  setPerPage={setMessagesPerPage}
-                  convPage={conversationsPage}
-                  setConvPage={setConversationsPage}
-                  convPerPage={conversationsPerPage}
-                  setConvPerPage={setConversationsPerPage}
-                  dmThreadQ={dmThreadQ}
-                  setDmThreadQ={setDmThreadQ}
-                  loading={loading}
-                />
-              )}
-              {activeTab === "groups" && (
-                <GroupsView
-                  groups={groups}
-                  setEditModal={setEditModal}
-                  setDeleteModal={setDeleteModal}
-                  groupsSubTab={groupsSubTab}
-                  setGroupsSubTab={setGroupsSubTab}
-                  groupConversations={groupConversations}
-                  selectedGroup={selectedGroup}
-                  groupThreadMessages={groupThreadMessages}
-                  onSelectGroupConversation={onSelectGroupConversation}
-                  q={groupsQ}
-                  setQ={setGroupsQ}
-                  page={groupsPage}
-                  setPage={_setGroupsPage}
-                  perPage={groupsPerPage}
-                  setPerPage={() => { }}
-                  convPage={groupConvPage}
-                  setConvPage={setGroupConvPage}
-                  convPerPage={groupConvPerPage}
-                  setConvPerPage={setGroupConvPerPage}
-                  loading={loading}
-                  groupThreadQ={groupThreadQ}
-                  setGroupThreadQ={setGroupThreadQ}
-                />
-              )}
-              {activeTab === "community" && (
-                <CommunityGroupsView
-                  communityGroups={communityGroups}
-                  setCommunityGroups={setCommunityGroups}
-                  loading={loading}
-                  onRefresh={loadData}
-                />
-              )}
-              {activeTab === "posts" && (
-                <PostsView
-                  posts={posts}
-                  q={postsQ}
-                  setQ={setPostsQ}
-                  page={postsPage}
-                  setPage={setPostsPage}
-                  perPage={postsPerPage}
-                  setPerPage={setPostsPerPage}
-                  total={postsTotal}
-                  visibility={postsVisibility}
-                  setVisibility={setPostsVisibility}
-                  onRefresh={loadData}
-                  loading={loading}
-                  setDeleteModal={setDeleteModal}
-                />
-              )}
-              {activeTab === "uploads" && (
-                <UploadsView
-                  uploads={uploads}
-                  q={uploadsQ}
-                  setQ={setUploadsQ}
-                  page={uploadsPage}
-                  setPage={setUploadsPage}
-                  perPage={uploadsPerPage}
-                  setPerPage={setUploadsPerPage}
-                  total={uploadsTotal}
-                  onRefresh={loadData}
-                  loading={loading}
-                />
-              )}
-              {activeTab === "statuses" && <StatusesView statuses={statuses} setDeleteModal={setDeleteModal} />}
-              {activeTab === "announcements" && (
-                <AnnouncementsView
-                  announcements={announcements}
-                  onRefresh={loadData}
-                  setDeleteModal={setDeleteModal}
-                  isAnnouncementModalOpen={isAnnouncementModalOpen}
-                  setIsAnnouncementModalOpen={setIsAnnouncementModalOpen}
-                  onEditAnnouncement={handleEditAnnouncement}
-                />
-              )}
-              {activeTab === "follow-leaderboard" && (
-                <FollowLeaderboardView
-                  leaderboard={followLeaderboard}
-                  limit={followLeaderboardLimit}
-                  setLimit={setFollowLeaderboardLimit}
-                  onRefresh={loadData}
-                  loading={loading}
-                />
-              )}
-            </>
-          )}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={loadData}
+                className="btn btn-sm btn-ghost gap-2"
+                title="Refresh Data"
+              >
+                <RefreshCw className="w-4 h-4" />
+                <span className="hidden sm:inline text-xs">Refresh</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-3 md:p-6">
+            {loading ? (
+              <div className="flex justify-center py-12">
+                <span className="loading loading-spinner loading-lg"></span>
+              </div>
+            ) : (
+              <>
+                {activeTab === "dashboard" && <DashboardView overview={overview} users={users} messages={messages} groups={groups} statuses={statuses} recentActivity={recentActivity} />}
+                {activeTab === "users" && <UsersView users={users} setEditModal={setEditModal} setDeleteModal={setDeleteModal} />}
+                {activeTab === "messages" && (
+                  <MessagesView
+                    messagesSubTab={messagesSubTab}
+                    setMessagesSubTab={setMessagesSubTab}
+                    messages={messages}
+                    conversations={conversations}
+                    selectedConversation={selectedConversation}
+                    threadMessages={threadMessages}
+                    onSelectConversation={onSelectConversation}
+                    setEditModal={setEditModal}
+                    setDeleteModal={setDeleteModal}
+                    q={messagesQ}
+                    setQ={setMessagesQ}
+                    page={messagesPage}
+                    setPage={setMessagesPage}
+                    perPage={messagesPerPage}
+                    setPerPage={setMessagesPerPage}
+                    convPage={conversationsPage}
+                    setConvPage={setConversationsPage}
+                    convPerPage={conversationsPerPage}
+                    setConvPerPage={setConversationsPerPage}
+                    dmThreadQ={dmThreadQ}
+                    setDmThreadQ={setDmThreadQ}
+                    loading={loading}
+                  />
+                )}
+                {activeTab === "groups" && (
+                  <GroupsView
+                    groups={groups}
+                    setEditModal={setEditModal}
+                    setDeleteModal={setDeleteModal}
+                    groupsSubTab={groupsSubTab}
+                    setGroupsSubTab={setGroupsSubTab}
+                    groupConversations={groupConversations}
+                    selectedGroup={selectedGroup}
+                    groupThreadMessages={groupThreadMessages}
+                    onSelectGroupConversation={onSelectGroupConversation}
+                    q={groupsQ}
+                    setQ={setGroupsQ}
+                    page={groupsPage}
+                    setPage={_setGroupsPage}
+                    perPage={groupsPerPage}
+                    convPage={groupConvPage}
+                    setConvPage={setGroupConvPage}
+                    convPerPage={groupConvPerPage}
+                    setConvPerPage={setGroupConvPerPage}
+                    loading={loading}
+                    groupThreadQ={groupThreadQ}
+                    setGroupThreadQ={setGroupThreadQ}
+                  />
+                )}
+                {activeTab === "community" && (
+                  <CommunityGroupsView
+                    communityGroups={communityGroups}
+                    setCommunityGroups={setCommunityGroups}
+                    loading={loading}
+                    onRefresh={loadData}
+                  />
+                )}
+                {activeTab === "posts" && (
+                  <PostsView
+                    posts={posts}
+                    q={postsQ}
+                    setQ={setPostsQ}
+                    page={postsPage}
+                    setPage={setPostsPage}
+                    perPage={postsPerPage}
+                    setPerPage={setPostsPerPage}
+                    total={postsTotal}
+                    visibility={postsVisibility}
+                    setVisibility={setPostsVisibility}
+                    onRefresh={loadData}
+                    loading={loading}
+                    setDeleteModal={setDeleteModal}
+                  />
+                )}
+                {activeTab === "uploads" && (
+                  <UploadsView
+                    uploads={uploads}
+                    q={uploadsQ}
+                    setQ={setUploadsQ}
+                    page={uploadsPage}
+                    setPage={setUploadsPage}
+                    perPage={uploadsPerPage}
+                    setPerPage={setUploadsPerPage}
+                    total={uploadsTotal}
+                    onRefresh={loadData}
+                    loading={loading}
+                  />
+                )}
+                {activeTab === "statuses" && <StatusesView statuses={statuses} setDeleteModal={setDeleteModal} />}
+                {activeTab === "announcements" && (
+                  <AnnouncementsView
+                    announcements={announcements}
+                    onRefresh={loadData}
+                    setDeleteModal={setDeleteModal}
+                    isAnnouncementModalOpen={isAnnouncementModalOpen}
+                    setIsAnnouncementModalOpen={setIsAnnouncementModalOpen}
+                    onEditAnnouncement={handleEditAnnouncement}
+                  />
+                )}
+                {activeTab === "follow-leaderboard" && (
+                  <FollowLeaderboardView
+                    leaderboard={followLeaderboard}
+                    limit={followLeaderboardLimit}
+                    setLimit={setFollowLeaderboardLimit}
+                    onRefresh={loadData}
+                    loading={loading}
+                  />
+                )}
+                {activeTab === "feature-requests" && (
+                  <FeatureRequestsView
+                    requests={featureRequests}
+                    loading={featureRequestsLoading}
+                    onRefresh={loadData}
+                    setDeleteModal={setDeleteModal}
+                  />
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -554,6 +706,9 @@ export default function AdminPage() {
         initialData={editingAnnouncement}
         isEditing={!!editingAnnouncement}
       />
+
+      {/* Appearance/Customization Modal */}
+      <AppearanceModal />
     </div>
   );
 }
@@ -1181,7 +1336,6 @@ function MessagesView({ messagesSubTab, setMessagesSubTab, messages, conversatio
                     <button className="join-item btn btn-sm" onClick={() => setConvPage(p => p + 1)}>Next</button>
                   </div>
                 </div>
-                s
                 <div className="space-y-2">
                   {conversations.map((c, idx) => (
                     <button
@@ -1683,6 +1837,267 @@ function GroupsView({ groups, setEditModal, setDeleteModal, groupsSubTab, setGro
             </div>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+// Feature Requests View for Admin
+import FeatureRequestModal from "../components/admin/FeatureRequestModal";
+import DeclineConfirmationModal from "../components/admin/DeclineConfirmationModal";
+
+// Feature Requests View for Admin
+function FeatureRequestsView({ requests, loading, onRefresh, setDeleteModal }) {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('newest');
+  const [selectedRequest, setSelectedRequest] = useState(null);
+  const [declineModalRequest, setDeclineModalRequest] = useState(null);
+
+  // Filter and sort requests
+  const filteredRequests = requests
+    .filter(request => {
+      const matchesSearch = request.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        request.description.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesStatus = statusFilter === 'all' || request.status === statusFilter;
+      const matchesCategory = categoryFilter === 'all' || request.category === categoryFilter;
+
+      return matchesSearch && matchesStatus && matchesCategory;
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'oldest':
+          return new Date(a.createdAt) - new Date(b.createdAt);
+        case 'mostVotes':
+          return (b.upvotes - b.downvotes) - (a.upvotes - a.downvotes);
+        case 'leastVotes':
+          return (a.upvotes - a.downvotes) - (b.upvotes - b.downvotes);
+        case 'newest':
+        default:
+          return new Date(b.createdAt) - new Date(a.createdAt);
+      }
+    });
+
+  // Status badge styling
+  const getStatusBadge = (status) => {
+    const badges = {
+      'pending': 'badge-neutral',
+      'reviewing': 'badge-warning',
+      'approved': 'badge-success',
+      'rejected': 'badge-error',
+      'implemented': 'badge-info'
+    };
+
+    return badges[status] || 'badge-neutral';
+  };
+
+  // Category badge styling
+  const getCategoryBadge = (category) => {
+    const badges = {
+      'bug': 'badge-error',
+      'feature': 'badge-primary',
+      'improvement': 'badge-secondary',
+      'ui': 'badge-accent'
+    };
+
+    return badges[category] || 'badge-neutral';
+  };
+
+  const updateRequest = async (requestId, action, reason = null) => {
+    try {
+      let response;
+      if (action === 'approve') {
+        response = await axiosInstance.patch(`/api/feature-requests/admin/feature-requests/${requestId}/approve`);
+      } else if (action === 'decline') {
+        response = await axiosInstance.patch(`/api/feature-requests/admin/feature-requests/${requestId}/decline`, { reason });
+      } else {
+        // Legacy status update
+        response = await axiosInstance.patch(`/api/feature-requests/admin/feature-requests/${requestId}/status`, { status: action.status, category: action.category });
+      }
+
+      if (response.data.success) {
+        toast.success(`Request ${action === 'approve' ? 'approved' : action === 'decline' ? 'declined' : 'updated'} successfully!`);
+        onRefresh();
+      } else {
+        toast.error('Failed to update request.');
+      }
+    } catch (error) {
+      console.error('Error updating request:', error);
+      toast.error(error.response?.data?.message || 'Failed to update request.');
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Header Section */}
+      <div className="card bg-base-100 shadow">
+        <div className="card-body p-4 md:p-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <h2 className="text-base md:text-lg font-semibold">Feature Request Management</h2>
+              <p className="text-sm text-base-content/60 hidden sm:block">Manage and moderate community feature requests</p>
+            </div>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
+              <div className="stats shadow stats-vertical sm:stats-horizontal">
+                <div className="stat py-2 px-3">
+                  <div className="stat-title text-xs">Total Requests</div>
+                  <div className="stat-value text-sm md:text-lg text-primary">{requests.length}</div>
+                </div>
+                <div className="stat py-2 px-3">
+                  <div className="stat-title text-xs">Pending Review</div>
+                  <div className="stat-value text-sm md:text-lg text-warning">{requests.filter(r => r.status === 'pending').length}</div>
+                </div>
+                <div className="stat py-2 px-3">
+                  <div className="stat-title text-xs">Approved</div>
+                  <div className="stat-value text-sm md:text-lg text-success">{requests.filter(r => r.status === 'approved').length}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Controls */}
+      <div className="card bg-base-200 shadow-lg">
+        <div className="card-body">
+          <div className="flex flex-col lg:flex-row gap-4">
+            {/* Search */}
+            <div className="form-control flex-1">
+              <div className="join">
+                <input
+                  type="text"
+                  placeholder="Search requests..."
+                  className="input input-bordered join-item flex-1"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                <button className="btn btn-primary join-item" onClick={onRefresh} title="Refresh">
+                  <RefreshCw className="w-4 h-4" />
+                </button>
+                <button className="btn btn-primary join-item">
+                  <Search className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Filters */}
+            <div className="flex flex-wrap gap-2 lg:justify-end">
+              <select
+                className="select select-bordered select-sm min-w-32"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="all">All Status</option>
+                <option value="pending">Pending</option>
+                <option value="reviewing">Reviewing</option>
+                <option value="approved">Approved</option>
+                <option value="implemented">Implemented</option>
+                <option value="rejected">Rejected</option>
+              </select>
+
+              <select
+                className="select select-bordered select-sm min-w-32"
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+              >
+                <option value="all">All Categories</option>
+                <option value="bug">Bug Fix</option>
+                <option value="feature">New Feature</option>
+                <option value="improvement">Improvement</option>
+                <option value="ui">UI/UX</option>
+              </select>
+
+              <select
+                className="select select-bordered select-sm min-w-32"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+              >
+                <option value="newest">Newest First</option>
+                <option value="oldest">Oldest First</option>
+                <option value="mostVotes">Most Votes</option>
+                <option value="leastVotes">Least Votes</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Requests List */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {loading ? (
+          <div className="text-center py-12 col-span-3">
+            <span className="loading loading-spinner loading-lg"></span>
+            <div className="text-base font-medium mt-4">Loading feature requests...</div>
+          </div>
+        ) : filteredRequests.length === 0 ? (
+          <div className="card bg-base-200 col-span-3">
+            <div className="card-body text-center py-12">
+              <MessageCircle className="w-16 h-16 mx-auto mb-4 opacity-50" />
+              <h3 className="text-lg font-semibold mb-2">No requests found</h3>
+              <p className="text-base-content/70">
+                {searchTerm || statusFilter !== 'all' || categoryFilter !== 'all'
+                  ? 'Try adjusting your filters to see more results.'
+                  : 'No feature requests have been submitted yet.'}
+              </p>
+            </div>
+          </div>
+        ) : (
+          filteredRequests.map((request) => (
+            <div key={request._id} className="card bg-base-200 shadow-lg">
+              <div className="card-body">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={`badge badge-sm ${getCategoryBadge(request.category)}`}>
+                        {request.category}
+                      </span>
+                      <span className={`badge badge-sm ${getStatusBadge(request.status)}`}>
+                        {request.status}
+                      </span>
+                      <span className="badge badge-ghost badge-sm">
+                        Score: {request.upvotes - request.downvotes}
+                      </span>
+                    </div>
+
+                    <h3 className="text-lg font-semibold mb-2 line-clamp-2">{request.title}</h3>
+                    <p className="text-sm text-base-content/70 mb-3 line-clamp-3">{request.description}</p>
+
+                    <div className="flex items-center gap-4 text-xs text-base-content/60">
+                      <span>By: {request.submittedBy?.fullName || 'Anonymous'}</span>
+                      <span>Submitted: {new Date(request.createdAt).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="card-actions justify-end">
+                  <button className="btn btn-sm btn-ghost" onClick={() => setSelectedRequest(request)}>See More</button>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {selectedRequest && (
+        <FeatureRequestModal
+          request={selectedRequest}
+          onClose={() => setSelectedRequest(null)}
+          onUpdate={updateRequest}
+          onDelete={setDeleteModal}
+          onDeclineRequest={setDeclineModalRequest}
+        />
+      )}
+
+      {declineModalRequest && (
+        <DeclineConfirmationModal
+          request={declineModalRequest}
+          onClose={() => setDeclineModalRequest(null)}
+          onConfirm={async (requestId, reason) => {
+            await updateRequest(requestId, 'decline', reason);
+          }}
+        />
       )}
     </div>
   );
@@ -3152,12 +3567,7 @@ function DeleteModal({ deleteModal, setDeleteModal, handleDelete }) {
 
 
 // Announcements View
-function AnnouncementsView({ announcements, onRefresh, setDeleteModal, isAnnouncementModalOpen, setIsAnnouncementModalOpen, onEditAnnouncement }) {
-  const handleModalSuccess = (newAnnouncement) => {
-    // Refresh the announcements list
-    onRefresh();
-  };
-
+function AnnouncementsView({ announcements, setDeleteModal, setIsAnnouncementModalOpen, onEditAnnouncement }) {
   return (
     <div className="space-y-4">
       {/* Header Section */}
@@ -3187,59 +3597,117 @@ function AnnouncementsView({ announcements, onRefresh, setDeleteModal, isAnnounc
         </div>
       </div>
 
-      {/* Announcements List */}
-      <div className="space-y-3">
-        {announcements.length === 0 ? (
-          <div className="card bg-base-100 shadow">
-            <div className="card-body text-center py-12">
-              <Megaphone className="w-16 h-16 mx-auto mb-4 text-base-content/30" />
-              <p className="text-base-content/60">No announcements yet</p>
-            </div>
+      {/* Announcements Grid */}
+      {announcements.length === 0 ? (
+        <div className="card bg-base-100 shadow">
+          <div className="card-body text-center py-12">
+            <Megaphone className="w-16 h-16 mx-auto mb-4 text-base-content/30" />
+            <p className="text-base-content/60">No announcements yet</p>
           </div>
-        ) : (
-          announcements.map((announcement) => (
-            <div key={announcement._id} className="card bg-base-100 shadow hover:shadow-lg transition-shadow">
-              <div className="card-body p-4 md:p-6">
-                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h3 className="font-semibold text-base md:text-lg">{announcement.title}</h3>
-                      {announcement.priority === 'high' && (
-                        <span className="badge badge-warning badge-sm">High Priority</span>
-                      )}
-                      {announcement.priority === 'urgent' && (
-                        <span className="badge badge-error badge-sm">Urgent</span>
-                      )}
-                    </div>
-                    <p className="text-sm text-base-content/80 whitespace-pre-wrap mb-3">
-                      {announcement.content}
-                    </p>
-                    <div className="text-xs text-base-content/60">
-                      Posted {new Date(announcement.createdAt).toLocaleDateString()} at {new Date(announcement.createdAt).toLocaleTimeString()}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+          {announcements.map((announcement) => {
+            // Determine banner color based on priority
+            const bannerColor =
+              announcement.priority === 'alert' ? 'bg-gradient-to-r from-error to-error/80' :
+                announcement.priority === 'warning' ? 'bg-gradient-to-r from-warning to-warning/80' :
+                  'bg-gradient-to-r from-primary to-primary/80';
+
+            const iconColor =
+              announcement.priority === 'alert' ? 'text-error' :
+                announcement.priority === 'warning' ? 'text-warning' :
+                  'text-primary';
+
+            const priorityLabel =
+              announcement.priority === 'alert' ? '🚨 Alert' :
+                announcement.priority === 'warning' ? '⚠️ Warning' :
+                  'ℹ️ Info';
+
+            return (
+              <div key={announcement._id} className="card bg-base-100 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden">
+                {/* Banner Header - Use actual banner image if available */}
+                {announcement.bannerImage ? (
+                  <div className="relative h-48 overflow-hidden">
+                    <img
+                      src={announcement.bannerImage}
+                      alt={announcement.title}
+                      className="w-full h-full object-cover"
+                    />
+                    {/* Overlay gradient for text readability */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
+                    
+                    {/* Content overlay */}
+                    <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 text-white">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <h3 className="font-bold text-lg md:text-xl line-clamp-2 mb-2">
+                            {announcement.title}
+                          </h3>
+                          <span className="badge badge-sm bg-white/30 backdrop-blur-sm border-white/50 text-white">
+                            {priorityLabel}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      className="btn btn-xs md:btn-sm btn-outline"
-                      onClick={() => onEditAnnouncement(announcement)}
-                    >
-                      <Edit className="w-3 h-3 md:w-4 md:h-4" />
-                      <span className="text-xs md:text-sm">Edit</span>
-                    </button>
-                    <button
-                      className="btn btn-xs md:btn-sm btn-error btn-outline"
-                      onClick={() => setDeleteModal({ type: 'announcements', id: announcement._id, name: announcement.title })}
-                    >
-                      <Trash2 className="w-3 h-3 md:w-4 md:h-4" />
-                      <span className="text-xs md:text-sm">Delete</span>
-                    </button>
+                ) : (
+                  <div className={`${bannerColor} p-4 md:p-6 text-white relative overflow-hidden h-48`}>
+                    <div className="absolute top-0 right-0 opacity-10">
+                      <Megaphone className="w-32 h-32 transform rotate-12" />
+                    </div>
+                    <div className="relative z-10 h-full flex flex-col justify-end">
+                      <h3 className="font-bold text-lg md:text-xl line-clamp-2 mb-2">
+                        {announcement.title}
+                      </h3>
+                      <span className="badge badge-sm bg-white/30 backdrop-blur-sm border-white/50 text-white w-fit">
+                        {priorityLabel}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Card Body */}
+                <div className="card-body p-4 md:p-6">
+                  {/* Content */}
+                  <div className="mb-4">
+                    <p className="text-sm md:text-base text-base-content/80 whitespace-pre-wrap line-clamp-4">
+                      {announcement.content}
+                    </p>
+                  </div>
+
+                  {/* Footer Info */}
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t border-base-300">
+                    <div className="flex items-center gap-2 text-xs md:text-sm text-base-content/60">
+                      <div className={`w-2 h-2 rounded-full ${iconColor.replace('text-', 'bg-')} animate-pulse`}></div>
+                      <span>Posted {new Date(announcement.createdAt).toLocaleDateString()}</span>
+                      <span className="hidden sm:inline">at {new Date(announcement.createdAt).toLocaleTimeString()}</span>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-2">
+                      <button
+                        className="btn btn-xs md:btn-sm btn-ghost gap-1"
+                        onClick={() => onEditAnnouncement(announcement)}
+                      >
+                        <Edit className="w-3 h-3 md:w-4 md:h-4" />
+                        <span>Edit</span>
+                      </button>
+                      <button
+                        className="btn btn-xs md:btn-sm btn-error btn-ghost gap-1"
+                        onClick={() => setDeleteModal({ type: 'announcements', id: announcement._id, name: announcement.title })}
+                      >
+                        <Trash2 className="w-3 h-3 md:w-4 md:h-4" />
+                        <span>Delete</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))
-        )}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -3302,7 +3770,7 @@ function FollowLeaderboardView({ leaderboard, limit, setLimit, onRefresh, loadin
                   </tr>
                 </thead>
                 <tbody>
-                  {leaderboard.map((user, index) => (
+                  {[...leaderboard].sort((a, b) => b.followersCount - a.followersCount).map((user, index) => (
                     <tr key={user._id} className="hover">
                       <td className="font-semibold">
                         <div className="flex items-center gap-2">

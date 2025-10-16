@@ -73,7 +73,7 @@ export const createAnnouncement = async (req, res) => {
 		const announcement = new Announcement({
 			title,
 			content,
-			priority: priority || "normal",
+			priority: priority || "info",
 			bannerImage,
 			bannerImagePublicId,
 			createdBy: req.user._id,
@@ -144,7 +144,7 @@ export const updateAnnouncement = async (req, res) => {
 		// Update the announcement
 		announcement.title = title;
 		announcement.content = content;
-		announcement.priority = priority || "normal";
+		announcement.priority = priority || "info";
 
 		await announcement.save();
 
@@ -299,17 +299,15 @@ export const getUnreadAnnouncementsCount = async (req, res) => {
 // Get user rankings by followers
 export const getRankings = async (req, res) => {
   try {
-    // TODO: Implement proper follower/subscriber system
-    // For now, return users sorted by a placeholder field
     const users = await User.find()
-      .select('fullName email profilePic followersCount')
-      .sort({ followersCount: -1 })
+      .select('fullName email profilePic followers')
+      .sort({ 'followers.length': -1 })
       .limit(50);
 
-    // Add placeholder follower counts if not present
+    // Add follower counts based on actual followers array length
     const usersWithCounts = users.map(user => ({
       ...user.toObject(),
-      followersCount: user.followersCount || 0
+      followersCount: user.followers?.length || 0
     }));
 
     res.status(200).json(usersWithCounts);

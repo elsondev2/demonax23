@@ -1,5 +1,6 @@
 import { XIcon, Mail, User, Calendar, Activity, MessageCircle, Phone, MapPin, UserPlus, UserMinus, Users } from "lucide-react";
 import Avatar from "./Avatar";
+import FollowButton, { FollowerCount } from "./FollowButton";
 import IOSModal from "./IOSModal";
 import { useAuthStore } from "../store/useAuthStore";
 import { useCallStore } from "../store/useCallStore";
@@ -10,57 +11,6 @@ import toast from "react-hot-toast";
 function UserProfileModal({ user, isOpen, onClose }) {
   const { onlineUsers, authUser } = useAuthStore();
   const { startCall, callStatus } = useCallStore();
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [followStats, setFollowStats] = useState({ followersCount: 0, followingCount: 0 });
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (user?._id && authUser?._id) {
-      checkFollowStatus();
-      loadFollowStats();
-    }
-  }, [user?._id, authUser?._id]);
-
-  const checkFollowStatus = async () => {
-    try {
-      const res = await axiosInstance.get(`/api/follow/following/${authUser._id}`);
-      const following = res.data || [];
-      setIsFollowing(following.some(u => u._id === user._id));
-    } catch (error) {
-      console.error("Error checking follow status:", error);
-    }
-  };
-
-  const loadFollowStats = async () => {
-    try {
-      const res = await axiosInstance.get(`/api/follow/stats/${user._id}`);
-      setFollowStats(res.data);
-    } catch (error) {
-      console.error("Error loading follow stats:", error);
-    }
-  };
-
-  const handleFollowToggle = async () => {
-    if (loading) return;
-    setLoading(true);
-    try {
-      if (isFollowing) {
-        await axiosInstance.post(`/api/follow/unfollow/${user._id}`);
-        setIsFollowing(false);
-        setFollowStats(prev => ({ ...prev, followersCount: prev.followersCount - 1 }));
-        toast.success(`Unfollowed ${user.fullName}`);
-      } else {
-        await axiosInstance.post(`/api/follow/follow/${user._id}`);
-        setIsFollowing(true);
-        setFollowStats(prev => ({ ...prev, followersCount: prev.followersCount + 1 }));
-        toast.success(`Following ${user.fullName}`);
-      }
-    } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to update follow status");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   if (!isOpen) return null;
 
@@ -142,18 +92,14 @@ function UserProfileModal({ user, isOpen, onClose }) {
           <div className="badge badge-ghost badge-sm mb-3">{user?.username ? `@${user.username}` : "No username"}</div>
           
           {/* Follow Stats */}
-          <div className="flex gap-4 text-sm">
-            <div className="flex items-center gap-1">
-              <Users className="w-4 h-4 text-base-content/60" />
-              <span className="font-semibold">{followStats.followersCount}</span>
-              <span className="text-base-content/60">Followers</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <Users className="w-4 h-4 text-base-content/60" />
-              <span className="font-semibold">{followStats.followingCount}</span>
-              <span className="text-base-content/60">Following</span>
-            </div>
-          </div>
+           <div className="flex gap-4 text-sm">
+             <FollowerCount userId={user._id} />
+             <div className="flex items-center gap-1">
+               <Users className="w-4 h-4 text-base-content/60" />
+               <span className="font-semibold">{user.followingCount || 0}</span>
+               <span className="text-base-content/60">Following</span>
+             </div>
+           </div>
         </div>
 
         {/* Info Cards */}
@@ -233,27 +179,19 @@ function UserProfileModal({ user, isOpen, onClose }) {
         {/* Enhanced Action buttons */}
         <div className="p-6 pt-0 space-y-3">
           {/* Follow/Unfollow Button - Only show if not viewing own profile */}
-          {authUser?._id !== user?._id && (
-            <button
-              className={`btn w-full gap-2 ${isFollowing ? 'btn-outline' : 'btn-primary'}`}
-              onClick={handleFollowToggle}
-              disabled={loading}
-            >
-              {loading ? (
-                <span className="loading loading-spinner loading-sm"></span>
-              ) : isFollowing ? (
-                <>
-                  <UserMinus className="w-4 h-4" />
-                  Unfollow
-                </>
-              ) : (
-                <>
-                  <UserPlus className="w-4 h-4" />
-                  Follow
-                </>
-              )}
-            </button>
-          )}
+           {authUser?._id !== user?._id && (
+             <FollowButton
+               userId={user._id}
+               size="default"
+               className="w-full"
+               onFollowChange={() => {
+                 // Refresh posts to update follower counts
+                 setTimeout(() => {
+                   window.dispatchEvent(new CustomEvent('postsAutoRefresh'));
+                 }, 1000);
+               }}
+             />
+           )}
           
           <div className="flex gap-3">
             <button className="btn btn-primary flex-1 gap-2 shadow-lg hover:shadow-xl transition-shadow">
