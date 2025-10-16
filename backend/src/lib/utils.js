@@ -11,6 +11,7 @@ export const generateToken = (userId, res) => {
     expiresIn: "7d",
   });
 
+  // Set cookie for backward compatibility and same-origin requests
   res.cookie("jwt", token, {
     maxAge: 7 * 24 * 60 * 60 * 1000, // MS
     httpOnly: true, // prevent XSS attacks: cross-site scripting
@@ -18,7 +19,7 @@ export const generateToken = (userId, res) => {
     secure: ENV.NODE_ENV === "production" ? true : false, // must be true when sameSite is "none"
   });
 
-  return token;
+  return token; // Return token so it can be sent in response body for cross-origin requests
 };
 
 // http://localhost
