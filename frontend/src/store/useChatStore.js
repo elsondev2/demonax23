@@ -1484,7 +1484,6 @@ export const useChatStore = create((set, get) => ({
 
     console.log("✅ SUCCESSFULLY SUBSCRIBED TO ALL REAL-TIME SOCKET EVENTS");
     console.log("📡 Socket ID:", socket.id);
-    console.log("📡 Registered socket listeners:", socket.eventNames());
     console.log("📡 Subscription timestamp:", new Date().toISOString());
     set({ isSubscribed: true, currentSocketId: socket.id });
   },
