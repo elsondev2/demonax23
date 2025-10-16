@@ -4,25 +4,38 @@ import { ENV } from "../lib/env.js";
 
 export const socketAuthMiddleware = async (socket, next) => {
   try {
-    // Extract token from http-only cookies - more robust approach
+    // Extract token - try multiple sources for maximum compatibility
     let token = null;
     
-    // Try to get token from cookie header
-    if (socket.handshake.headers.cookie) {
+    // PRIORITY 1: Try auth.token (sent from frontend explicitly)
+    if (socket.handshake.auth && socket.handshake.auth.token) {
+      token = socket.handshake.auth.token;
+      console.log("Socket token found in auth.token");
+    }
+    
+    // PRIORITY 2: Try cookie header (for cookie-based auth)
+    if (!token && socket.handshake.headers.cookie) {
       const cookies = socket.handshake.headers.cookie.split(';').map(cookie => cookie.trim());
       const jwtCookie = cookies.find(cookie => cookie.startsWith('jwt='));
       if (jwtCookie) {
         token = jwtCookie.split('=')[1];
+        console.log("Socket token found in cookie");
       }
     }
 
-    // If no token in cookie, try to get from auth header (fallback)
-    if (!token && socket.handshake.auth && socket.handshake.auth.token) {
-      token = socket.handshake.auth.token;
+    // PRIORITY 3: Try Authorization header
+    if (!token && socket.handshake.headers.authorization) {
+      const authHeader = socket.handshake.headers.authorization;
+      if (authHeader.startsWith('Bearer ')) {
+        token = authHeader.substring(7);
+        console.log("Socket token found in Authorization header");
+      }
     }
 
     if (!token) {
-      console.log("Socket connection rejected: No token provided");
+      console.log("Socket connection rejected: No token provided in any location");
+      console.log("Available headers:", Object.keys(socket.handshake.headers));
+      console.log("Auth object:", socket.handshake.auth);
       return next(new Error("Unauthorized - No Token Provided"));
     }
 

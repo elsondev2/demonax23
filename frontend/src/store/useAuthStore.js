@@ -264,9 +264,16 @@ export const useAuthStore = create((set, get) => ({
 
     set({ isConnecting: true });
 
-    // Get token from localStorage as fallback
-    const token = document.cookie.split(';').find(c => c.trim().startsWith('jwt='));
-    const jwtToken = token ? token.split('=')[1] : null;
+    // Get token from localStorage (primary) or cookies (fallback)
+    let jwtToken = localStorage.getItem('jwt-token');
+    
+    // If not in localStorage, try cookies
+    if (!jwtToken) {
+      const cookieToken = document.cookie.split(';').find(c => c.trim().startsWith('jwt='));
+      jwtToken = cookieToken ? cookieToken.split('=')[1] : null;
+    }
+
+    console.log('🔐 Socket authentication token:', jwtToken ? 'Found' : 'Missing');
 
     // Create new socket connection with credentials
     const apiBase = axiosInstance.defaults.baseURL || "http://localhost:3001";
@@ -275,15 +282,20 @@ export const useAuthStore = create((set, get) => ({
         userId: authUser._id,
       },
       auth: {
-        token: jwtToken // Send token in auth header as fallback
+        token: jwtToken // Send token in auth header
       },
       withCredentials: true, // This is crucial for sending cookies
       transports: ['websocket', 'polling'], // Try both transports
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionAttempts: Infinity,
     });
 
     // Setup socket event handlers
     newSocket.on("connect", () => {
-      console.log("Socket connected!");
+      console.log("✅ Socket connected successfully!");
+      console.log("📡 Socket ID:", newSocket.id);
+      console.log("📡 Connected to:", apiBase);
       set({
         socket: newSocket,
         isConnecting: false,
@@ -295,7 +307,12 @@ export const useAuthStore = create((set, get) => ({
     });
 
     newSocket.on("connect_error", (err) => {
-      console.error("Socket connection error:", err);
+      console.error("❌ Socket connection error:", err.message);
+      console.error("📡 Error details:", {
+        message: err.message,
+        type: err.type,
+        description: err.description
+      });
 
       const { reconnectAttempts, maxReconnectAttempts, reconnectInterval } = get();
 
@@ -386,7 +403,7 @@ export const useAuthStore = create((set, get) => ({
     try {
       import("./useChatStore").then(async mod => {
         const chatStore = mod.useChatStore.getState();
-        try { await chatStore.getMyChatPartners(); } catch { }
+        try { await chatStore.getMyChatPartners(); } catch { /* empty */ }
         try { await chatStore.getAllContacts(); } catch { /* empty */ }
         const imgs = [];
         (chatStore.chats || []).forEach(c => {
