@@ -387,7 +387,7 @@ export const useAuthStore = create((set, get) => ({
           if (!c.isGroup && c.profilePic) imgs.push(c.profilePic);
         });
         (chatStore.allContacts || []).forEach(u => { if (u.profilePic) imgs.push(u.profilePic); });
-        imgs.slice(0, 200).forEach(url => { try { fetch(url); } catch { } });
+        imgs.slice(0, 200).forEach(url => { try { fetch(url); } catch { /* empty */ } });
       });
     } catch { /* empty */ }
   },
