@@ -138,7 +138,9 @@ function StatusComposerModal({ open, onClose }) {
               const dur = isFinite(a.duration) ? a.duration : 0;
               setBgAudioDuration(Math.round(dur));
             });
-            const reader = new FileReader(); reader.readAsDataURL(f);
+            // Audio files don't need compression
+            const reader = new FileReader(); 
+            reader.readAsDataURL(f);
             await new Promise((r)=> (reader.onloadend = r));
             setBgAudioBase64(reader.result?.toString() || null);
           }} />

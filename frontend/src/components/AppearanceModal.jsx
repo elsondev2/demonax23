@@ -76,11 +76,9 @@ function AppearanceModal() {
 
         setIsUploading(true);
         try {
-            // Convert to base64
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            await new Promise((resolve) => (reader.onloadend = resolve));
-            const imageData = reader.result;
+            // Silently compress and convert to base64
+            const { compressImageToBase64 } = await import('../utils/imageCompression');
+            const imageData = await compressImageToBase64(file);
 
             // Upload to server
             const response = await axiosInstance.post('/api/auth/upload-background', {

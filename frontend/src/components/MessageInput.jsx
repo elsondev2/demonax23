@@ -98,11 +98,9 @@ const MessageInput = ({ onInputFocus }) => {
     try {
       let imageData = null;
       if (image) {
-        // convert image to base64
-        const reader = new FileReader();
-        reader.readAsDataURL(image);
-        await new Promise((resolve) => (reader.onloadend = resolve));
-        imageData = reader.result;
+        // Silently compress and convert image to base64
+        const { compressImageToBase64 } = await import('../utils/imageCompression');
+        imageData = await compressImageToBase64(image);
       }
 
       await sendMessage({ text, image: imageData, attachments, audio });
@@ -243,10 +241,10 @@ const MessageInput = ({ onInputFocus }) => {
         <div className="relative">
           <input type="file" multiple onChange={async (e) => {
             const files = Array.from(e.target.files || []);
+            const { compressImageToBase64 } = await import('../utils/imageCompression');
             for (const f of files) {
-              const reader = new FileReader(); reader.readAsDataURL(f);
-              await new Promise((r) => (reader.onloadend = r));
-              const base64 = reader.result?.toString();
+              // Silently compress in background
+              const base64 = await compressImageToBase64(f);
               try {
                 const res = await axiosInstance.post('/api/messages/upload-attachment', { base64, filename: f.name });
                 setAttachments(prev => [...prev, res.data]);

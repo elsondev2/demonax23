@@ -33,17 +33,15 @@ function CreateGroupModal({ isOpen, onClose }) {
     }
   }, [isOpen, getAllContacts, authUser._id]);
 
-  const handleImageUpload = (e) => {
+  const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const base64 = e.target.result;
-      setGroupPicture(base64);
-      setGroupPicturePreview(base64);
-    };
-    reader.readAsDataURL(file);
+    // Silently compress in background
+    const { compressImageToBase64 } = await import('../utils/imageCompression');
+    const base64 = await compressImageToBase64(file);
+    setGroupPicture(base64);
+    setGroupPicturePreview(base64);
   };
 
   const handleContactToggle = (contactId) => {

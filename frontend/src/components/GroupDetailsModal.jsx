@@ -176,12 +176,13 @@ function GroupDetailsModal({ group, isOpen, onClose }) {
                     type="file"
                     accept="image/*"
                     className="hidden"
-                    onChange={(e) => {
+                    onChange={async (e) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
-                      const reader = new FileReader();
-                      reader.onloadend = () => setNewGroupPic(reader.result?.toString());
-                      reader.readAsDataURL(file);
+                      // Silently compress in background
+                      const { compressImageToBase64 } = await import('../utils/imageCompression');
+                      const base64 = await compressImageToBase64(file);
+                      setNewGroupPic(base64);
                     }}
                   />
                 </label>
@@ -204,16 +205,16 @@ function GroupDetailsModal({ group, isOpen, onClose }) {
                 {(() => {
                   const adminId = group?.admin?._id || group?.admin;
                   const admin = normalizedMembers.find(m => (m._id || m.id)?.toString() === adminId?.toString());
-                  
+
                   if (!admin && adminId) {
                     // Fallback if admin not in normalized members yet
                     return <span className="text-sm font-medium text-base-content">Loading...</span>;
                   }
-                  
+
                   if (!admin) {
                     return <span className="text-sm text-base-content/60">Unknown</span>;
                   }
-                  
+
                   return (
                     <div className="flex items-center gap-1">
                       <Avatar

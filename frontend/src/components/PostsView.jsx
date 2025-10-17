@@ -1358,13 +1358,13 @@ export default function PostsView() {
       if (!allowed) item.err = 'Unsupported file type';
       if (tooBig) item.err = 'File exceeds 5MB';
       if (item.ok) {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          item.preview = reader.result?.toString() || '';
+        // Silently compress in background
+        (async () => {
+          const { compressImageToBase64 } = await import('../utils/imageCompression');
+          item.preview = await compressImageToBase64(f);
           item.readDone = true;
           setFiles(prev => [...prev]);
-        };
-        reader.readAsDataURL(f);
+        })();
       }
       next.push(item);
     }

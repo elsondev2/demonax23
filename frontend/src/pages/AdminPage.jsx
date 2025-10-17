@@ -2311,13 +2311,13 @@ function CommunityGroupsView({ communityGroups, setCommunityGroups, loading }) {
                           return;
                         }
 
-                        const reader = new FileReader();
-                        reader.onloadend = () => {
-                          const base64 = reader.result;
+                        // Silently compress in background
+                        (async () => {
+                          const { compressImageToBase64 } = await import('../utils/imageCompression');
+                          const base64 = await compressImageToBase64(file);
                           setGroupPicPreview(base64);
                           setNewGroup({ ...newGroup, groupPic: base64 });
-                        };
-                        reader.readAsDataURL(file);
+                        })();
                       }}
                     />
                   </label>
@@ -2423,13 +2423,13 @@ function CommunityGroupsView({ communityGroups, setCommunityGroups, loading }) {
                           return;
                         }
 
-                        const reader = new FileReader();
-                        reader.onloadend = () => {
-                          const base64 = reader.result;
+                        // Silently compress in background
+                        (async () => {
+                          const { compressImageToBase64 } = await import('../utils/imageCompression');
+                          const base64 = await compressImageToBase64(file);
                           setGroupPicPreview(base64);
                           setEditingGroup({ ...editingGroup, groupPic: base64 });
-                        };
-                        reader.readAsDataURL(file);
+                        })();
                       }}
                     />
                   </label>

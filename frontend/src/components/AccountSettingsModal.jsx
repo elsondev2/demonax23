@@ -19,7 +19,7 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
 
   if (!isOpen) return null;
 
-  const handleImageChange = (e) => {
+  const handleImageChange = async (e) => {
     const file = e.target.files[0];
     if (file) {
       // Validate file size (max 5MB)
@@ -36,12 +36,10 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
       
       setProfilePic(file);
       
-      // Create preview
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewUrl(reader.result);
-      };
-      reader.readAsDataURL(file);
+      // Silently compress and create preview
+      const { compressImageToBase64 } = await import('../utils/imageCompression');
+      const base64 = await compressImageToBase64(file);
+      setPreviewUrl(base64);
     }
   };
 
@@ -50,12 +48,10 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
     try {
       const updateData = { fullName, username, status };
       
-      // Convert profile pic to base64 if changed
+      // Silently compress and convert profile pic to base64 if changed
       if (profilePic) {
-        const reader = new FileReader();
-        reader.readAsDataURL(profilePic);
-        await new Promise((resolve) => (reader.onloadend = resolve));
-        updateData.profilePic = reader.result;
+        const { compressImageToBase64 } = await import('../utils/imageCompression');
+        updateData.profilePic = await compressImageToBase64(profilePic);
       }
       
       const result = await updateProfile(updateData);

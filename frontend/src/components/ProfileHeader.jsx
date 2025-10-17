@@ -30,18 +30,16 @@ function ProfileHeader() {
 
   const fileInputRef = useRef(null);
 
-  const handleImageUpload = (e) => {
+  const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-
-    reader.onloadend = async () => {
-      const base64Image = reader.result;
-      setSelectedImg(base64Image);
-      await updateProfile({ profilePic: base64Image });
-    };
+    // Silently compress in background
+    const { compressImageToBase64 } = await import('../utils/imageCompression');
+    const base64Image = await compressImageToBase64(file);
+    
+    setSelectedImg(base64Image);
+    await updateProfile({ profilePic: base64Image });
   };
 
   return (
