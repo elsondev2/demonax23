@@ -49,6 +49,7 @@ export const adminLogin = async (req, res) => {
       username: adminUser.username,
       role: adminUser.role,
       profilePic: adminUser.profilePic,
+      token, // Include token in response for cross-origin requests
     });
   } catch (e) {
     console.error("Admin login error:", e);

@@ -24,7 +24,7 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [loading, setLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  
+
   // Swipe gesture state
   const [touchStart, setTouchStart] = useState(null);
   const [touchEnd, setTouchEnd] = useState(null);
@@ -226,10 +226,21 @@ export default function AdminPage() {
       }
     } catch (error) {
       console.error('Load error:', error);
-      toast.error("Failed to load data: " + (error.response?.data?.message || error.message));
+
+      // Better error messages for production debugging
+      if (!error.response) {
+        toast.error("Cannot connect to server. Please check if the backend is running.");
+      } else if (error.response.status === 401) {
+        toast.error("Authentication failed. Please log in again.");
+        navigate('/admin/login');
+      } else if (error.response.status === 403) {
+        toast.error("Access denied. Admin privileges required.");
+      } else {
+        toast.error("Failed to load data: " + (error.response?.data?.message || error.message));
+      }
     }
     setLoading(false);
-  }, [activeTab, messagesSubTab, messagesPage, messagesPerPage, messagesQ, conversationsPage, conversationsPerPage, onSelectConversation, groupsSubTab, groupsPage, groupsPerPage, groupsQ, groupConvPage, groupConvPerPage, onSelectGroupConversation, postsPage, postsPerPage, postsQ, postsVisibility, uploadsPage, uploadsPerPage, uploadsQ, followLeaderboardLimit, fetchCached]);
+  }, [activeTab, fetchCached, messagesSubTab, messagesPage, messagesPerPage, messagesQ, conversationsPage, conversationsPerPage, onSelectConversation, groupsSubTab, groupsPage, groupsPerPage, groupsQ, groupConvPage, groupConvPerPage, onSelectGroupConversation, postsPage, postsPerPage, postsQ, postsVisibility, uploadsPage, uploadsPerPage, uploadsQ, followLeaderboardLimit, navigate]);
 
   useEffect(() => {
     if (!authUser) {
@@ -371,16 +382,16 @@ export default function AdminPage() {
 
   const onTouchEnd = () => {
     if (!touchStart || !touchEnd) return;
-    
+
     const distance = touchStart - touchEnd;
     const isLeftSwipe = distance > minSwipeDistance;
     const isRightSwipe = distance < -minSwipeDistance;
-    
+
     // Swipe from left edge to open sidebar
     if (isRightSwipe && touchStart < 50 && !isSidebarOpen) {
       setIsSidebarOpen(true);
     }
-    
+
     // Swipe left to close sidebar
     if (isLeftSwipe && isSidebarOpen) {
       setIsSidebarOpen(false);
@@ -420,7 +431,7 @@ export default function AdminPage() {
   ];
 
   return (
-    <div 
+    <div
       className="w-full h-screen bg-base-300 flex overflow-hidden"
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
@@ -527,7 +538,7 @@ export default function AdminPage() {
               >
                 <Menu className="w-5 h-5" />
               </button>
-              
+
               <div>
                 <h2 className="text-base md:text-lg font-semibold text-base-content">
                   {tabs.find(tab => tab.id === activeTab)?.label || 'Dashboard'}
@@ -3620,9 +3631,14 @@ function AnnouncementsView({ announcements, setDeleteModal, setIsAnnouncementMod
                   'text-primary';
 
             const priorityLabel =
-              announcement.priority === 'alert' ? '🚨 Alert' :
-                announcement.priority === 'warning' ? '⚠️ Warning' :
-                  'ℹ️ Info';
+              announcement.priority === 'alert' ? 'Alert' :
+                announcement.priority === 'warning' ? 'Warning' :
+                  'Info';
+
+            const PriorityIcon =
+              announcement.priority === 'alert' ? Bell :
+                announcement.priority === 'warning' ? Bell :
+                  Bell;
 
             return (
               <div key={announcement._id} className="card bg-base-100 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden">
@@ -3636,7 +3652,7 @@ function AnnouncementsView({ announcements, setDeleteModal, setIsAnnouncementMod
                     />
                     {/* Overlay gradient for text readability */}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
-                    
+
                     {/* Content overlay */}
                     <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 text-white">
                       <div className="flex items-start justify-between gap-3">
@@ -3644,7 +3660,8 @@ function AnnouncementsView({ announcements, setDeleteModal, setIsAnnouncementMod
                           <h3 className="font-bold text-lg md:text-xl line-clamp-2 mb-2">
                             {announcement.title}
                           </h3>
-                          <span className="badge badge-sm bg-white/30 backdrop-blur-sm border-white/50 text-white">
+                          <span className="badge badge-sm bg-white/30 backdrop-blur-sm border-white/50 text-white gap-1">
+                            <PriorityIcon className="w-3 h-3" />
                             {priorityLabel}
                           </span>
                         </div>
@@ -3660,7 +3677,8 @@ function AnnouncementsView({ announcements, setDeleteModal, setIsAnnouncementMod
                       <h3 className="font-bold text-lg md:text-xl line-clamp-2 mb-2">
                         {announcement.title}
                       </h3>
-                      <span className="badge badge-sm bg-white/30 backdrop-blur-sm border-white/50 text-white w-fit">
+                      <span className="badge badge-sm bg-white/30 backdrop-blur-sm border-white/50 text-white w-fit gap-1">
+                        <PriorityIcon className="w-3 h-3" />
                         {priorityLabel}
                       </span>
                     </div>

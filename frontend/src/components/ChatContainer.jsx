@@ -51,7 +51,7 @@ function ChatContainer() {
   const [newMessageCount, setNewMessageCount] = useState(0);
 
   // Message rendering diagnostics
-  const {  forceCheck } = useMessageRenderingDiagnostics(messagesContainerRef);
+  const { forceCheck } = useMessageRenderingDiagnostics(messagesContainerRef);
 
   // Check socket connection periodically (reduced frequency)
   useEffect(() => {
@@ -321,7 +321,7 @@ function ChatContainer() {
 
       // Mark the very first message in the conversation
       const isTodayFirstMsg = i === 0;
-      
+
       // Mark if message is unread
       const isUnread = showUnreadSeparator && i >= firstUnreadIndex;
 

@@ -27,6 +27,11 @@ function AdminLoginPage() {
     try {
       const res = await axiosInstance.post("/api/admin/login", formData);
       
+      // Store token in localStorage for Authorization header
+      if (res.data.token) {
+        localStorage.setItem("jwt-token", res.data.token);
+      }
+      
       // Update auth store with admin user
       setAuthUser(res.data);
       
