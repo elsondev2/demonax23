@@ -1,6 +1,21 @@
 import imageCompression from 'browser-image-compression';
 
 /**
+ * Compress file (image or video) automatically
+ * Detects file type and uses appropriate compression
+ */
+export async function compressFile(file, options = {}) {
+  if (file.type.startsWith('image/')) {
+    return compressImage(file, options);
+  } else if (file.type.startsWith('video/')) {
+    // Lazy load video compression
+    const { compressVideo } = await import('./videoCompression');
+    return compressVideo(file, options);
+  }
+  return file;
+}
+
+/**
  * Silently compress image in background
  * No user notification - just works
  */
@@ -52,6 +67,15 @@ export async function compressImageToBase64(file, options = {}) {
     reader.onerror = reject;
     reader.readAsDataURL(compressed);
   });
+}
+
+/**
+ * Compress multiple files (images/videos) in parallel
+ */
+export async function compressFiles(files, options = {}) {
+  return Promise.all(
+    Array.from(files).map(file => compressFile(file, options))
+  );
 }
 
 /**

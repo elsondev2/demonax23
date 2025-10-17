@@ -102,13 +102,18 @@ function StatusComposerModal({ open, onClose }) {
 
   if (!open) return null;
 
-  const onFile = (e) => {
+  const onFile = async (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
+    
+    // Silently compress in background (images and videos)
+    const { compressFile } = await import('../utils/imageCompression');
+    const compressed = await compressFile(f);
+    
     const reader = new FileReader();
     reader.onloadend = () => setPreview(reader.result?.toString() || null);
-    reader.readAsDataURL(f);
-    setFile(f);
+    reader.readAsDataURL(compressed);
+    setFile(compressed);
   };
 
   const onSubmit = async () => {
