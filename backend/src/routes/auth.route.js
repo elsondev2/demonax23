@@ -1,6 +1,16 @@
 import express from "express";
 import multer from "multer";
-import { signup, login, logout, updateProfile, uploadBackground, googleAuth } from "../controllers/auth.controller.js";
+import {
+  signup,
+  login,
+  logout,
+  updateProfile,
+  uploadBackground,
+  googleAuth,
+  sendOTP,
+  verifyOTPCode,
+  checkVerificationStatus
+} from "../controllers/auth.controller.js";
 import { protectRoute } from "../middleware/auth.middleware.js";
 import { arcjetProtection } from "../middleware/arcjet.middleware.js";
 
@@ -33,6 +43,11 @@ router.post("/google", googleAuth); // Google OAuth route
 
 router.put("/update-profile", protectRoute, updateProfile);
 router.post("/upload-background", protectRoute, uploadBackground);
+
+// Email verification routes
+router.post("/send-otp", sendOTP);
+router.post("/verify-otp", verifyOTPCode);
+router.get("/verification-status/:userId", checkVerificationStatus);
 
 router.get("/check", protectRoute, (req, res) => res.status(200).json(req.user));
 

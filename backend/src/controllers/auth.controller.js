@@ -93,7 +93,19 @@ export const signup = async (req, res) => {
       }
 
       const savedUser = await newUser.save();
-      const token = generateToken(savedUser._id, res);
+
+      // Don't generate token yet - user needs to verify email first
+      // const token = generateToken(savedUser._id, res);
+
+      // Auto-send verification email
+      try {
+        const { createAndSendOTP } = await import("../services/otp.service.js");
+        await createAndSendOTP(savedUser._id.toString(), savedUser.email, "email");
+        console.log("Verification email sent to:", savedUser.email);
+      } catch (err) {
+        console.log("Failed to send verification email:", err);
+        // Don't fail signup if email fails - user can request resend
+      }
 
       // Auto-join default community group "†ŘØỮβŁ€ ₥ΔҜ€ŘŞ"
       try {
@@ -107,13 +119,15 @@ export const signup = async (req, res) => {
         console.log("Failed to auto-join default community group:", err);
       }
 
+      // Return user data without token - they need to verify email first
       res.status(201).json({
         _id: savedUser._id,
         fullName: savedUser.fullName,
         email: savedUser.email,
         username: savedUser.username,
         profilePic: savedUser.profilePic,
-        token, // Include token in response for cross-origin requests
+        isVerified: savedUser.isVerified,
+        requiresVerification: true, // Flag to frontend
       });
     } else {
       res.status(400).json({ message: "Invalid user data" });
@@ -319,6 +333,11 @@ export const googleAuth = async (req, res) => {
       if (!user.profilePic && picture) {
         user.profilePic = picture;
       }
+      // Ensure Google OAuth users are verified
+      if (!user.isVerified) {
+        user.isVerified = true;
+        user.verifiedAt = new Date();
+      }
       await user.save();
     } else {
       // User doesn't exist
@@ -342,6 +361,8 @@ export const googleAuth = async (req, res) => {
         username: username,
         profilePic: picture || "",
         googleId: googleId,
+        isVerified: true, // Google OAuth users are pre-verified
+        verifiedAt: new Date(),
         // No password needed for Google OAuth users
         password: await bcrypt.hash(Math.random().toString(36), 10), // Random password as fallback
       });
@@ -366,5 +387,134 @@ export const googleAuth = async (req, res) => {
   } catch (error) {
     console.error("Error in Google auth controller:", error);
     res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+
+// ============================================
+// EMAIL VERIFICATION ENDPOINTS
+// ============================================
+
+import { createAndSendOTP, verifyOTP, checkRateLimit } from "../services/otp.service.js";
+
+/**
+ * Send OTP for email verification
+ * POST /api/auth/send-otp
+ */
+export const sendOTP = async (req, res) => {
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ message: "User ID is required" });
+    }
+
+    // Find user
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Check if already verified
+    if (user.isVerified) {
+      return res.status(400).json({ message: "Account already verified" });
+    }
+
+    // Check rate limiting
+    const rateLimit = await checkRateLimit(userId);
+    if (!rateLimit.allowed) {
+      return res.status(429).json({ message: rateLimit.error });
+    }
+
+    // Create and send OTP
+    await createAndSendOTP(userId, user.email, "email");
+
+    res.status(200).json({
+      message: "Verification code sent to your email",
+      email: user.email,
+    });
+  } catch (error) {
+    console.error("Error in sendOTP:", error);
+    res.status(500).json({ message: "Failed to send verification code" });
+  }
+};
+
+/**
+ * Verify OTP
+ * POST /api/auth/verify-otp
+ */
+export const verifyOTPCode = async (req, res) => {
+  try {
+    const { userId, code } = req.body;
+
+    if (!userId || !code) {
+      return res.status(400).json({ message: "User ID and code are required" });
+    }
+
+    // Find user
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Check if already verified
+    if (user.isVerified) {
+      return res.status(400).json({ message: "Account already verified" });
+    }
+
+    // Verify OTP
+    const result = await verifyOTP(userId, code);
+
+    if (!result.success) {
+      return res.status(400).json({ message: result.error });
+    }
+
+    // Update user as verified
+    user.isVerified = true;
+    user.verifiedAt = new Date();
+    await user.save();
+
+    // Generate token and log them in
+    const token = generateToken(user._id, res);
+
+    res.status(200).json({
+      message: "Account verified successfully",
+      user: {
+        _id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        username: user.username,
+        profilePic: user.profilePic,
+        isVerified: user.isVerified,
+      },
+      token,
+    });
+  } catch (error) {
+    console.error("Error in verifyOTPCode:", error);
+    res.status(500).json({ message: "Failed to verify code" });
+  }
+};
+
+/**
+ * Check verification status
+ * GET /api/auth/verification-status/:userId
+ */
+export const checkVerificationStatus = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const user = await User.findById(userId).select("isVerified email fullName");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({
+      isVerified: user.isVerified,
+      email: user.email,
+      fullName: user.fullName,
+    });
+  } catch (error) {
+    console.error("Error in checkVerificationStatus:", error);
+    res.status(500).json({ message: "Failed to check verification status" });
   }
 };

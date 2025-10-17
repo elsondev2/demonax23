@@ -172,7 +172,18 @@ export const useAuthStore = create((set, get) => ({
 
       const res = await axiosInstance.post("/api/auth/signup", userData, config);
       
-      // Store token in localStorage for Authorization header
+      // Check if verification is required
+      if (res.data.requiresVerification) {
+        // Don't store token or connect socket yet
+        // Just return user data for verification page
+        return { 
+          success: true, 
+          requiresVerification: true,
+          userData: res.data 
+        };
+      }
+      
+      // Old flow for Google OAuth (already verified)
       if (res.data.token) {
         localStorage.setItem("jwt-token", res.data.token);
       }

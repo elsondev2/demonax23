@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/useAuthStore";
 import BorderAnimatedContainer from "../components/BorderAnimatedContainer";
 import ProfilePicUpload from "../components/ProfilePicUpload";
@@ -8,36 +9,45 @@ import { Link } from "react-router";
 import GoogleSignIn from "../components/GoogleSignIn";
 
 function SignUpPage() {
-  const [formData, setFormData] = useState({ 
-    fullName: "", 
-    username: "", 
-    email: "", 
+  const navigate = useNavigate();
+  const [formData, setFormData] = useState({
+    fullName: "",
+    username: "",
+    email: "",
     password: "",
-    profilePic: null 
+    profilePic: null
   });
   const [previewUrl, setPreviewUrl] = useState(null);
   const { signup, isSigningUp, updateProfile } = useAuthStore();
 
   const handleImageSelect = (file) => {
     setFormData({ ...formData, profilePic: file });
-    try { setPreviewUrl(URL.createObjectURL(file)); } catch {}
+    try { setPreviewUrl(URL.createObjectURL(file)); } catch { }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Create FormData for file upload
     const submitData = new FormData();
     submitData.append('fullName', formData.fullName);
     submitData.append('username', formData.username);
     submitData.append('email', formData.email);
     submitData.append('password', formData.password);
-    
+
     if (formData.profilePic) {
       submitData.append('profilePic', formData.profilePic);
     }
-    
-    signup(submitData);
+
+    const result = await signup(submitData);
+
+    // If verification required, redirect to verification page
+    if (result?.requiresVerification) {
+      navigate('/verify-email', {
+        state: { userData: result.userData },
+        replace: true
+      });
+    }
   };
 
   return (
@@ -46,10 +56,10 @@ function SignUpPage() {
       {/* Updated container to use min-h-screen for mobile and maintain fixed height for desktop */}
       <div className="relative w-full max-w-6xl min-h-screen md:min-h-[800px] md:h-[800px] h-auto">
         <BorderAnimatedContainer>
-<div className="w-full h-full flex flex-col md:flex-row-reverse">
-{/* FORM COLUMN - RIGHT (Google only) */}
-<div className="md:w-1/2 p-8 flex items-center justify-center md:border-l border-slate-600/30 min-h-screen md:min-h-0 h-full overflow-y-auto">
-<div className="w-full max-w-md">
+          <div className="w-full h-full flex flex-col md:flex-row-reverse">
+            {/* FORM COLUMN - RIGHT (Google only) */}
+            <div className="md:w-1/2 p-8 flex items-center justify-center md:border-l border-slate-600/30 min-h-screen md:min-h-0 h-full overflow-y-auto">
+              <div className="w-full max-w-md">
                 <div className="mb-6 text-sm text-base-content/70">
                   Already have an account? <Link to="/login" className="link link-hover">Log in</Link>
                 </div>
@@ -63,11 +73,11 @@ function SignUpPage() {
                     <p className="text-sm text-base-content/70 mb-2">Continue with</p>
                     <div className="flex flex-col gap-3">
                       <div className="inline-block">
-                        <GoogleSignIn text="signup_with" onSuccess={(info)=>{
+                        <GoogleSignIn text="signup_with" onSuccess={(info) => {
                           // Pre-fill from Google token claims if available
-                          try{
+                          try {
                             const claims = info?.claims || {};
-                            setFormData(prev=>({
+                            setFormData(prev => ({
                               ...prev,
                               fullName: claims.name || prev.fullName,
                               email: claims.email || prev.email,
@@ -75,7 +85,7 @@ function SignUpPage() {
                             if (claims.picture && !formData.profilePic) {
                               setPreviewUrl(claims.picture);
                             }
-                          }catch{}
+                          } catch { /* empty */ }
                         }} />
                       </div>
                       {/* Summary */}
@@ -95,7 +105,7 @@ function SignUpPage() {
                 <div className="divider my-8 text-base-content/60">or</div>
 
                 {/* Step 2: Pick username and photo only */}
-                <form onSubmit={async (e)=>{
+                <form onSubmit={async (e) => {
                   e.preventDefault();
                   // Finish profile after Google sign-in
                   const updates = { fullName: formData.fullName, username: formData.username };
@@ -103,7 +113,7 @@ function SignUpPage() {
                   if (formData.profilePic) {
                     const reader = new FileReader();
                     reader.readAsDataURL(formData.profilePic);
-                    await new Promise(res=> reader.onloadend = res);
+                    await new Promise(res => reader.onloadend = res);
                     updates.profilePic = reader.result;
                   } else if (previewUrl && previewUrl.startsWith('http')) {
                     // Try to fetch Google picture, ignore errors
@@ -137,7 +147,7 @@ function SignUpPage() {
                         className="grow"
                         placeholder="janedoe"
                         value={formData.username}
-                        onChange={(e)=>setFormData({...formData, username:e.target.value})}
+                        onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                         required
                       />
                     </label>
@@ -167,7 +177,7 @@ function SignUpPage() {
               </div>
             </div>
 
-{/* ILLUSTRATION - LEFT card (AppLogo) */}
+            {/* ILLUSTRATION - LEFT card (AppLogo) */}
             <div className="hidden md:w-1/2 md:flex items-center justify-center p-10">
               <div className="w-full h-full rounded-3xl border border-base-300/60 bg-base-200/40 flex items-center justify-center">
                 <AppLogo className="w-48 h-48 md:w-56 md:h-56 opacity-90" />

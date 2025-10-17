@@ -14,12 +14,16 @@ import DonateView from "../components/DonateView";
 import CallModal from "../components/CallModal";
 import CallScreen from "../components/CallScreen";
 import SocketStatusIndicator from "../components/SocketStatusIndicator";
+import WelcomeTour from "../components/WelcomeTour";
+import { useWelcomeTour } from "../hooks/useWelcomeTour";
 import { useCallStore } from "../store/useCallStore";
 
 
 function ChatPage() {
   const { selectedUser, selectedGroup, getMyChatPartners } = useChatStore();
   const { socket, connectSocket, authUser, isConnecting } = useAuthStore();
+  const { showTour, completeTour, skipTour } = useWelcomeTour();
+  const [manualTourOpen, setManualTourOpen] = useState(false);
   // Call system cleanup is handled automatically
 
   const navigate = useNavigate();
@@ -188,7 +192,7 @@ function ChatPage() {
   };
 
   const views = [
-    { name: 'Sidebar', component: <ChatsView /> },
+    { name: 'Sidebar', component: <ChatsView onShowTour={() => setManualTourOpen(true)} /> },
     { name: 'Right', component: getRightComponent() },
   ];
 
@@ -246,7 +250,7 @@ function ChatPage() {
           <div className="w-full h-full flex overflow-hidden">
             {/* Sidebar - Fixed width, scrollable content */}
             <div className="w-96 h-full bg-base-200 border-r border-base-300 flex-shrink-0 overflow-hidden">
-              <ChatsView />
+              <ChatsView onShowTour={() => setManualTourOpen(true)} />
             </div>
             {/* Main content area - Takes remaining space */}
             <div className="flex-1 h-full overflow-hidden">
@@ -262,6 +266,20 @@ function ChatPage() {
 
       {/* Socket Status Indicator - Shows when disconnected */}
       <SocketStatusIndicator />
+
+      {/* Welcome Tour - First time user onboarding */}
+      {(showTour || manualTourOpen) && (
+        <WelcomeTour
+          onComplete={() => {
+            completeTour();
+            setManualTourOpen(false);
+          }}
+          onSkip={() => {
+            skipTour();
+            setManualTourOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }

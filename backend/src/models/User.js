@@ -61,6 +61,28 @@ const userSchema = new mongoose.Schema(
       ref: "User",
       default: [],
     }],
+    // Email verification fields
+    isVerified: {
+      type: Boolean,
+      default: false,
+    },
+    verificationMethod: {
+      type: String,
+      enum: ["email", "sms", "whatsapp"],
+      default: "email",
+    },
+    verifiedAt: {
+      type: Date,
+      default: null,
+    },
+    signupAttempts: {
+      type: Number,
+      default: 0,
+    },
+    lastSignupAttempt: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true } // createdAt & updatedAt
 );

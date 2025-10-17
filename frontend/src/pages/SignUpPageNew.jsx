@@ -94,7 +94,16 @@ function SignUpPageNew() {
     }
 
     if (result?.success) {
-      navigate("/chat");
+      // Check if verification is required
+      if (result.requiresVerification) {
+        navigate('/verify-email', {
+          state: { userData: result.userData },
+          replace: true
+        });
+      } else {
+        // Already verified (e.g., Google OAuth)
+        navigate("/chat");
+      }
     }
   };
 

@@ -2,6 +2,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router";
 import ChatPage from "./pages/ChatPage";
 import LoginPageNew from "./pages/LoginPageNew";
 import SignUpPageNew from "./pages/SignUpPageNew";
+import EmailVerificationPage from "./pages/EmailVerificationPage";
 import JoinGroupPage from "./pages/JoinGroupPage";
 import AdminPage from "./pages/AdminPage";
 import AdminLoginPageNew from "./pages/AdminLoginPageNew";
@@ -57,6 +58,7 @@ function AppContent() {
           <Route path="/signin" element={authUser ? <Navigate to="/chat" replace /> : <LoginPageNew />} />
           <Route path="/signup" element={authUser ? <Navigate to="/chat" replace /> : <SignUpPageNew />} />
           <Route path="/register" element={authUser ? <Navigate to="/chat" replace /> : <SignUpPageNew />} />
+          <Route path="/verify-email" element={<EmailVerificationPage />} />
           <Route path="/join/:token" element={
             <ProtectedRoute>
               <JoinGroupPage />

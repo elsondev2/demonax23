@@ -10,7 +10,7 @@ import { useChatStore } from '../store/useChatStore';
 /**
  * ChatsView - The main chat list view (left panel)
  */
-export default function ChatsView() {
+export default function ChatsView({ onShowTour }) {
   const navigate = useNavigate();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
@@ -53,7 +53,7 @@ export default function ChatsView() {
     <div className="relative flex flex-col h-full bg-base-200">
       {/* Profile Header - Fixed at top */}
       <div className="flex-shrink-0">
-        <ProfileHeader />
+        <ProfileHeader onShowTour={onShowTour} />
       </div>
 
       {/* CHAT LIST - Scrollable content */}

@@ -12,7 +12,7 @@ import { UsersIcon } from "lucide-react";
 
 const mouseClickSound = new Audio("/sounds/mouse-click.mp3");
 
-function ProfileHeader() {
+function ProfileHeader({ onShowTour }) {
   const { logout, authUser, updateProfile } = useAuthStore();
   const { isSoundEnabled } = useChatStore();
   const [selectedImg, setSelectedImg] = useState(null);
@@ -128,7 +128,11 @@ function ProfileHeader() {
       </div>
 
       {showSettings && (
-        <AccountSettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
+        <AccountSettingsModal 
+          isOpen={showSettings} 
+          onClose={() => setShowSettings(false)}
+          onShowTour={onShowTour}
+        />
       )}
       {showFriends && (
         <FriendsModal isOpen={showFriends} onClose={() => setShowFriends(false)} />
