@@ -333,7 +333,7 @@ export const useCallStore = create((set, get) => ({
   // Reject incoming call
   rejectCall: () => {
     const { socket } = useAuthStore.getState();
-    const { caller, callType } = get();
+    const { caller } = get();
 
     // Stop ringtone
     get().stopRingtone();
@@ -342,21 +342,13 @@ export const useCallStore = create((set, get) => ({
     if (socket && socket.connected && caller) {
       try {
         socket.emit('call-reject', { to: String(caller) });
-        
-        // Send rejection message from rejecter's side
-        const callMessage = `[CALL_ICON] ${callType === 'video' ? 'Video' : 'Voice'} call declined`;
-        socket.emit('call-history-message', {
-          to: String(caller),
-          text: String(callMessage),
-          callType: String(callType),
-          duration: 0,
-          status: 'rejected'
-        });
+        // Note: call-history-message will be sent by endCall() to avoid duplicates
       } catch (error) {
         console.error('Failed to emit call-reject:', error);
       }
     }
 
+    // endCall will handle sending the rejection message
     get().endCall('rejected');
   },
 
@@ -397,54 +389,59 @@ export const useCallStore = create((set, get) => ({
       }
     }
 
-    // Send call history message if call was connected
-    if (wasConnected && finalDuration > 0 && callDirection === 'outgoing' && otherParty) {
-      const startTime = new Date(callStartTime);
-      const endTime = new Date();
-      const formatTime = (date) => {
-        let h = date.getHours();
-        const m = String(date.getMinutes()).padStart(2, '0');
-        const ap = h >= 12 ? 'PM' : 'AM';
-        h = h % 12; if (h === 0) h = 12;
-        return `${h}:${m} ${ap}`;
-      };
+    // Send call history message based on call outcome
+    // Only send ONE message per call to avoid duplicates
+    if (otherParty && callDirection === 'outgoing') {
+      if (wasConnected && finalDuration > 0) {
+        // Call was connected - send completed message
+        const startTime = new Date(callStartTime);
+        const endTime = new Date();
+        const formatTime = (date) => {
+          let h = date.getHours();
+          const m = String(date.getMinutes()).padStart(2, '0');
+          const ap = h >= 12 ? 'PM' : 'AM';
+          h = h % 12; if (h === 0) h = 12;
+          return `${h}:${m} ${ap}`;
+        };
 
-      const mins = Math.floor(finalDuration / 60);
-      const secs = finalDuration % 60;
-      const durationText = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+        const mins = Math.floor(finalDuration / 60);
+        const secs = finalDuration % 60;
+        const durationText = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
 
-      const callMessage = `[CALL_ICON] ${callType === 'video' ? 'Video' : 'Voice'} call • ${durationText}\n${formatTime(startTime)} - ${formatTime(endTime)}`;
+        const callMessage = `[CALL_ICON] ${callType === 'video' ? 'Video' : 'Voice'} call • ${durationText}\n${formatTime(startTime)} - ${formatTime(endTime)}`;
 
-      try {
-        socket.emit('call-history-message', {
-          to: String(otherParty),
-          text: String(callMessage),
-          callType: String(callType),
-          duration: Number(finalDuration),
-          startTime: startTime.toISOString(),
-          endTime: endTime.toISOString(),
-          status: 'completed'
-        });
-      } catch (error) {
-        console.error('Failed to emit call-history-message:', error);
+        try {
+          console.log('📞 Sending completed call history message');
+          socket.emit('call-history-message', {
+            to: String(otherParty),
+            text: String(callMessage),
+            callType: String(callType),
+            duration: Number(finalDuration),
+            startTime: startTime.toISOString(),
+            endTime: endTime.toISOString(),
+            status: 'completed'
+          });
+        } catch (error) {
+          console.error('Failed to emit call-history-message:', error);
+        }
+      } else if (reason === 'rejected') {
+        // Call was rejected - send declined message
+        const callMessage = `[CALL_ICON] ${callType === 'video' ? 'Video' : 'Voice'} call declined`;
+        
+        try {
+          console.log('📞 Sending rejected call history message');
+          socket.emit('call-history-message', {
+            to: String(otherParty),
+            text: String(callMessage),
+            callType: String(callType),
+            duration: 0,
+            status: 'rejected'
+          });
+        } catch (error) {
+          console.error('Failed to emit rejected call message:', error);
+        }
       }
-    }
-    
-    // Send rejected call message if call was rejected
-    if (reason === 'rejected' && otherParty) {
-      const callMessage = `[CALL_ICON] ${callType === 'video' ? 'Video' : 'Voice'} call declined`;
-      
-      try {
-        socket.emit('call-history-message', {
-          to: String(otherParty),
-          text: String(callMessage),
-          callType: String(callType),
-          duration: 0,
-          status: 'rejected'
-        });
-      } catch (error) {
-        console.error('Failed to emit rejected call message:', error);
-      }
+      // Note: For missed calls or other reasons, no message is sent
     }
 
     // Show notification based on reason (skip for cleanup)

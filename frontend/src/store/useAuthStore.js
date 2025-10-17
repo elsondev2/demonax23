@@ -397,23 +397,45 @@ export const useAuthStore = create((set, get) => ({
         if (statusStore.subscribeSockets) statusStore.subscribeSockets();
         if (statusStore.precacheFeed) statusStore.precacheFeed();
       }).catch(() => { });
-    } catch { }
+    } catch { /* empty */ }
 
     // Preload chats, contacts and their avatars for faster UI
     try {
       import("./useChatStore").then(async mod => {
         const chatStore = mod.useChatStore.getState();
-        try { await chatStore.getMyChatPartners(); } catch { /* empty */ }
-        try { await chatStore.getAllContacts(); } catch { /* empty */ }
-        const imgs = [];
+        console.log('🚀 Preloading app resources...');
+        
+        // Load chats and contacts in parallel
+        await Promise.allSettled([
+          chatStore.getMyChatPartners(),
+          chatStore.getAllContacts()
+        ]);
+        
+        // Collect all image URLs for preloading
+        const imageUrls = [];
+        
+        // Collect from chats
         (chatStore.chats || []).forEach(c => {
-          if (c.isGroup && c.groupPic) imgs.push(c.groupPic);
-          if (!c.isGroup && c.profilePic) imgs.push(c.profilePic);
+          if (c.isGroup && c.groupPic) imageUrls.push(c.groupPic);
+          if (!c.isGroup && c.profilePic) imageUrls.push(c.profilePic);
         });
-        (chatStore.allContacts || []).forEach(u => { if (u.profilePic) imgs.push(u.profilePic); });
-        imgs.slice(0, 200).forEach(url => { try { fetch(url); } catch { /* empty */ } });
+        
+        // Collect from contacts
+        (chatStore.allContacts || []).forEach(u => {
+          if (u.profilePic) imageUrls.push(u.profilePic);
+        });
+        
+        // Preload using image cache utility
+        if (imageUrls.length > 0) {
+          const { imageCache } = await import('../utils/imageCache');
+          await imageCache.preloadBatch(imageUrls);
+        }
+        
+        console.log('✅ App resources preloaded successfully');
       });
-    } catch { /* empty */ }
+    } catch (error) {
+      console.warn('⚠️ Failed to preload some resources:', error);
+    }
   },
 
   checkAndReconnectSocket: () => {

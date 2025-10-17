@@ -7,7 +7,13 @@ class ImageCache {
   constructor() {
     this.cache = new Map();
     this.loading = new Set();
-    this.maxCacheSize = 200; // Maximum number of images to cache
+    this.maxCacheSize = 500; // Maximum number of images to cache (increased from 200)
+    this.stats = {
+      hits: 0,
+      misses: 0,
+      preloaded: 0,
+      failed: 0
+    };
   }
 
   /**
@@ -20,8 +26,11 @@ class ImageCache {
 
     // Already cached
     if (this.cache.has(url)) {
+      this.stats.hits++;
       return url;
     }
+
+    this.stats.misses++;
 
     // Already loading
     if (this.loading.has(url)) {
@@ -38,25 +47,28 @@ class ImageCache {
     // Start loading
     this.loading.add(url);
 
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       const img = new Image();
-      
+
       img.onload = () => {
         this.loading.delete(url);
         this.cache.set(url, true);
-        
-        // Enforce cache size limit
+        this.stats.preloaded++;
+
+        // Enforce cache size limit (LRU - remove oldest)
         if (this.cache.size > this.maxCacheSize) {
           const firstKey = this.cache.keys().next().value;
           this.cache.delete(firstKey);
         }
-        
+
         resolve(url);
       };
 
       img.onerror = () => {
         this.loading.delete(url);
-        reject(new Error(`Failed to load image: ${url}`));
+        this.stats.failed++;
+        // Don't reject - just resolve with URL so app continues working
+        resolve(url);
       };
 
       img.src = url;
@@ -70,13 +82,22 @@ class ImageCache {
    */
   async preloadBatch(urls) {
     const uniqueUrls = [...new Set(urls)].filter(url => url && url !== '/avatar.png');
-    
-    // Load in batches of 10 to avoid overwhelming the browser
-    const batchSize = 10;
+
+    if (uniqueUrls.length === 0) return;
+
+    console.log(`🖼️ Preloading ${uniqueUrls.length} images...`);
+    const startTime = Date.now();
+
+    // Load in batches of 15 to optimize performance (increased from 10)
+    const batchSize = 15;
     for (let i = 0; i < uniqueUrls.length; i += batchSize) {
       const batch = uniqueUrls.slice(i, i + batchSize);
       await Promise.allSettled(batch.map(url => this.preload(url)));
     }
+
+    const duration = Date.now() - startTime;
+    console.log(`✅ Preloaded ${uniqueUrls.length} images in ${duration}ms`);
+    console.log(`📊 Cache stats:`, this.getStats());
   }
 
   /**
@@ -104,7 +125,14 @@ class ImageCache {
     return {
       cached: this.cache.size,
       loading: this.loading.size,
-      maxSize: this.maxCacheSize
+      maxSize: this.maxCacheSize,
+      hits: this.stats.hits,
+      misses: this.stats.misses,
+      preloaded: this.stats.preloaded,
+      failed: this.stats.failed,
+      hitRate: this.stats.hits + this.stats.misses > 0
+        ? `${Math.round((this.stats.hits / (this.stats.hits + this.stats.misses)) * 100)}%`
+        : '0%'
     };
   }
 }
