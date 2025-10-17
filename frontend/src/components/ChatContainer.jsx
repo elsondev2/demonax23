@@ -3,7 +3,6 @@ import { useAuthStore } from "../store/useAuthStore";
 import { useChatStore } from "../store/useChatStore";
 import ChatHeader from "./ChatHeader";
 import NoChatHistoryPlaceholder from "./NoChatHistoryPlaceholder";
-import LoadingBar from "./LoadingBar";
 import MessageInput from "./MessageInput";
 import MessageItem from "./MessageItem";
 import MessageEditModal from "./MessageEditModal";
