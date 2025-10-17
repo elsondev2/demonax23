@@ -1,9 +1,23 @@
-import { createFFmpeg, fetchFile } from '@ffmpeg/ffmpeg';
-
 // Singleton FFmpeg instance
 let ffmpegInstance = null;
 let isLoading = false;
 let loadPromise = null;
+let ffmpegModule = null;
+
+/**
+ * Dynamically import FFmpeg to avoid build issues
+ */
+async function loadFFmpegModule() {
+  if (ffmpegModule) return ffmpegModule;
+
+  try {
+    ffmpegModule = await import('@ffmpeg/ffmpeg');
+    return ffmpegModule;
+  } catch (error) {
+    console.warn('Failed to import FFmpeg module:', error.message);
+    throw error;
+  }
+}
 
 /**
  * Get or create FFmpeg instance
@@ -24,11 +38,13 @@ async function getFFmpeg() {
   isLoading = true;
   loadPromise = (async () => {
     try {
+      const { createFFmpeg } = await loadFFmpegModule();
+
       ffmpegInstance = createFFmpeg({
         log: false, // Silent operation
         corePath: 'https://unpkg.com/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js',
       });
-      
+
       await ffmpegInstance.load();
       console.log('🎬 Video compression ready');
       return ffmpegInstance;
@@ -60,7 +76,6 @@ export async function compressVideo(file, options = {}) {
   }
 
   const {
-    maxSizeMB = 10,
     quality = 28, // CRF value (lower = better quality, 18-28 recommended)
     maxWidth = 1280,
     maxHeight = 720,
@@ -68,13 +83,14 @@ export async function compressVideo(file, options = {}) {
 
   try {
     const ffmpeg = await getFFmpeg();
-    
+    const { fetchFile } = await loadFFmpegModule();
+
     // Write input file
     const inputName = 'input.mp4';
     const outputName = 'output.mp4';
-    
+
     ffmpeg.FS('writeFile', inputName, await fetchFile(file));
-    
+
     // Compress video with smart settings
     await ffmpeg.run(
       '-i', inputName,
@@ -87,19 +103,19 @@ export async function compressVideo(file, options = {}) {
       '-movflags', '+faststart', // Web optimization
       outputName
     );
-    
+
     // Read compressed file
     const data = ffmpeg.FS('readFile', outputName);
     const compressedBlob = new Blob([data.buffer], { type: 'video/mp4' });
-    
+
     // Clean up
     try {
       ffmpeg.FS('unlink', inputName);
       ffmpeg.FS('unlink', outputName);
-    } catch (e) {
+    } catch {
       // Ignore cleanup errors
     }
-    
+
     // Only use compressed if it's smaller
     if (compressedBlob.size < file.size) {
       // Convert to File object
@@ -107,10 +123,10 @@ export async function compressVideo(file, options = {}) {
         type: 'video/mp4',
         lastModified: Date.now(),
       });
-      
+
       return compressedFile;
     }
-    
+
     return file;
   } catch (error) {
     // Silent fail - return original
@@ -125,13 +141,13 @@ export async function compressVideo(file, options = {}) {
  */
 export async function compressVideoToBase64(file, options = {}) {
   const { onProgress } = options;
-  
+
   if (onProgress) onProgress(10);
-  
+
   const compressed = await compressVideo(file, options);
-  
+
   if (onProgress) onProgress(80);
-  
+
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -150,7 +166,7 @@ export async function isVideoCompressionAvailable() {
   try {
     await getFFmpeg();
     return true;
-  } catch (error) {
+  } catch {
     return false;
   }
 }
@@ -162,16 +178,16 @@ export function getVideoDuration(file) {
   return new Promise((resolve, reject) => {
     const video = document.createElement('video');
     video.preload = 'metadata';
-    
+
     video.onloadedmetadata = () => {
       window.URL.revokeObjectURL(video.src);
       resolve(video.duration);
     };
-    
+
     video.onerror = () => {
       reject(new Error('Failed to load video metadata'));
     };
-    
+
     video.src = URL.createObjectURL(file);
   });
 }
@@ -183,7 +199,7 @@ export function getVideoDimensions(file) {
   return new Promise((resolve, reject) => {
     const video = document.createElement('video');
     video.preload = 'metadata';
-    
+
     video.onloadedmetadata = () => {
       window.URL.revokeObjectURL(video.src);
       resolve({
@@ -191,11 +207,11 @@ export function getVideoDimensions(file) {
         height: video.videoHeight,
       });
     };
-    
+
     video.onerror = () => {
       reject(new Error('Failed to load video metadata'));
     };
-    
+
     video.src = URL.createObjectURL(file);
   });
 }
