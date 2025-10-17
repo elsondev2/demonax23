@@ -49,12 +49,15 @@ Feature documentation and comparisons:
 
 Known issues and their solutions:
 
-- **[Call Troubleshooting](./docs/fixes/CALL_TROUBLESHOOTING.md)** - Call issues
-- **[WebRTC Debug](./docs/fixes/WEBRTC_CONNECTION_DEBUG.md)** - WebRTC debugging
-- **[Socket.IO Fixes](./docs/fixes/SOCKET_IO_FIXES.md)** - Connection fixes
-- **[Group Chat Fixes](./docs/fixes/GROUP_CHAT_REFRESH_FIX.md)** - Group chat issues
-- **[Restart Instructions](./docs/fixes/RESTART_INSTRUCTIONS.md)** - System restart
-- **[Sign-in Fixes](./docs/fixes/SIGNIN_FIXES_SUMMARY.md)** - Auth fixes
+- **[Live Update Fixes](./fixes/LIVE_UPDATE_FIXES.md)** - Real-time message updates ⭐ NEW
+- **[Production Socket Fix](./fixes/PRODUCTION_SOCKET_FIX.md)** - Socket auth in production ⭐ NEW
+- **[Deployment Auth Fix](./fixes/DEPLOYMENT_AUTH_FIX.md)** - Production authentication ⭐ NEW
+- **[Call Troubleshooting](./fixes/CALL_TROUBLESHOOTING.md)** - Call issues
+- **[WebRTC Debug](./fixes/WEBRTC_CONNECTION_DEBUG.md)** - WebRTC debugging
+- **[Socket.IO Fixes](./fixes/SOCKET_IO_FIXES.md)** - Connection fixes
+- **[Group Chat Fixes](./fixes/GROUP_CHAT_REFRESH_FIX.md)** - Group chat issues
+- **[Restart Instructions](./fixes/RESTART_INSTRUCTIONS.md)** - System restart
+- **[Sign-in Fixes](./fixes/SIGNIN_FIXES_SUMMARY.md)** - Auth fixes
 - And more...
 
 ---
@@ -65,9 +68,10 @@ Known issues and their solutions:
 
 Enhancement documentation:
 
-- **[Call Improvements](./docs/improvements/CALL_IMPROVEMENTS_SUMMARY.md)** - Call enhancements
-- **[Final Updates](./docs/improvements/FINAL_UPDATES_SUMMARY.md)** - Update summary
-- **[Final Fixes](./docs/improvements/FINAL_FIXES_SUMMARY.md)** - Fix summary
+- **[Call & Cache Improvements](./improvements/CALL_AND_CACHE_IMPROVEMENTS.md)** - Call messages & caching ⭐ NEW
+- **[Call Improvements](./improvements/CALL_IMPROVEMENTS_SUMMARY.md)** - Call enhancements
+- **[Final Updates](./improvements/FINAL_UPDATES_SUMMARY.md)** - Update summary
+- **[Final Fixes](./improvements/FINAL_FIXES_SUMMARY.md)** - Fix summary
 
 ---
 
@@ -174,13 +178,16 @@ pawspa-chat-app/
 - [Sign-in Fixes](./docs/fixes/SIGNIN_FIXES_SUMMARY.md)
 
 ### Real-time Communication
-- [Socket.IO Fixes](./docs/fixes/SOCKET_IO_FIXES.md)
-- [WebRTC Debug](./docs/fixes/WEBRTC_CONNECTION_DEBUG.md)
+- [Live Update Fixes](./fixes/LIVE_UPDATE_FIXES.md) - Real-time messaging ⭐ NEW
+- [Production Socket Fix](./fixes/PRODUCTION_SOCKET_FIX.md) - Socket auth ⭐ NEW
+- [Socket.IO Fixes](./fixes/SOCKET_IO_FIXES.md)
+- [WebRTC Debug](./fixes/WEBRTC_CONNECTION_DEBUG.md)
 
 ### Video/Audio Calls
-- [Call Troubleshooting](./docs/fixes/CALL_TROUBLESHOOTING.md)
-- [Call Testing](./docs/testing/CALL_TESTING_GUIDE.md)
-- [Call Improvements](./docs/improvements/CALL_IMPROVEMENTS_SUMMARY.md)
+- [Call & Cache Improvements](./improvements/CALL_AND_CACHE_IMPROVEMENTS.md) - Latest fixes ⭐ NEW
+- [Call Troubleshooting](./fixes/CALL_TROUBLESHOOTING.md)
+- [Call Testing](./testing/CALL_TESTING_GUIDE.md)
+- [Call Improvements](./improvements/CALL_IMPROVEMENTS_SUMMARY.md)
 
 ### Deployment
 - [All Deployment Docs](./docs/deployment/)
@@ -200,12 +207,12 @@ pawspa-chat-app/
 - **Deployment Guides**: 7 files
 - **Setup Guides**: 3 files
 - **Feature Docs**: 3 files
-- **Bug Fixes**: 13 files
-- **Improvements**: 4 files
+- **Bug Fixes**: 16 files (+3 new)
+- **Improvements**: 5 files (+1 new)
 - **Testing Guides**: 2 files
 - **Design Docs**: 4 files
 
-**Total Documentation Files**: 40+
+**Total Documentation Files**: 44+
 
 ---
 
@@ -276,9 +283,16 @@ vercel logs
 
 ---
 
-**Last Updated**: 2025-10-05  
-**Documentation Version**: 1.0  
+**Last Updated**: 2025-10-17  
+**Documentation Version**: 1.1  
 **Project**: PawSpa Chat Application
+
+### Recent Updates (2025-10-17)
+- ✅ Added Live Update Fixes documentation
+- ✅ Added Production Socket Fix guide
+- ✅ Added Deployment Auth Fix documentation
+- ✅ Added Call & Cache Improvements guide
+- ✅ Reorganized all documentation into proper folders
 
 ---
 
