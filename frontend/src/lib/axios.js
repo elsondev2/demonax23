@@ -17,6 +17,9 @@ axiosInstance.interceptors.request.use(
     const token = localStorage.getItem('jwt-token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+      console.log(`🔑 Token added to ${config.method?.toUpperCase()} ${config.url}`);
+    } else {
+      console.log(`⚠️ No token for ${config.method?.toUpperCase()} ${config.url}`);
     }
     return config;
   },

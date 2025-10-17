@@ -30,13 +30,20 @@ function AdminLoginPage() {
       // Store token in localStorage for Authorization header
       if (res.data.token) {
         localStorage.setItem("jwt-token", res.data.token);
+        console.log("✅ Admin token stored in localStorage");
       }
       
-      // Update auth store with admin user
-      setAuthUser(res.data);
+      // Update auth store with admin user (without token in the user object)
+      const { token: _token, ...userData } = res.data;
+      setAuthUser(userData);
+      console.log("✅ Admin user set in auth store:", userData);
       
       toast.success("Admin login successful!");
-      navigate("/admin");
+      
+      // Small delay to ensure state is updated before navigation
+      setTimeout(() => {
+        navigate("/admin");
+      }, 100);
     } catch (error) {
       console.error("Admin login error:", error);
       toast.error(error.response?.data?.message || "Invalid admin credentials");

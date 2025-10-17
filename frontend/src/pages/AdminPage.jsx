@@ -25,6 +25,19 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  // Debug logging
+  useEffect(() => {
+    const token = localStorage.getItem('jwt-token');
+    const storedUser = localStorage.getItem('chat-user');
+    console.log("🔍 AdminPage Debug:", {
+      hasAuthUser: !!authUser,
+      authUserRole: authUser?.role,
+      hasToken: !!token,
+      hasStoredUser: !!storedUser,
+      tokenPreview: token ? `${token.substring(0, 20)}...` : 'none'
+    });
+  }, [authUser]);
+
   // Swipe gesture state
   const [touchStart, setTouchStart] = useState(null);
   const [touchEnd, setTouchEnd] = useState(null);
@@ -231,6 +244,10 @@ export default function AdminPage() {
       if (!error.response) {
         toast.error("Cannot connect to server. Please check if the backend is running.");
       } else if (error.response.status === 401) {
+        // Clear invalid token and redirect
+        console.log("❌ 401 Unauthorized - clearing token and redirecting");
+        localStorage.removeItem('jwt-token');
+        localStorage.removeItem('chat-user');
         toast.error("Authentication failed. Please log in again.");
         navigate('/admin/login');
       } else if (error.response.status === 403) {
@@ -243,14 +260,28 @@ export default function AdminPage() {
   }, [activeTab, fetchCached, messagesSubTab, messagesPage, messagesPerPage, messagesQ, conversationsPage, conversationsPerPage, onSelectConversation, groupsSubTab, groupsPage, groupsPerPage, groupsQ, groupConvPage, groupConvPerPage, onSelectGroupConversation, postsPage, postsPerPage, postsQ, postsVisibility, uploadsPage, uploadsPerPage, uploadsQ, followLeaderboardLimit, navigate]);
 
   useEffect(() => {
-    if (!authUser) {
+    // Check if we have a token in localStorage
+    const token = localStorage.getItem('jwt-token');
+
+    if (!authUser && !token) {
+      console.log("❌ No auth user and no token - redirecting to login");
       navigate('/admin/login');
       return;
     }
-    if (authUser.role !== 'admin') {
+
+    if (!authUser && token) {
+      console.log("⚠️ Token exists but no auth user - this might be a page refresh");
+      // Don't redirect immediately, let the API calls try with the token
+      // If they fail with 401, the loadData error handler will redirect
+    }
+
+    if (authUser && authUser.role !== 'admin') {
+      console.log("❌ User is not admin");
       setLoading(false);
       return;
     }
+
+    console.log("✅ Loading admin data...");
     loadData();
   }, [authUser, navigate, activeTab, messagesSubTab, groupsSubTab, messagesPage, groupsPage, conversationsPage, groupConvPage, postsPage, uploadsPage, messagesPerPage, groupsPerPage, conversationsPerPage, groupConvPerPage, postsPerPage, uploadsPerPage, followLeaderboardLimit, loadData]);
 
