@@ -584,7 +584,7 @@ export const getGroupMessages = async (req, res) => {
   }
 };
 
-// Uploads Listing (from messages attachments/images and statuses)
+// Uploads Listing (from ALL sources in Supabase)
 export const listUploads = async (req, res) => {
   try {
     const { limit = 100, skip = 0, q = "" } = req.query;
@@ -594,10 +594,11 @@ export const listUploads = async (req, res) => {
     const msgAttach = await Message.find({ "attachments.0": { $exists: true } })
       .select("attachments senderId receiverId groupId createdAt")
       .populate('senderId', 'fullName email')
-      .populate('receiverId', 'fullName email');
+      .populate('receiverId', 'fullName email')
+      .populate('groupId', 'name');
     msgAttach.forEach(m => {
       (m.attachments || []).forEach(att => {
-        if (!att.url) return; // Skip attachments without URLs
+        if (!att.url) return;
         if (q && !(`${att.filename || ''} ${att.contentType || ''}`.toLowerCase().includes(String(q).toLowerCase()))) return;
         uploads.push({
           _id: `${m._id}:${att.storageKey || att.url}`,
@@ -608,7 +609,19 @@ export const listUploads = async (req, res) => {
           contentType: att.contentType,
           size: att.size,
           user: m.senderId ? { _id: m.senderId._id, fullName: m.senderId.fullName, email: m.senderId.email } : null,
-          where: m.groupId ? { type: 'group', id: m.groupId } : { type: 'dm', id: m.receiverId?._id },
+          sender: m.senderId ? { _id: m.senderId._id, fullName: m.senderId.fullName, email: m.senderId.email } : null,
+          receiver: m.receiverId ? { _id: m.receiverId._id, fullName: m.receiverId.fullName, email: m.receiverId.email } : null,
+          where: m.groupId ? {
+            type: 'group-message',
+            id: m.groupId._id,
+            name: m.groupId.name,
+            messageId: m._id
+          } : {
+            type: 'dm-message',
+            id: m.receiverId?._id,
+            name: m.receiverId?.fullName,
+            messageId: m._id
+          },
           createdAt: m.createdAt,
         });
       });
@@ -618,9 +631,10 @@ export const listUploads = async (req, res) => {
     const msgImages = await Message.find({ image: { $exists: true, $ne: "" } })
       .select("image imageStorageKey senderId receiverId groupId createdAt")
       .populate('senderId', 'fullName email')
-      .populate('receiverId', 'fullName email');
+      .populate('receiverId', 'fullName email')
+      .populate('groupId', 'name');
     msgImages.forEach(m => {
-      if (!m.image) return; // Skip messages without images
+      if (!m.image) return;
       if (q && !((m.image || '').toLowerCase().includes(String(q).toLowerCase()))) return;
       uploads.push({
         _id: `${m._id}:image`,
@@ -631,13 +645,63 @@ export const listUploads = async (req, res) => {
         contentType: 'image/*',
         size: null,
         user: m.senderId ? { _id: m.senderId._id, fullName: m.senderId.fullName, email: m.senderId.email } : null,
-        where: m.groupId ? { type: 'group', id: m.groupId } : { type: 'dm', id: m.receiverId?._id },
+        sender: m.senderId ? { _id: m.senderId._id, fullName: m.senderId.fullName, email: m.senderId.email } : null,
+        receiver: m.receiverId ? { _id: m.receiverId._id, fullName: m.receiverId.fullName, email: m.receiverId.email } : null,
+        where: m.groupId ? {
+          type: 'group-message',
+          id: m.groupId._id,
+          name: m.groupId.name,
+          messageId: m._id
+        } : {
+          type: 'dm-message',
+          id: m.receiverId?._id,
+          name: m.receiverId?.fullName,
+          messageId: m._id
+        },
+        createdAt: m.createdAt,
+      });
+    });
+
+    // Message audio (voice messages)
+    const msgAudio = await Message.find({ "audio.url": { $exists: true, $ne: "" } })
+      .select("audio senderId receiverId groupId createdAt")
+      .populate('senderId', 'fullName email')
+      .populate('receiverId', 'fullName email')
+      .populate('groupId', 'name');
+    msgAudio.forEach(m => {
+      if (!m.audio?.url) return;
+      if (q && !((m.audio.url || '').toLowerCase().includes(String(q).toLowerCase()))) return;
+      uploads.push({
+        _id: `${m._id}:audio`,
+        kind: 'message-audio',
+        url: m.audio.url,
+        storageKey: m.audio.storageKey,
+        filename: null,
+        contentType: m.audio.contentType || 'audio/*',
+        size: null,
+        duration: m.audio.durationSec,
+        user: m.senderId ? { _id: m.senderId._id, fullName: m.senderId.fullName, email: m.senderId.email } : null,
+        sender: m.senderId ? { _id: m.senderId._id, fullName: m.senderId.fullName, email: m.senderId.email } : null,
+        receiver: m.receiverId ? { _id: m.receiverId._id, fullName: m.receiverId.fullName, email: m.receiverId.email } : null,
+        where: m.groupId ? {
+          type: 'group-message',
+          id: m.groupId._id,
+          name: m.groupId.name,
+          messageId: m._id
+        } : {
+          type: 'dm-message',
+          id: m.receiverId?._id,
+          name: m.receiverId?.fullName,
+          messageId: m._id
+        },
         createdAt: m.createdAt,
       });
     });
 
     // Status media and audio
-    const statuses = await Status.find({}).select("userId mediaUrl storageKey audioUrl audioStorageKey mediaType createdAt").populate('userId', 'fullName email');
+    const statuses = await Status.find({})
+      .select("userId mediaUrl storageKey audioUrl audioStorageKey mediaType audioDurationSec createdAt")
+      .populate('userId', 'fullName email');
     statuses.forEach(s => {
       if (s.mediaUrl && (!q || (s.mediaUrl || '').toLowerCase().includes(String(q).toLowerCase()))) {
         uploads.push({
@@ -649,7 +713,7 @@ export const listUploads = async (req, res) => {
           contentType: s.mediaType,
           size: null,
           user: s.userId ? { _id: s.userId._id, fullName: s.userId.fullName, email: s.userId.email } : null,
-          where: { type: 'status', id: s._id },
+          where: { type: 'status', id: s._id, name: 'User Status' },
           createdAt: s.createdAt,
         });
       }
@@ -661,46 +725,86 @@ export const listUploads = async (req, res) => {
           storageKey: s.audioStorageKey,
           filename: null,
           contentType: 'audio/*',
-          size: s.audioDurationSec ? s.audioDurationSec * 1000 : null,
+          size: null,
+          duration: s.audioDurationSec,
           user: s.userId ? { _id: s.userId._id, fullName: s.userId.fullName, email: s.userId.email } : null,
-          where: { type: 'status', id: s._id },
+          where: { type: 'status', id: s._id, name: 'Status Background Music' },
           createdAt: s.createdAt,
         });
       }
     });
 
+    // Post items (media in posts)
+    const posts = await Post.find({ "items.0": { $exists: true } })
+      .select("items postedBy title createdAt")
+      .populate('postedBy', 'fullName email');
+    posts.forEach(p => {
+      (p.items || []).forEach((item, idx) => {
+        if (!item.url) return;
+        if (q && !(`${item.filename || ''} ${item.contentType || ''}`.toLowerCase().includes(String(q).toLowerCase()))) return;
+        uploads.push({
+          _id: `${p._id}:post-item-${idx}`,
+          kind: 'post-media',
+          url: item.url,
+          storageKey: item.storageKey,
+          filename: item.filename,
+          contentType: item.contentType,
+          size: item.size,
+          user: p.postedBy ? { _id: p.postedBy._id, fullName: p.postedBy.fullName, email: p.postedBy.email } : null,
+          where: {
+            type: 'post',
+            id: p._id,
+            name: p.title || 'Untitled Post',
+            itemIndex: idx
+          },
+          createdAt: p.createdAt,
+        });
+      });
+    });
+
     // User profile pictures
-    const users = await User.find({ profilePic: { $exists: true, $ne: "" } }).select("profilePic fullName email createdAt");
+    const users = await User.find({ profilePic: { $exists: true, $ne: "" } })
+      .select("profilePic fullName email username createdAt");
     users.forEach(u => {
       if (q && !(u.profilePic || '').toLowerCase().includes(String(q).toLowerCase())) return;
       uploads.push({
         _id: `${u._id}:profile-pic`,
         kind: 'profile-picture',
         url: u.profilePic,
-        storageKey: null, // Profile pics might not have storage keys if uploaded via external services
+        storageKey: null,
         filename: null,
         contentType: 'image/*',
         size: null,
         user: { _id: u._id, fullName: u.fullName, email: u.email },
-        where: { type: 'user-profile', id: u._id },
+        where: {
+          type: 'user-profile',
+          id: u._id,
+          name: `${u.fullName} (@${u.username || 'user'})`
+        },
         createdAt: u.createdAt,
       });
     });
 
     // Group pictures
-    const groups = await Group.find({ groupPic: { $exists: true, $ne: "" } }).select("groupPic name admin createdAt").populate('admin', 'fullName email');
+    const groups = await Group.find({ groupPic: { $exists: true, $ne: "" } })
+      .select("groupPic name admin createdAt")
+      .populate('admin', 'fullName email');
     groups.forEach(g => {
       if (q && !(g.groupPic || '').toLowerCase().includes(String(q).toLowerCase())) return;
       uploads.push({
         _id: `${g._id}:group-pic`,
         kind: 'group-picture',
         url: g.groupPic,
-        storageKey: null, // Group pics might not have storage keys
+        storageKey: null,
         filename: null,
         contentType: 'image/*',
         size: null,
         user: g.admin ? { _id: g.admin._id, fullName: g.admin.fullName, email: g.admin.email } : null,
-        where: { type: 'group', id: g._id },
+        where: {
+          type: 'group',
+          id: g._id,
+          name: g.name
+        },
         createdAt: g.createdAt,
       });
     });
@@ -724,7 +828,7 @@ export const listUploads = async (req, res) => {
 // Delete upload helper endpoint (best-effort) by kind and storageKey
 export const deleteUpload = async (req, res) => {
   try {
-    const { kind, refId, storageKey } = req.body || {};
+    const { kind, refId, storageKey, itemIndex } = req.body || {};
     if (!kind) return res.status(400).json({ message: 'kind is required' });
 
     if (kind === 'message-attachment') {
@@ -772,8 +876,31 @@ export const deleteUpload = async (req, res) => {
       cacheInvalidate('admin:');
       return res.json({ message: 'Group picture removed' });
     }
+    if (kind === 'message-audio') {
+      if (!refId) return res.status(400).json({ message: 'refId required' });
+      const msg = await Message.findById(refId);
+      if (!msg) return res.status(404).json({ message: 'Message not found' });
+      if (msg.audio?.storageKey) { try { await removeFromSupabase(msg.audio.storageKey); } catch { } }
+      msg.audio = null;
+      await msg.save();
+      cacheInvalidate('admin:');
+      return res.json({ message: 'Voice message removed' });
+    }
+    if (kind === 'post-media') {
+      if (!refId || itemIndex === undefined) return res.status(400).json({ message: 'refId and itemIndex required' });
+      const post = await Post.findById(refId);
+      if (!post) return res.status(404).json({ message: 'Post not found' });
+      if (post.items[itemIndex]?.storageKey) {
+        try { await removeFromSupabase(post.items[itemIndex].storageKey); } catch { }
+      }
+      post.items.splice(itemIndex, 1);
+      await post.save();
+      cacheInvalidate('admin:');
+      return res.json({ message: 'Post media removed' });
+    }
     return res.status(400).json({ message: 'Unsupported kind' });
   } catch (e) {
+    console.error('Delete upload error:', e);
     res.status(500).json({ message: 'Failed to delete upload' });
   }
 };
@@ -1130,5 +1257,30 @@ export const getFollowLeaderboard = async (req, res) => {
   } catch (e) {
     console.error('Error getting follow leaderboard:', e);
     res.status(500).json({ message: "Failed to fetch follow leaderboard" });
+  }
+};
+
+// Get unused uploads (files in Supabase not referenced in database)
+export const getUnusedUploads = async (req, res) => {
+  try {
+    // This would require listing all files from Supabase storage
+    // and comparing with database references
+    // For now, return empty array as this requires Supabase admin SDK
+    res.json({ unused: [], message: 'Feature requires Supabase admin SDK integration' });
+  } catch (e) {
+    console.error('Error getting unused uploads:', e);
+    res.status(500).json({ message: "Failed to get unused uploads" });
+  }
+};
+
+// Clean up unused uploads
+export const cleanupUnusedUploads = async (req, res) => {
+  try {
+    // This would delete files from Supabase that aren't referenced in the database
+    // Requires Supabase admin SDK
+    res.json({ deleted: 0, message: 'Feature requires Supabase admin SDK integration' });
+  } catch (e) {
+    console.error('Error cleaning up unused uploads:', e);
+    res.status(500).json({ message: "Failed to cleanup unused uploads" });
   }
 };

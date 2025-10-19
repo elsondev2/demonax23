@@ -21,6 +21,8 @@ import {
   getGroupMessages,
   listUploads,
   deleteUpload,
+  getUnusedUploads,
+  cleanupUnusedUploads,
   listPosts,
   deletePost,
   deleteComment,
@@ -68,6 +70,8 @@ router.delete("/statuses/:id", protectRoute, requireAdmin, deleteStatus);
 // Uploads
 router.get("/uploads", protectRoute, requireAdmin, listUploads);
 router.delete("/uploads", protectRoute, requireAdmin, deleteUpload);
+router.get("/uploads/unused", protectRoute, requireAdmin, getUnusedUploads);
+router.post("/uploads/cleanup", protectRoute, requireAdmin, cleanupUnusedUploads);
 
 // Posts Management
 router.get("/posts", protectRoute, requireAdmin, listPosts);

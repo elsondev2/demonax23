@@ -122,14 +122,8 @@ function SignUpPageNew() {
     const result = await signup(submitData);
 
     if (result?.success) {
-      if (result.requiresVerification) {
-        navigate('/verify-email', {
-          state: { userData: result.userData },
-          replace: true
-        });
-      } else {
-        navigate("/chat");
-      }
+      // Verification disabled - go directly to chat
+      navigate("/chat");
     }
   };
 
@@ -349,10 +343,10 @@ function SignUpPageNew() {
                     </label>
                   </div>
 
-                  {/* Verification Notice */}
+                  {/* Coming Soon Notice */}
                   <div className="bg-info/10 border border-info/30 rounded-lg p-3 mt-4">
                     <p className="text-xs text-base-content/70 text-center">
-                      📧 After creating your account, you'll receive a verification code via email to complete the setup.
+                      🚀 Email verification coming soon! For now, you can start using your account immediately.
                     </p>
                   </div>
 

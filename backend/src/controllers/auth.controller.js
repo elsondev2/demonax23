@@ -242,7 +242,7 @@ export const updateProfile = async (req, res) => {
     }
 
     await user.save();
-    
+
     // Invalidate user cache
     cacheInvalidate(`user:${user._id}`);
 
@@ -542,7 +542,7 @@ export const checkUserExists = async (req, res) => {
 
     const user = await User.findOne({ email: email.trim().toLowerCase() });
 
-    return res.status(200).json({ 
+    return res.status(200).json({
       exists: !!user,
       message: user ? "User exists" : "User not found"
     });

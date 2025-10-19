@@ -337,19 +337,27 @@ export default function AdminPage() {
   useEffect(() => {
     const handler = async (e) => {
       const u = e.detail;
-      const ok = window.confirm(`Delete ${u.kind} uploaded by ${u.user?.fullName || 'user'}?`);
+      const locationInfo = u.where?.name ? ` from ${u.where.name}` : '';
+      const ok = window.confirm(`Delete ${u.kind.replace(/-/g, ' ')}${locationInfo} uploaded by ${u.user?.fullName || 'user'}?`);
       if (!ok) return;
       try {
         const payload = (function map() {
           if (u.kind === 'message-attachment') return { kind: u.kind, refId: u._id.split(':')[0], storageKey: u.storageKey };
           if (u.kind === 'message-image') return { kind: u.kind, refId: u._id.split(':')[0] };
+          if (u.kind === 'message-audio') return { kind: u.kind, refId: u._id.split(':')[0] };
           if (u.kind === 'status-media') return { kind: u.kind, refId: u.where?.id };
           if (u.kind === 'status-audio') return { kind: u.kind, refId: u.where?.id };
+          if (u.kind === 'post-media') return { kind: u.kind, refId: u.where?.id, itemIndex: u.where?.itemIndex };
+          if (u.kind === 'profile-picture') return { kind: u.kind, refId: u.where?.id };
+          if (u.kind === 'group-picture') return { kind: u.kind, refId: u.where?.id };
           return null;
         })();
-        if (!payload) return;
+        if (!payload) {
+          toast.error('Unsupported upload type');
+          return;
+        }
         await axiosInstance.delete('/api/admin/uploads', { data: payload });
-        toast.success('Upload deleted');
+        toast.success('Upload deleted successfully');
         loadData();
       } catch {
         toast.error('Failed to delete');
