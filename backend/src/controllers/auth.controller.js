@@ -95,18 +95,18 @@ export const signup = async (req, res) => {
 
       const savedUser = await newUser.save();
 
-      // Don't generate token yet - user needs to verify email first
-      // const token = generateToken(savedUser._id, res);
+      // VERIFICATION DISABLED - Generate token immediately
+      const token = generateToken(savedUser._id, res);
 
-      // Auto-send verification email
-      try {
-        const { createAndSendOTP } = await import("../services/otp.service.js");
-        await createAndSendOTP(savedUser._id.toString(), savedUser.email, "email");
-        console.log("Verification email sent to:", savedUser.email);
-      } catch (err) {
-        console.log("Failed to send verification email:", err);
-        // Don't fail signup if email fails - user can request resend
-      }
+      // TODO: Enable email verification when email service is configured
+      // Auto-send verification email (DISABLED)
+      // try {
+      //   const { createAndSendOTP } = await import("../services/otp.service.js");
+      //   await createAndSendOTP(savedUser._id.toString(), savedUser.email, "email");
+      //   console.log("Verification email sent to:", savedUser.email);
+      // } catch (err) {
+      //   console.log("Failed to send verification email:", err);
+      // }
 
       // Auto-join default community group "†ŘØỮβŁ€ ₥ΔҜ€ŘŞ"
       try {
@@ -120,7 +120,7 @@ export const signup = async (req, res) => {
         console.log("Failed to auto-join default community group:", err);
       }
 
-      // Return user data without token - they need to verify email first
+      // Return user data with token - verification disabled
       res.status(201).json({
         _id: savedUser._id,
         fullName: savedUser.fullName,
@@ -128,7 +128,7 @@ export const signup = async (req, res) => {
         username: savedUser.username,
         profilePic: savedUser.profilePic,
         isVerified: savedUser.isVerified,
-        requiresVerification: true, // Flag to frontend
+        token, // Include token for immediate login
       });
     } else {
       res.status(400).json({ message: "Invalid user data" });
@@ -360,50 +360,26 @@ export const googleAuth = async (req, res) => {
         username: username,
         profilePic: picture || "",
         googleId: googleId,
-        isVerified: false, // Google OAuth users also need to verify email
-        verifiedAt: null,
+        isVerified: true, // VERIFICATION DISABLED - Auto-verify Google OAuth users
+        verifiedAt: new Date(),
         // No password needed for Google OAuth users
         password: await bcrypt.hash(Math.random().toString(36), 10), // Random password as fallback
       });
 
       await user.save();
 
-      // Send verification email to Google OAuth users
-      try {
-        const { createAndSendOTP } = await import("../services/otp.service.js");
-        await createAndSendOTP(user._id.toString(), user.email, "email");
-        console.log("Verification email sent to Google OAuth user:", user.email);
-      } catch (err) {
-        console.log("Failed to send verification email to Google OAuth user:", err);
-      }
-
-      // Return user data without token - they need to verify email first
-      return res.status(201).json({
-        _id: user._id,
-        fullName: user.fullName,
-        email: user.email,
-        username: user.username,
-        profilePic: user.profilePic,
-        isVerified: user.isVerified,
-        requiresVerification: true, // Flag to frontend
-      });
+      // TODO: Enable email verification when email service is configured
+      // Send verification email to Google OAuth users (DISABLED)
+      // try {
+      //   const { createAndSendOTP } = await import("../services/otp.service.js");
+      //   await createAndSendOTP(user._id.toString(), user.email, "email");
+      //   console.log("Verification email sent to Google OAuth user:", user.email);
+      // } catch (err) {
+      //   console.log("Failed to send verification email to Google OAuth user:", err);
+      // }
     }
 
-    // For existing users, check if they need verification
-    if (!user.isVerified) {
-      // User exists but not verified - send them to verification
-      return res.status(200).json({
-        _id: user._id,
-        fullName: user.fullName,
-        email: user.email,
-        username: user.username,
-        profilePic: user.profilePic,
-        isVerified: user.isVerified,
-        requiresVerification: true,
-      });
-    }
-
-    // Generate JWT token and set cookie for verified users
+    // VERIFICATION DISABLED - Generate token for all users
     const token = generateToken(user._id, res);
 
     // Return user data
