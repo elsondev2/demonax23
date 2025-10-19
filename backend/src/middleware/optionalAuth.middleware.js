@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import { ENV } from "../lib/env.js";
+import { cacheWrap } from "../lib/cache.js";
 
 export const optionalAuth = async (req, res, next) => {
   try {
@@ -15,7 +16,11 @@ export const optionalAuth = async (req, res, next) => {
     if (token) {
       const decoded = jwt.verify(token, ENV.JWT_SECRET);
       if (decoded) {
-        const user = await User.findById(decoded.userId).select("-password");
+        const user = await cacheWrap(
+          `user:${decoded.userId}`,
+          300000,
+          async () => await User.findById(decoded.userId).select("-password")
+        );
         if (user) {
           req.user = user;
         }

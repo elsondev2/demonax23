@@ -1,8 +1,7 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, memo } from "react";
 import { useChatStore } from "../store/useChatStore";
-import UsersLoadingSkeleton from "./UsersLoadingSkeleton";
-import NoChatsFound from "./NoChatsFound";
 import { useAuthStore } from "../store/useAuthStore";
+import { useGroupInfo } from "../hooks/useGroupInfo";
 import { UsersIcon, Plus } from "lucide-react";
 import CreateGroupModal from "./CreateGroupModal";
 import useGroupStore from "../store/useGroupStore";
@@ -10,8 +9,92 @@ import useFriendStore from "../store/useFriendStore";
 import { Search as SearchIcon } from "lucide-react";
 import Avatar from "./Avatar";
 
+// Helper component for group items - OUTSIDE main component to prevent recreation
+const GroupItem = memo(({ group, onClick, formatTime }) => {
+  const groupInfo = useGroupInfo(group);
+  
+  return (
+    <div className="bg-base-300/20 hover:bg-base-300/40 p-3 rounded-xl cursor-pointer transition-colors"
+      onClick={onClick}>
+      <div className="flex items-center gap-3">
+        <Avatar
+          src={group.groupPic}
+          name={group.name}
+          alt={group.name}
+          size="w-12 h-12"
+          loading="lazy"
+        />
+        <div className="flex-1 min-w-0">
+          <h4 className="text-base-content font-medium truncate text-sm md:text-base">{group.name}</h4>
+          <p className="text-base-content/60 text-xs truncate">
+            {groupInfo.totalMembers} member{groupInfo.totalMembers !== 1 ? 's' : ''}
+            {groupInfo.onlineCount > 0 && ` • ${groupInfo.onlineCount} online`}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 text-base-content/60 text-xs">
+          <span>{formatTime(group.lastMessageTime)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}, (prevProps, nextProps) => {
+  return prevProps.group._id === nextProps.group._id && 
+         prevProps.group.lastMessageTime === nextProps.group.lastMessageTime &&
+         prevProps.group.groupPic === nextProps.group.groupPic &&
+         prevProps.group.name === nextProps.group.name;
+});
+
+// Helper component for community group items - OUTSIDE main component
+const CommunityGroupItem = memo(({ group, onClick, formatTime, formatLastMessagePreview, joinCommunityGroup }) => {
+  const groupInfo = useGroupInfo(group);
+  
+  return (
+    <div className="bg-base-300/20 hover:bg-base-300/40 p-3 rounded-xl cursor-pointer transition-colors"
+      onClick={onClick}>
+      <div className="flex items-center gap-3">
+        <Avatar
+          src={group.groupPic}
+          name={group.name}
+          alt={group.name}
+          size="w-12 h-12"
+          loading="lazy"
+        />
+        <div className="flex-1 min-w-0">
+          <h4 className="text-base-content font-medium truncate text-sm md:text-base">{group.name}</h4>
+          <p className="text-base-content/60 text-xs truncate">
+            {group.isMember 
+              ? formatLastMessagePreview({ ...group, isGroup: true }) 
+              : `${groupInfo.totalMembers} member${groupInfo.totalMembers !== 1 ? 's' : ''}`
+            }
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {group.isMember ? (
+            <div className="text-base-content/60 text-xs">
+              <span>{formatTime(group.lastMessageTime)}</span>
+            </div>
+          ) : (
+            <button className="btn btn-xs btn-primary" onClick={(e) => {
+              e.stopPropagation();
+              joinCommunityGroup(group._id);
+            }}>
+              Join
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}, (prevProps, nextProps) => {
+  return prevProps.group._id === nextProps.group._id && 
+         prevProps.group.lastMessageTime === nextProps.group.lastMessageTime &&
+         prevProps.group.groupPic === nextProps.group.groupPic &&
+         prevProps.group.name === nextProps.group.name &&
+         prevProps.group.isMember === nextProps.group.isMember;
+});
+
 function ChatsList() {
-  const { getMyChatPartners, getAllContacts, allContacts, chats, isUsersLoading, setSelectedUser, setSelectedGroup, recordVisit, visitCounts } = useChatStore();
+  const { getMyChatPartners, getAllContacts, allContacts, chats, setSelectedUser, setSelectedGroup, recordVisit, visitCounts } = useChatStore();
   const { getGroupById, getGroups, groups, getCommunityGroups, communityGroups, isCommunityGroupsLoading, joinCommunityGroup } = useGroupStore();
   const { fetchRequests, requests, sendRequest: sendFriendRequest, acceptRequest, rejectRequest, cancelRequest } = useFriendStore();
   const { onlineUsers, authUser } = useAuthStore();
@@ -52,29 +135,41 @@ function ChatsList() {
     if (!socket) return;
 
     const handleNewMessage = () => {
-      getMyChatPartners();
+      // Only refresh if on recent tab
       if (activeTab === 'recent') {
-        // Refresh recent chats when new message arrives
         getMyChatPartners();
       }
     };
 
     const handleNewGroupMessage = () => {
-      // Always refresh both groups and community groups
-      getGroups();
-      getCommunityGroups();
-      // Also refresh chat partners to update recent tab
-      getMyChatPartners();
+      // Only refresh groups if on groups/communities tab
+      if (activeTab === 'groups' || activeTab === 'communities') {
+        getGroups();
+        getCommunityGroups();
+      }
+      // Update recent tab if active
+      if (activeTab === 'recent') {
+        getMyChatPartners();
+      }
     };
 
     const handleGroupUpdated = () => {
-      getGroups();
-      getCommunityGroups();
+      // Only refresh if on groups/communities tab
+      if (activeTab === 'groups' || activeTab === 'communities') {
+        getGroups();
+        getCommunityGroups();
+      }
     };
 
     const handleUserUpdated = () => {
-      getAllContacts();
-      getMyChatPartners();
+      // Only refresh contacts if on contacts tab
+      if (activeTab === 'contacts') {
+        getAllContacts();
+      }
+      // Update recent if active
+      if (activeTab === 'recent') {
+        getMyChatPartners();
+      }
     };
 
     const handleFriendRequestUpdate = () => {
@@ -156,25 +251,47 @@ function ChatsList() {
     console.log('ChatsList: Selecting chat:', { chatId: chat._id, isGroup: chat.isGroup });
 
     try {
-      // Clear any existing selection first to ensure clean state
-      setSelectedUser(null);
-      setSelectedGroup(null);
+      // Check if this chat is already open
+      const { selectedUser, selectedGroup, refreshCurrentConversation } = useChatStore.getState();
+      const isAlreadyOpen = chat.isGroup
+        ? (selectedGroup?._id === chat._id)
+        : (selectedUser?._id === chat._id);
 
-      // Small delay to ensure state is cleared
-      await new Promise(resolve => setTimeout(resolve, 50));
+      if (isAlreadyOpen) {
+        console.log('ChatsList: Chat already open, refreshing instead of reloading');
+        // Just refresh the current conversation
+        await refreshCurrentConversation();
+
+        // Still dispatch event for mobile sidebar
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('chatSelected', { detail: chat }));
+        }
+        return;
+      }
 
       if (chat.isGroup) {
-        // Always fetch full group details to ensure members are properly populated
+        // Clear user selection only when switching to group
+        setSelectedUser(null);
+
+        // OPTIMISTIC: Set group immediately for instant UI response
+        setSelectedGroup(chat);
+        console.log('ChatsList: Optimistically set group:', chat._id);
+
+        // Fetch full group details in background to update with complete data
         try {
           const fullGroup = await getGroupById(chat._id);
           console.log('ChatsList: Loaded full group details:', fullGroup._id);
+          // Update with full data (members, etc.)
           setSelectedGroup(fullGroup);
         } catch (error) {
-          console.warn('ChatsList: Failed to load full group details, using fallback:', error);
-          setSelectedGroup(chat);
+          console.warn('ChatsList: Failed to load full group details, keeping optimistic data:', error);
+          // Keep the optimistic data if fetch fails
         }
       } else {
+        // Clear group selection only when switching to user
+        setSelectedGroup(null);
         console.log('ChatsList: Setting selected user:', chat._id);
+        // User chat already has full data, set immediately
         setSelectedUser(chat);
       }
 
@@ -193,9 +310,6 @@ function ChatsList() {
 
     } catch (error) {
       console.error('ChatsList: Failed to select chat:', error);
-      // Try to recover by clearing selection
-      setSelectedUser(null);
-      setSelectedGroup(null);
     }
   };
 
@@ -215,7 +329,12 @@ function ChatsList() {
 
   // Function to format last message preview
   const formatLastMessagePreview = (chat) => {
-    if (!chat.lastMessage) {
+    // Check if lastMessage exists and is not empty
+    if (!chat.lastMessage || chat.lastMessage.trim() === '') {
+      // If there's a lastMessageTime, it means there was a message (likely attachment/audio)
+      if (chat.lastMessageTime) {
+        return "📎 Attachment";
+      }
       return "No messages yet";
     }
 
@@ -362,11 +481,11 @@ function ChatsList() {
         <div className="flex items-center gap-4 mb-3 px-1 py-1">
           {/* Plus button navigates to Contacts */}
           <button
-            className="btn btn-circle btn-ghost border border-base-300 hover:border-base-400"
+            className="btn btn-circle btn-primary shadow-md hover:shadow-lg transition-all duration-200"
             title="Find contacts"
             onClick={() => setActiveTab('contacts')}
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="w-6 h-6" />
           </button>
           {/* Top 3 most visited/recent chats */}
           <div className="quick-access-scroll flex items-center gap-4 overflow-x-auto overflow-y-hidden no-scrollbar"
@@ -460,24 +579,12 @@ function ChatsList() {
               </div>
             </div>
             {filteredGroups.map(group => (
-              <div key={group._id} className="bg-base-300/20 hover:bg-base-300/40 p-3 rounded-xl cursor-pointer transition-colors"
-                onClick={() => handleChatSelect({ ...group, isGroup: true })}>
-                <div className="flex items-center gap-3">
-                  <Avatar
-                    src={group.groupPic}
-                    name={group.name}
-                    alt={group.name}
-                    size="w-12 h-12"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-base-content font-medium truncate text-sm md:text-base">{group.name}</h4>
-                    <p className="text-base-content/60 text-xs truncate">{group.lastMessage || 'No messages yet'}</p>
-                  </div>
-                  <div className="flex items-center gap-2 text-base-content/60 text-xs">
-                    <span>{formatTime(group.lastMessageTime)}</span>
-                  </div>
-                </div>
-              </div>
+              <GroupItem 
+                key={group._id} 
+                group={group} 
+                onClick={() => handleChatSelect({ ...group, isGroup: true })}
+                formatTime={formatTime}
+              />
             ))}
           </div>
         )}
@@ -485,7 +592,15 @@ function ChatsList() {
         {/* COMMUNITIES TAB CONTENT */}
         {activeTab === 'communities' && (
           <div className="space-y-2">
-            {isCommunityGroupsLoading ? (
+            {/* Show loading indicator at top if loading, but still show cached data */}
+            {isCommunityGroupsLoading && filteredCommunityGroups.length > 0 && (
+              <div className="flex justify-center py-2">
+                <span className="loading loading-spinner loading-sm"></span>
+              </div>
+            )}
+
+            {/* Show full loading only if no data yet */}
+            {isCommunityGroupsLoading && filteredCommunityGroups.length === 0 ? (
               <div className="flex justify-center py-4">
                 <span className="loading loading-spinner loading-md"></span>
               </div>
@@ -496,43 +611,20 @@ function ChatsList() {
               </div>
             ) : (
               filteredCommunityGroups.map(group => (
-                <div key={group._id} className="bg-base-300/20 hover:bg-base-300/40 p-3 rounded-xl cursor-pointer transition-colors"
+                <CommunityGroupItem
+                  key={group._id}
+                  group={group}
                   onClick={() => {
                     if (group.isMember) {
                       handleChatSelect({ ...group, isGroup: true });
                     } else {
                       joinCommunityGroup(group._id);
                     }
-                  }}>
-                  <div className="flex items-center gap-3">
-                    <Avatar
-                      src={group.groupPic}
-                      name={group.name}
-                      alt={group.name}
-                      size="w-12 h-12"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-base-content font-medium truncate text-sm md:text-base">{group.name}</h4>
-                      <p className="text-base-content/60 text-xs truncate">
-                        {group.isMember ? (group.lastMessage || 'No messages yet') : `${group.members?.length || 0} members`}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {group.isMember ? (
-                        <div className="text-base-content/60 text-xs">
-                          <span>{formatTime(group.lastMessageTime)}</span>
-                        </div>
-                      ) : (
-                        <button className="btn btn-xs btn-primary" onClick={(e) => {
-                          e.stopPropagation();
-                          joinCommunityGroup(group._id);
-                        }}>
-                          Join
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                  }}
+                  formatTime={formatTime}
+                  formatLastMessagePreview={formatLastMessagePreview}
+                  joinCommunityGroup={joinCommunityGroup}
+                />
               ))
             )}
           </div>

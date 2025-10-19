@@ -41,6 +41,8 @@ export const getMessagesByUserId = async (req, res) => {
       ],
       groupId: { $exists: false } // Only individual messages
     })
+    .populate("senderId", "fullName profilePic")
+    .populate("quotedMessage.senderId", "fullName profilePic")
     .sort({ createdAt: -1 }) // Newest first
     .skip(skip)
     .limit(limit);
@@ -68,8 +70,14 @@ export const getGroupMessages = async (req, res) => {
     const limit = parseInt(req.query.limit) || 50;
     const skip = (page - 1) * limit;
 
-    // Check if user is a member of the group
-    const group = await Group.findOne({ _id: groupId, members: userId });
+    // Check if user is a member or admin of the group
+    const group = await Group.findOne({ 
+      _id: groupId,
+      $or: [
+        { members: userId },
+        { admin: userId }
+      ]
+    });
     if (!group) {
       return res.status(403).json({ message: "You are not a member of this group." });
     }
@@ -80,6 +88,7 @@ export const getGroupMessages = async (req, res) => {
     // Get messages with pagination (newest first for recent messages)
     const messages = await Message.find({ groupId })
       .populate("senderId", "fullName profilePic")
+      .populate("quotedMessage.senderId", "fullName profilePic")
       .sort({ createdAt: -1 }) // Newest first
       .skip(skip)
       .limit(limit);
@@ -164,8 +173,9 @@ export const sendMessage = async (req, res) => {
 
       await newMessage.save();
 
-      // Populate sender details
+      // Populate sender details and quoted message sender
       await newMessage.populate("senderId", "fullName profilePic");
+      await newMessage.populate("quotedMessage.senderId", "fullName profilePic");
 
       // Emit the message to ALL group members INCLUDING the sender
       // This ensures the sender sees the message even if optimistic update fails
@@ -236,6 +246,10 @@ export const sendMessage = async (req, res) => {
       });
 
       await newMessage.save();
+
+      // Populate sender details and quoted message sender before emitting
+      await newMessage.populate("senderId", "fullName profilePic");
+      await newMessage.populate("quotedMessage.senderId", "fullName profilePic");
 
       // Emit to both receiver and sender for consistency
       // This ensures message appears even if optimistic update fails
@@ -508,8 +522,14 @@ export const getChatPartners = async (req, res) => {
     // Get unique group IDs
     const groupIds = Array.from(groupMap.keys());
 
-    // Get group details
-    const groups = await Group.find({ _id: { $in: groupIds }, members: loggedInUserId });
+    // Get group details - include groups where user is member OR admin
+    const groups = await Group.find({ 
+      _id: { $in: groupIds },
+      $or: [
+        { members: loggedInUserId },
+        { admin: loggedInUserId }
+      ]
+    });
 
     // Add last message information to each chat partner and compute unread counts
     const chatPartnersWithLastMessage = await Promise.all(chatPartners.map(async (partner) => {

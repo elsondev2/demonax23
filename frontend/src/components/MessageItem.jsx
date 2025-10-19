@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
-import { AlertCircle, RotateCcw, Edit, Trash2, Quote, FileText, Play, Pause, Volume2, MoreVertical, Phone, Video } from "lucide-react";
+import { AlertCircle, RotateCcw, Edit, Trash2, Quote, FileText, MoreVertical, Phone, Video, Download, Maximize2 } from "lucide-react";
 import useLongPress from "../hooks/useLongPress";
 import Avatar from "./Avatar";
+import AudioPlayer from "./AudioPlayer";
+import ImagePreviewModal from "./ImagePreviewModal";
+import MessageWithLinkPreviews from "./MessageWithLinkPreviews";
 
 const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selectedGroup, groupPosition, isUnread }) => {
   const { authUser } = useAuthStore();
@@ -11,8 +14,31 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
 
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState('bottom'); // 'bottom' or 'top'
+  const [imageLoading, setImageLoading] = useState(!!message.image);
+  const [attachmentLoadingStates, setAttachmentLoadingStates] = useState({});
+  const [imageMenuOpen, setImageMenuOpen] = useState(null); // Track which image menu is open
+  const [previewImage, setPreviewImage] = useState(null); // For full preview modal
   const messageRef = useRef(null);
   const dropdownRef = useRef(null);
+
+  // Reset image loading state when message image changes
+  useEffect(() => {
+    if (message.image) {
+      setImageLoading(true);
+    }
+  }, [message.image]);
+
+  // Reset attachment loading states when attachments change
+  useEffect(() => {
+    if (message.attachments && message.attachments.length > 0) {
+      const initialStates = {};
+      message.attachments.forEach((_, idx) => {
+        initialStates[idx] = true;
+      });
+      setAttachmentLoadingStates(initialStates);
+    }
+  }, [message.attachments]);
 
   const senderId = typeof message.senderId === 'object' && message.senderId ? message.senderId._id : message.senderId;
   const senderObj = typeof message.senderId === 'object' && message.senderId ? message.senderId : null;
@@ -20,13 +46,30 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
 
   // Get sender info
   const getSenderInfo = () => {
+    // Check if sender was deleted
+    if (message.senderDeleted) {
+      return { name: 'Deleted User', avatar: null, isDeleted: true };
+    }
+
     if (isOwnMessage) return { name: 'You', avatar: authUser?.profilePic };
     if (senderObj) return { name: senderObj.fullName, avatar: senderObj.profilePic };
     if (selectedUser) return { name: selectedUser.fullName, avatar: selectedUser.profilePic };
-    if (selectedGroup && Array.isArray(selectedGroup.members)) {
-      const member = selectedGroup.members.find(m => m._id === senderId);
-      if (member) {
-        return { name: member.fullName, avatar: member.profilePic };
+    if (selectedGroup) {
+      // Check if sender is the admin
+      const adminId = typeof selectedGroup.admin === 'object' ? selectedGroup.admin._id : selectedGroup.admin;
+      if (adminId === senderId) {
+        const adminInfo = typeof selectedGroup.admin === 'object' ? selectedGroup.admin : null;
+        return { 
+          name: adminInfo?.fullName || 'Admin', 
+          avatar: adminInfo?.profilePic || null 
+        };
+      }
+      // Check in members array
+      if (Array.isArray(selectedGroup.members)) {
+        const member = selectedGroup.members.find(m => m._id === senderId);
+        if (member) {
+          return { name: member.fullName, avatar: member.profilePic };
+        }
       }
       // If member not found in group, they might be deleted
       return { name: 'Deleted User', avatar: null, isDeleted: true };
@@ -83,6 +126,20 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
     }
   }, [showDropdown]);
 
+  // Close image menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (imageMenuOpen && !event.target.closest('.group/image') && !event.target.closest('.group/attachment')) {
+        setImageMenuOpen(null);
+      }
+    };
+
+    if (imageMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [imageMenuOpen]);
+
   const handleEditClick = (e) => {
     e.stopPropagation();
     setShowContextMenu(false);
@@ -126,176 +183,9 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
 
   const [docPreview, setDocPreview] = useState(null); // {url, filename}
 
-  // VoiceMessagePlayer component
-  const VoiceMessagePlayer = ({ audioUrl, isOwnMessage }) => {
-    const [isPlaying, setIsPlaying] = useState(false);
-    const [duration, setDuration] = useState(0);
-    const [currentTime, setCurrentTime] = useState(0);
-    const [isLoading, setIsLoading] = useState(true);
-
-    const audioRef = useRef(null);
-
-    // Fixed waveform bar heights for consistent appearance
-    const waveformBars = [6, 12, 8, 14, 10, 16, 8, 12];
-
-    useEffect(() => {
-      const audio = audioRef.current;
-      if (audio) {
-
-        const handleLoadedMetadata = () => {
-          setDuration(audio.duration || 0);
-          setIsLoading(false);
-        };
-
-        const handleTimeUpdate = () => {
-          setCurrentTime(audio.currentTime || 0);
-        };
-
-        const handlePlay = () => {
-          setIsPlaying(true);
-        };
-
-        const handlePause = () => {
-          setIsPlaying(false);
-        };
-
-        const handleEnded = () => {
-          setIsPlaying(false);
-          setCurrentTime(0);
-        };
-
-        const handleLoadStart = () => {
-          setIsLoading(true);
-        };
-
-        const handleCanPlay = () => {
-          setIsLoading(false);
-        };
-
-        audio.addEventListener('loadedmetadata', handleLoadedMetadata);
-        audio.addEventListener('timeupdate', handleTimeUpdate);
-        audio.addEventListener('play', handlePlay);
-        audio.addEventListener('pause', handlePause);
-        audio.addEventListener('ended', handleEnded);
-        audio.addEventListener('loadstart', handleLoadStart);
-        audio.addEventListener('canplay', handleCanPlay);
-
-        return () => {
-          audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
-          audio.removeEventListener('timeupdate', handleTimeUpdate);
-          audio.removeEventListener('play', handlePlay);
-          audio.removeEventListener('pause', handlePause);
-          audio.removeEventListener('ended', handleEnded);
-          audio.removeEventListener('loadstart', handleLoadStart);
-          audio.removeEventListener('canplay', handleCanPlay);
-        };
-      }
-    }, [audioUrl]);
-
-    const togglePlayPause = async () => {
-      const audio = audioRef.current;
-
-      if (audio) {
-        try {
-          if (isPlaying) {
-            audio.pause();
-          } else {
-            await audio.play();
-          }
-        } catch (error) {
-          console.error('Audio playback error:', error);
-          setIsPlaying(false);
-        }
-      }
-    };
-
-    const formatTime = (time) => {
-      const minutes = Math.floor(time / 60);
-      const seconds = Math.floor(time % 60);
-      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-    };
-
-    const progressPercentage = duration ? (currentTime / duration) * 100 : 0;
-
-    return (
-      <div className={`flex items-center gap-2 p-3 rounded-lg max-w-sm w-full sm:max-w-xs ${isOwnMessage
-        ? 'bg-primary/10 border border-primary/20'
-        : 'bg-base-300/30 border border-base-300/50'
-        }`}>
-        {/* Play/Pause Button */}
-        <button
-          onClick={togglePlayPause}
-          disabled={isLoading}
-          className={`btn btn-circle flex-shrink-0 min-h-[44px] w-11 h-11 sm:w-10 sm:h-10 ${isLoading ? 'opacity-50 cursor-not-allowed' : ''
-            } ${isOwnMessage
-              ? 'bg-primary hover:bg-primary/80 text-primary-content'
-              : 'bg-base-content/10 hover:bg-base-content/20 text-base-content'
-            }`}
-        >
-          {isLoading ? (
-            <div className="loading loading-spinner loading-xs" />
-          ) : isPlaying ? (
-            <Pause className="w-4 h-4" />
-          ) : (
-            <Play className="w-4 h-4 ml-0.5" />
-          )}
-        </button>
-
-        {/* Progress Bar and Waveform */}
-        <div className="flex-1 flex items-center gap-2">
-          {/* Animated Waveform Bars */}
-          <div className="flex items-center gap-0.5 flex-1">
-            {waveformBars.map((height, i) => (
-              <div
-                key={i}
-                className={`w-0.5 bg-current rounded-full transition-all duration-300 ${isOwnMessage ? 'text-primary/60' : 'text-base-content/40'
-                  } ${isPlaying ? 'animate-pulse' : ''}`}
-                style={{
-                  height: `${height}px`,
-                  animationDelay: `${i * 100}ms`
-                }}
-              />
-            ))}
-          </div>
-
-          {/* Progress Bar */}
-          <div className="w-12 bg-base-300/50 rounded-full h-1 relative overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-200 ${isOwnMessage ? 'bg-primary' : 'bg-base-content/60'
-                }`}
-              style={{ width: `${progressPercentage}%` }}
-            />
-          </div>
-
-          {/* Time Display */}
-          <div className={`text-xs font-mono min-w-[40px] text-center sm:min-w-[35px] ${isOwnMessage ? 'text-primary-content/70' : 'text-base-content/60'
-            }`}>
-            {formatTime(currentTime)} / {formatTime(duration)}
-          </div>
-        </div>
-
-        {/* Audio Icon */}
-        <div className={`flex-shrink-0 ${isOwnMessage ? 'text-primary-content/70' : 'text-base-content/60'
-          }`}>
-          <Volume2 className="w-4 h-4" />
-        </div>
-
-        {/* Hidden Audio Element */}
-        <audio
-          ref={audioRef}
-          src={audioUrl}
-          preload="metadata"
-          className="hidden"
-          controls={false}
-          crossOrigin="anonymous"
-        />
-      </div>
-    );
-  };
-
   return (
     <div
-      className={`px-4 py-1 ${showAvatar ? 'mt-2' : 'mt-0.5'} group relative message-item`}
+      className={`px-2 md:px-4 py-1 ${showAvatar ? 'mt-2' : 'mt-0.5'} group relative message-item`}
       data-message-id={message._id}
       role="listitem"
     >
@@ -320,7 +210,7 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
         {/* Message bubble */}
         <div
           ref={messageRef}
-          className={`max-w-[70%] min-w-[100px] rounded-lg px-3 py-2 pr-9 relative group ${isOwnMessage
+          className={`max-w-[70%] ${message.audio?.url ? 'min-w-[300px]' : 'min-w-[100px]'} rounded-lg px-3 py-2 pr-9 relative group ${isOwnMessage
             ? 'bg-primary text-primary-content ml-auto'
             : isUnread && !isOwnMessage
               ? 'bg-accent/30 text-base-content border-l-4 border-accent shadow-md'
@@ -333,6 +223,22 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
             <button
               onClick={(e) => {
                 e.stopPropagation();
+
+                // Detect if message is near bottom of viewport
+                if (messageRef.current && !showDropdown) {
+                  const rect = messageRef.current.getBoundingClientRect();
+                  const viewportHeight = window.innerHeight;
+                  const spaceBelow = viewportHeight - rect.bottom;
+                  const spaceAbove = rect.top;
+
+                  // If less than 200px space below and more space above, show dropdown upward
+                  if (spaceBelow < 200 && spaceAbove > spaceBelow) {
+                    setDropdownPosition('top');
+                  } else {
+                    setDropdownPosition('bottom');
+                  }
+                }
+
                 setShowDropdown(!showDropdown);
               }}
               className={`btn btn-xs btn-circle btn-ghost min-h-0 h-6 w-6 transition-all ${isOwnMessage
@@ -346,7 +252,7 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
 
             {/* Dropdown menu */}
             {showDropdown && (
-              <div className={`absolute ${isOwnMessage ? 'right-0' : 'left-0'} top-7 bg-base-100 border border-base-300 rounded-md shadow-lg py-1 min-w-[110px] z-50`}>
+              <div className={`absolute ${isOwnMessage ? 'right-0' : 'left-0'} ${dropdownPosition === 'top' ? 'bottom-7' : 'top-7'} bg-base-100 border border-base-300 rounded-lg shadow-xl py-1.5 min-w-[120px] z-50 ${dropdownPosition === 'top' ? 'dropdown-menu-animate-up origin-bottom-right' : 'dropdown-menu-animate origin-top-right'}`}>
                 {/* Quote option - available for all messages */}
                 <button
                   onClick={(e) => {
@@ -354,20 +260,20 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
                     setShowDropdown(false);
                     onQuote?.(message);
                   }}
-                  className="w-full px-3 py-1.5 text-left text-sm hover:bg-base-200 flex items-center gap-2 text-base-content transition-colors"
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-base-200 active:bg-base-300 flex items-center gap-2.5 text-base-content transition-all duration-150 rounded-md mx-1"
                 >
-                  <Quote className="w-3.5 h-3.5" />
-                  <span>Quote</span>
+                  <Quote className="w-4 h-4 flex-shrink-0" />
+                  <span className="font-medium">Quote</span>
                 </button>
 
                 {/* Edit option - only for own messages with text */}
                 {isOwnMessage && message.text && (
                   <button
                     onClick={handleEditClick}
-                    className="w-full px-3 py-1.5 text-left text-sm hover:bg-base-200 flex items-center gap-2 text-base-content transition-colors"
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-base-200 active:bg-base-300 flex items-center gap-2.5 text-base-content transition-all duration-150 rounded-md mx-1"
                   >
-                    <Edit className="w-3.5 h-3.5" />
-                    <span>Edit</span>
+                    <Edit className="w-4 h-4 flex-shrink-0" />
+                    <span className="font-medium">Edit</span>
                   </button>
                 )}
 
@@ -375,10 +281,10 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
                 {isOwnMessage && (
                   <button
                     onClick={handleDeleteClick}
-                    className="w-full px-3 py-1.5 text-left text-sm hover:bg-error/10 flex items-center gap-2 text-error transition-colors"
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-error/10 active:bg-error/20 flex items-center gap-2.5 text-error transition-all duration-150 rounded-md mx-1"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Delete</span>
+                    <Trash2 className="w-4 h-4 flex-shrink-0" />
+                    <span className="font-medium">Delete</span>
                   </button>
                 )}
               </div>
@@ -404,14 +310,52 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
             {/* Quoted message */}
             {message.quotedMessage && (() => {
               const q = message.quotedMessage;
-              const qSenderId = typeof q.senderId === 'object' ? q.senderId._id : q.senderId;
-              let qName = 'Unknown';
-              if (qSenderId === authUser?._id) qName = 'You';
-              else if (selectedUser && selectedUser._id === qSenderId) qName = selectedUser.fullName;
-              else if (selectedGroup && Array.isArray(selectedGroup.members)) {
-                const m = selectedGroup.members.find(m => m._id === qSenderId);
-                if (m) qName = m.fullName;
+              
+              // Extract sender ID and info - handle both object and string formats
+              let qSenderId = null;
+              let qSenderObj = null;
+              
+              if (typeof q.senderId === 'object' && q.senderId) {
+                qSenderId = q.senderId._id || q.senderId.id;
+                qSenderObj = q.senderId; // Keep the populated object
+              } else {
+                qSenderId = q.senderId;
               }
+              
+              let qName = 'Unknown';
+              
+              // Convert to string for comparison
+              const qSenderIdStr = qSenderId?.toString();
+              const authUserIdStr = authUser?._id?.toString();
+              
+              // Check if it's the current user
+              if (qSenderIdStr && authUserIdStr && qSenderIdStr === authUserIdStr) {
+                qName = 'You';
+              }
+              // If senderId is populated with user data, use it directly
+              else if (qSenderObj && qSenderObj.fullName) {
+                qName = qSenderObj.fullName;
+              }
+              // Check if it's a direct chat user
+              else if (selectedUser && qSenderIdStr === selectedUser._id?.toString()) {
+                qName = selectedUser.fullName;
+              }
+              // Check in group
+              else if (selectedGroup && qSenderIdStr) {
+                // Check if sender is the admin
+                const adminId = typeof selectedGroup.admin === 'object' ? selectedGroup.admin._id : selectedGroup.admin;
+                const adminIdStr = adminId?.toString();
+                
+                if (adminIdStr === qSenderIdStr) {
+                  qName = typeof selectedGroup.admin === 'object' ? selectedGroup.admin.fullName : 'Admin';
+                }
+                // Check in members array
+                else if (Array.isArray(selectedGroup.members)) {
+                  const m = selectedGroup.members.find(m => m._id?.toString() === qSenderIdStr);
+                  if (m) qName = m.fullName;
+                }
+              }
+              
               return (
                 <div className={`border-l-4 pl-3 py-2 mb-2 rounded-r-md ${isOwnMessage
                   ? 'bg-primary-content/10 border-primary-content/30'
@@ -449,23 +393,107 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
                             <Phone className={`w-4 h-4 ${isOwnMessage ? 'text-primary-content' : 'text-primary'}`} />
                           )}
                         </div>
-                        <span>{textWithoutIcon}</span>
+                        <MessageWithLinkPreviews text={textWithoutIcon} mentions={message.mentions} isOwnMessage={isOwnMessage} />
                       </div>
                     );
                   }
-                  return message.text;
+                  return <MessageWithLinkPreviews text={message.text} mentions={message.mentions} isOwnMessage={isOwnMessage} />;
                 })()}
               </div>
             )}
 
             {/* Message image */}
             {message.image && (
-              <div className="mt-2">
+              <div className="mt-2 relative group/image">
+                {/* Skeleton loader */}
+                {imageLoading && !message.isOptimistic && (
+                  <div className="skeleton w-full max-w-sm h-64 rounded-lg"></div>
+                )}
+                
                 <img
                   src={message.image}
                   alt="Message attachment"
-                  className="rounded-lg max-w-sm max-h-80 object-contain cursor-pointer hover:opacity-90 transition-opacity"
+                  className={`rounded-lg max-w-sm max-h-80 w-full object-contain cursor-pointer hover:opacity-90 transition-opacity ${
+                    message.isOptimistic ? 'opacity-90' : ''
+                  } ${imageLoading && !message.isOptimistic ? 'hidden' : 'block'}`}
+                  loading="eager"
+                  onLoad={() => {
+                    console.log('Image loaded:', message.image);
+                    setImageLoading(false);
+                  }}
+                  onError={(e) => {
+                    console.error('Image failed to load:', message.image);
+                    setImageLoading(false);
+                    // Show broken image placeholder
+                    e.target.style.display = 'none';
+                  }}
+                  onClick={() => !message.isOptimistic && setPreviewImage({ src: message.image, alt: 'Message image' })}
                 />
+                
+                {/* Uploading indicator */}
+                {message.isOptimistic && (
+                  <div className="absolute top-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
+                    <span className="loading loading-spinner loading-xs"></span>
+                    Uploading...
+                  </div>
+                )}
+                
+                {/* Image menu - shows on hover or when open */}
+                {!message.isOptimistic && !imageLoading && (
+                  <div className={`absolute top-2 right-2 ${imageMenuOpen === 'main' ? 'opacity-100' : 'opacity-0 group-hover/image:opacity-100'} transition-opacity`}>
+                    <div className="relative">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setImageMenuOpen(imageMenuOpen === 'main' ? null : 'main');
+                        }}
+                        className="btn btn-circle btn-xs bg-black/50 hover:bg-black/70 text-white border-none"
+                      >
+                        <MoreVertical className="w-3 h-3" />
+                      </button>
+                      
+                      {imageMenuOpen === 'main' && (
+                        <div className="absolute right-0 top-8 bg-base-100 border border-base-300 rounded-lg shadow-xl py-1 min-w-[140px] z-50">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPreviewImage({ src: message.image, alt: 'Message image' });
+                              setImageMenuOpen(null);
+                            }}
+                            className="w-full px-3 py-2 text-left text-sm hover:bg-base-200 flex items-center gap-2"
+                          >
+                            <Maximize2 className="w-4 h-4" />
+                            Full Preview
+                          </button>
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              try {
+                                const response = await fetch(message.image);
+                                const blob = await response.blob();
+                                const url = window.URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = 'image.jpg';
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                                window.URL.revokeObjectURL(url);
+                              } catch (error) {
+                                console.error('Failed to download:', error);
+                              }
+                              setImageMenuOpen(null);
+                            }}
+                            className="w-full px-3 py-2 text-left text-sm hover:bg-base-200 flex items-center gap-2"
+                          >
+                            <Download className="w-4 h-4" />
+                            Download
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             {/* Attachments */}
@@ -473,37 +501,132 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
               <div className="mt-2 space-y-2">
                 {message.attachments.map((a, idx) => (
                   a.contentType?.startsWith('image/') ? (
-                    <img
-                      key={idx}
-                      src={a.url}
-                      alt={a.filename || 'image'}
-                      className="rounded-lg max-w-sm max-h-80 object-contain cursor-pointer hover:opacity-90 transition-opacity"
-                    />
+                    <div key={idx} className="relative group/attachment">
+                      {/* Skeleton loader */}
+                      {attachmentLoadingStates[idx] !== false && (
+                        <div className="skeleton w-full max-w-sm h-64 rounded-lg"></div>
+                      )}
+                      
+                      <img
+                        src={a.url}
+                        alt={a.filename || 'image'}
+                        className={`rounded-lg max-w-sm max-h-80 w-full object-contain cursor-pointer hover:opacity-90 transition-opacity ${
+                          attachmentLoadingStates[idx] === false ? 'block' : 'hidden'
+                        }`}
+                        loading="eager"
+                        onLoad={() => {
+                          console.log('Attachment image loaded:', a.url);
+                          setAttachmentLoadingStates(prev => ({ ...prev, [idx]: false }));
+                        }}
+                        onError={(e) => {
+                          console.error('Attachment image failed to load:', a.url);
+                          setAttachmentLoadingStates(prev => ({ ...prev, [idx]: false }));
+                          e.target.style.display = 'none';
+                        }}
+                        onClick={() => setPreviewImage({ src: a.url, alt: a.filename || 'Attachment' })}
+                      />
+                      
+                      {/* Image menu */}
+                      {attachmentLoadingStates[idx] === false && (
+                        <div className={`absolute top-2 right-2 ${imageMenuOpen === `attachment-${idx}` ? 'opacity-100' : 'opacity-0 group-hover/attachment:opacity-100'} transition-opacity`}>
+                          <div className="relative">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setImageMenuOpen(imageMenuOpen === `attachment-${idx}` ? null : `attachment-${idx}`);
+                              }}
+                              className="btn btn-circle btn-xs bg-black/50 hover:bg-black/70 text-white border-none"
+                            >
+                              <MoreVertical className="w-3 h-3" />
+                            </button>
+                            
+                            {imageMenuOpen === `attachment-${idx}` && (
+                              <div className="absolute right-0 top-8 bg-base-100 border border-base-300 rounded-lg shadow-xl py-1 min-w-[140px] z-50">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPreviewImage({ src: a.url, alt: a.filename || 'Attachment' });
+                                    setImageMenuOpen(null);
+                                  }}
+                                  className="w-full px-3 py-2 text-left text-sm hover:bg-base-200 flex items-center gap-2"
+                                >
+                                  <Maximize2 className="w-4 h-4" />
+                                  Full Preview
+                                </button>
+                                <button
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    try {
+                                      const response = await fetch(a.url);
+                                      const blob = await response.blob();
+                                      const url = window.URL.createObjectURL(blob);
+                                      const link = document.createElement('a');
+                                      link.href = url;
+                                      link.download = a.filename || 'image.jpg';
+                                      document.body.appendChild(link);
+                                      link.click();
+                                      document.body.removeChild(link);
+                                      window.URL.revokeObjectURL(url);
+                                    } catch (error) {
+                                      console.error('Failed to download:', error);
+                                    }
+                                    setImageMenuOpen(null);
+                                  }}
+                                  className="w-full px-3 py-2 text-left text-sm hover:bg-base-200 flex items-center gap-2"
+                                >
+                                  <Download className="w-4 h-4" />
+                                  Download
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   ) : a.contentType === 'application/pdf' ? (
-                    <div key={idx} className="bg-base-200/50 border border-base-300/50 rounded-lg p-3 flex items-center justify-between max-w-sm">
+                    <div key={idx} className={`rounded-lg p-3 flex items-center justify-between max-w-sm border-2 ${
+                      isOwnMessage 
+                        ? 'bg-primary-content/20 border-primary-content/40' 
+                        : 'bg-base-200/50 border-base-300/50'
+                    }`}>
                       <div className="flex items-center gap-2 text-sm min-w-0 flex-1">
-                        <FileText className="w-4 h-4 text-base-content/60 flex-shrink-0" />
-                        <span className="truncate text-base-content/80">{a.filename || 'PDF'}</span>
+                        <FileText className={`w-5 h-5 flex-shrink-0 ${isOwnMessage ? 'text-primary-content' : 'text-base-content/60'}`} />
+                        <span className={`truncate font-medium ${isOwnMessage ? 'text-primary-content' : 'text-base-content/80'}`}>{a.filename || 'PDF'}</span>
                       </div>
                       <div className="flex gap-1 ml-2 flex-shrink-0">
                         <button
-                          className="btn btn-xs btn-ghost"
+                          className={`btn btn-xs ${isOwnMessage ? 'bg-primary-content/30 hover:bg-primary-content/40 text-primary-content border-primary-content/40' : 'btn-ghost'}`}
                           onClick={() => setDocPreview({ url: a.url, filename: a.filename || 'Document' })}
                         >
                           View
                         </button>
-                        <a target="_blank" rel="noreferrer" className="btn btn-xs btn-primary" href={a.url}>
-                          Open
+                        <a
+                          href={a.url}
+                          download={a.filename || 'document.pdf'}
+                          className={`btn btn-xs ${isOwnMessage ? 'bg-primary-content/30 hover:bg-primary-content/40 text-primary-content border-primary-content/40' : 'btn-ghost'}`}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Download className="w-3 h-3" />
                         </a>
                       </div>
                     </div>
                   ) : (
-                    <div key={idx} className="bg-base-200/50 border border-base-300/50 rounded-lg p-3 flex items-center justify-between max-w-sm">
+                    <div key={idx} className={`rounded-lg p-3 flex items-center justify-between max-w-sm border-2 ${
+                      isOwnMessage 
+                        ? 'bg-primary-content/20 border-primary-content/40' 
+                        : 'bg-base-200/50 border-base-300/50'
+                    }`}>
                       <div className="flex items-center gap-2 text-sm min-w-0 flex-1">
-                        <FileText className="w-4 h-4 text-base-content/60 flex-shrink-0" />
-                        <span className="truncate text-base-content/80">{a.filename || a.contentType || 'File'}</span>
+                        <FileText className={`w-5 h-5 flex-shrink-0 ${isOwnMessage ? 'text-primary-content' : 'text-base-content/60'}`} />
+                        <span className={`truncate font-medium ${isOwnMessage ? 'text-primary-content' : 'text-base-content/80'}`}>{a.filename || a.contentType || 'File'}</span>
                       </div>
-                      <a target="_blank" rel="noreferrer" className="btn btn-xs btn-primary ml-2 flex-shrink-0" href={a.url}>
+                      <a
+                        href={a.url}
+                        download={a.filename || 'file'}
+                        className={`btn btn-xs ${isOwnMessage ? 'bg-primary-content/30 hover:bg-primary-content/40 text-primary-content border-primary-content/40' : 'btn-ghost'} ml-2 flex-shrink-0`}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Download className="w-3 h-3 mr-1" />
                         Download
                       </a>
                     </div>
@@ -514,10 +637,7 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
             {/* Audio */}
             {message.audio?.url && (
               <div className="mt-2">
-                <VoiceMessagePlayer
-                  audioUrl={message.audio.url}
-                  isOwnMessage={isOwnMessage}
-                />
+                <AudioPlayer src={message.audio.url} isOwnMessage={isOwnMessage} />
               </div>
             )}
 
@@ -560,17 +680,7 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
           </div>
         </div>
 
-        {/* Avatar for sent messages (optional, usually not shown) */}
-        {isOwnMessage && showAvatar && false && (
-          <div className="flex-shrink-0 mb-1">
-            <Avatar
-              src={senderInfo.avatar}
-              name={senderInfo.name}
-              size="w-8 h-8"
-              className="rounded-full"
-            />
-          </div>
-        )}
+        {/* Avatar for sent messages is not shown */}
       </div>
 
       {/* Floating action buttons on hover - positioned above message */}
@@ -604,44 +714,62 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
 
       {/* Context menu for mobile long press */}
       {showContextMenu && (
-        <div className="dropdown dropdown-open absolute top-0 right-0 mt-[-45px] z-10">
-          <div className="dropdown-content menu bg-base-100 text-base-content rounded-xl shadow-lg border border-base-200 w-52">
-            {isOwnMessage && message.status !== 'failed' && (
+        <>
+          {/* Backdrop overlay */}
+          <div
+            className="fixed inset-0 bg-black/20 z-40 md:hidden"
+            onClick={() => setShowContextMenu(false)}
+          />
+
+          {/* Context menu */}
+          <div className={`fixed md:absolute ${isOwnMessage ? 'right-4' : 'left-4'} bottom-20 md:top-0 md:right-0 md:mt-[-45px] z-50 md:z-10`}>
+            <div className="menu bg-base-100 text-base-content rounded-xl shadow-2xl border border-base-200 w-56 p-2 animate-in fade-in slide-in-from-bottom-4 duration-200">
+              {/* Quote option - available for all messages */}
               <li>
                 <button
-                  onClick={handleEditClick}
-                  className="flex items-center gap-2"
-                  title="Edit message"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowContextMenu(false);
+                    onQuote?.(message);
+                  }}
+                  className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-base-200 active:bg-base-300 transition-colors"
+                  title="Quote message"
                 >
-                  <Edit size={16} />
-                  Edit
+                  <Quote size={18} className="text-base-content/70" />
+                  <span className="text-base font-medium">Quote</span>
                 </button>
               </li>
-            )}
-            <li>
-              <button
-                onClick={(e) => { e.stopPropagation(); setShowContextMenu(false); onQuote?.(message); }}
-                className="flex items-center gap-2"
-                title="Quote message"
-              >
-                <Quote size={16} />
-                Quote
-              </button>
-            </li>
-            {isOwnMessage && (
-              <li>
-                <button
-                  onClick={handleDeleteClick}
-                  className="flex items-center gap-2 text-error hover:bg-error/10"
-                  title="Delete message"
-                >
-                  <Trash2 size={16} />
-                  Delete
-                </button>
-              </li>
-            )}
+
+              {/* Edit option - only for own messages with text */}
+              {isOwnMessage && message.text && message.status !== 'failed' && (
+                <li>
+                  <button
+                    onClick={handleEditClick}
+                    className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-base-200 active:bg-base-300 transition-colors"
+                    title="Edit message"
+                  >
+                    <Edit size={18} className="text-base-content/70" />
+                    <span className="text-base font-medium">Edit</span>
+                  </button>
+                </li>
+              )}
+
+              {/* Delete option - only for own messages */}
+              {isOwnMessage && (
+                <li>
+                  <button
+                    onClick={handleDeleteClick}
+                    className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-error/10 active:bg-error/20 transition-colors"
+                    title="Delete message"
+                  >
+                    <Trash2 size={18} className="text-error" />
+                    <span className="text-base font-medium text-error">Delete</span>
+                  </button>
+                </li>
+              )}
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* Document preview modal */}
@@ -658,6 +786,15 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
             <button onClick={() => setDocPreview(null)}>close</button>
           </form>
         </dialog>
+      )}
+
+      {/* Image preview modal */}
+      {previewImage && (
+        <ImagePreviewModal
+          src={previewImage.src}
+          alt={previewImage.alt}
+          onClose={() => setPreviewImage(null)}
+        />
       )}
     </div>
   );

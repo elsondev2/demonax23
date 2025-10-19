@@ -63,6 +63,13 @@ const messageSchema = new mongoose.Schema(
       ref: "User",
       default: [],
     },
+    senderDeleted: {
+      type: Boolean,
+      default: false,
+    },
+    senderDeletedAt: {
+      type: Date,
+    },
   },
   { timestamps: true }
 );

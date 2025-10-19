@@ -58,7 +58,7 @@ const AccountSettingsModal = ({ isOpen, onClose, onShowTour }) => {
       if (result.success) {
         onClose();
       }
-    } catch (e) {
+    } catch {
       // handled in store via toast
     } finally {
       setSaving(false);
@@ -68,7 +68,7 @@ const AccountSettingsModal = ({ isOpen, onClose, onShowTour }) => {
   return (
     <IOSModal isOpen={isOpen} onClose={onClose} className="max-w-2xl">
       {/* Header */}
-      <div className="flex items-center justify-between p-6 border-b border-base-300">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-base-300 bg-base-100 flex-shrink-0">
         <div>
           <h3 className="text-xl font-semibold text-base-content">Account Settings</h3>
           <p className="text-sm text-base-content/80 mt-1">Manage your profile and preferences</p>
@@ -78,7 +78,8 @@ const AccountSettingsModal = ({ isOpen, onClose, onShowTour }) => {
         </button>
       </div>
 
-      <div className="p-6 space-y-6">
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-base-100">
         {/* Profile Picture Section */}
         <div className="flex flex-col items-center gap-4 p-6 bg-base-200/30 rounded-xl">
           <div className="relative group">
@@ -234,7 +235,7 @@ const AccountSettingsModal = ({ isOpen, onClose, onShowTour }) => {
       </div>
 
       {/* Footer */}
-      <div className="p-6 border-t border-base-300 bg-base-200/30">
+      <div className="px-6 py-4 border-t border-base-300 bg-base-100 flex-shrink-0">
         <div className="flex gap-3 justify-end">
           <button className="btn btn-ghost" onClick={onClose} disabled={saving}>
             Cancel

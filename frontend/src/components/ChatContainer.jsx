@@ -25,8 +25,6 @@ function ChatContainer() {
     messages,
     isMessagesLoading,
     hasMoreMessages,
-    sendMessage,
-    retryMessage,
     markConversationRead,
     markGroupRead,
     chatBackground,
@@ -49,6 +47,7 @@ function ChatContainer() {
   const [hasInteractedWithInput, setHasInteractedWithInput] = useState(false);
   const [showNewMessageIndicator, setShowNewMessageIndicator] = useState(false);
   const [newMessageCount, setNewMessageCount] = useState(0);
+  const [showBackToBottom, setShowBackToBottom] = useState(false);
 
   // Message rendering diagnostics
   const { forceCheck } = useMessageRenderingDiagnostics(messagesContainerRef);
@@ -91,14 +90,14 @@ function ChatContainer() {
       try {
         if (selectedUserId) {
           console.log('Loading messages for user:', selectedUserId);
-          await getMessagesByUserId(selectedUserId, 1, 50);
+          await getMessagesByUserId(selectedUserId, 1, 20);  // Load 20 messages for faster loading
           // Scroll to latest message instantly after loading
           requestAnimationFrame(() => {
             messageEndRef.current?.scrollIntoView({ behavior: "instant", block: "end" });
           });
         } else if (selectedGroupId) {
           console.log('Loading messages for group:', selectedGroupId);
-          await getGroupMessages(selectedGroupId, 1, 50);
+          await getGroupMessages(selectedGroupId, 1, 20);  // Load 20 messages for faster loading
           // Scroll to latest message instantly after loading
           requestAnimationFrame(() => {
             messageEndRef.current?.scrollIntoView({ behavior: "instant", block: "end" });
@@ -142,7 +141,7 @@ function ChatContainer() {
         clearTimeout(timer);
       };
     }
-  }, [isMessagesLoading, selectedUserId, selectedGroupId, detectAndRecoverMessageLoss, forceCheck]);
+  }, [isMessagesLoading, selectedUserId, selectedGroupId, detectAndRecoverMessageLoss, forceCheck, messages.length]);
 
 
   useEffect(() => {
@@ -203,6 +202,7 @@ function ChatContainer() {
     messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
     setShowNewMessageIndicator(false);
     setNewMessageCount(0);
+    setShowBackToBottom(false);
   };
 
   const handleEditMessage = (message) => {
@@ -244,10 +244,21 @@ function ChatContainer() {
   // Handle scroll for loading more messages
   const handleScroll = (e) => {
     const { scrollTop } = e.target;
+    const container = e.target;
 
     // Load more messages when scrolled near the top
     if (scrollTop < 100 && hasMoreMessages && !isMessagesLoading) {
       loadMoreMessages();
+    }
+
+    // Calculate distance from bottom
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+
+    // Show "Back to Bottom" button if scrolled up more than 800px (roughly 15+ messages)
+    if (distanceFromBottom > 800) {
+      setShowBackToBottom(true);
+    } else {
+      setShowBackToBottom(false);
     }
 
     // Hide new message indicator if user scrolls to bottom
@@ -333,7 +344,7 @@ function ChatContainer() {
   // fetch friend status when a new user chat opens
   useEffect(() => {
     if (selectedUser) friendStore.getStatus(selectedUser._id);
-  }, [selectedUser]);
+  }, [friendStore, selectedUser]);
 
   const items = prepareRenderItems();
   const firstMessageDate = messages[0]?.createdAt;
@@ -419,18 +430,25 @@ function ChatContainer() {
                 />
               )
             ))}
-            {/* 👇 scroll target with extra padding */}
-            <div ref={messageEndRef} className="pb-6" />
+            {/* 👇 scroll target with extra padding for mobile input */}
+            <div ref={messageEndRef} className="pb-4 md:pb-2" />
           </div>
         ) : (
           isMessagesLoading ? (
-            <div className="flex items-center justify-center h-64 text-base-content/70">
-              <div className="flex items-center gap-2">
-                <span className="loading loading-spinner loading-md" />
-                <span>Loading chat…</span>
-              </div>
+            // Loading skeleton - show whenever loading, even if no messages yet
+            <div className="space-y-4 p-4">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className={`flex gap-3 ${i % 2 === 0 ? '' : 'flex-row-reverse'}`}>
+                  <div className="skeleton w-10 h-10 rounded-full shrink-0"></div>
+                  <div className="flex-1 space-y-2 max-w-[70%]">
+                    <div className="skeleton h-4 w-1/4"></div>
+                    <div className={`skeleton h-16 ${i % 3 === 0 ? 'w-3/4' : i % 3 === 1 ? 'w-1/2' : 'w-2/3'}`}></div>
+                  </div>
+                </div>
+              ))}
             </div>
           ) : (
+            // Only show placeholder when NOT loading and truly no messages
             <NoChatHistoryPlaceholder
               name={getChatTitle()}
               isGroup={!!selectedGroup}
@@ -442,12 +460,38 @@ function ChatContainer() {
 
       {/* New Message Indicator */}
       {showNewMessageIndicator && newMessageCount > 0 && (
-        <div className="fixed bottom-20 left-1/2 transform -translate-x-1/2 z-30">
+        <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 z-30">
           <button
             onClick={scrollToBottom}
             className="btn btn-primary btn-sm shadow-lg animate-bounce"
           >
             {newMessageCount} new message{newMessageCount > 1 ? 's' : ''} - Click to view
+          </button>
+        </div>
+      )}
+
+      {/* Back to Bottom Button - Shows when scrolled up significantly */}
+      {showBackToBottom && !showNewMessageIndicator && (
+        <div className="absolute bottom-24 right-6 z-30 back-to-bottom-animate md:right-6 right-4">
+          <button
+            onClick={scrollToBottom}
+            className="btn btn-circle btn-primary shadow-xl hover:shadow-2xl transition-all duration-200 hover:scale-110"
+            title="Back to bottom"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-6 w-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 14l-7 7m0 0l-7-7m7 7V3"
+              />
+            </svg>
           </button>
         </div>
       )}

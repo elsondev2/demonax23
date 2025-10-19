@@ -4,14 +4,16 @@ import React, { useState, useEffect } from "react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useChatStore } from "../store/useChatStore";
 import useGroupStore from "../store/useGroupStore";
+import { useGroupInfo } from "../hooks/useGroupInfo";
 import Avatar from "./Avatar";
 import InviteViaLink from "./InviteViaLink";
 import toast from "react-hot-toast";
 
 function GroupDetailsModal({ group, isOpen, onClose }) {
-  const { authUser, onlineUsers: authOnlineUsers } = useAuthStore();
+  const { authUser } = useAuthStore();
   const { getAllContacts, allContacts, setSelectedGroup } = useChatStore();
   const { updateGroup, leaveGroup } = useGroupStore();
+  const groupInfo = useGroupInfo(group);
 
   const [activeTab, setActiveTab] = useState("info");
   const [name, setName] = useState(group?.name || "");
@@ -21,36 +23,6 @@ function GroupDetailsModal({ group, isOpen, onClose }) {
   const [newGroupPic, setNewGroupPic] = useState(null);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [onlineUsers, setOnlineUsers] = useState(authOnlineUsers || []);
-
-  // Enhanced admin check with multiple comparison methods
-  const isAdmin = React.useMemo(() => {
-    if (!group || !authUser) return false;
-
-    const groupAdminId = group.admin?._id || group.admin;
-    const userId = authUser._id;
-
-    // Try multiple comparison methods
-    const isAdminCheck =
-      groupAdminId === userId ||
-      String(groupAdminId) === String(userId) ||
-      groupAdminId?.toString() === userId?.toString();
-
-    // Debug logging
-    console.log('🔍 Admin Check:', {
-      groupAdmin: groupAdminId,
-      authUserId: userId,
-      isAdmin: isAdminCheck,
-      groupAdminType: typeof groupAdminId,
-      userIdType: typeof userId
-    });
-
-    return isAdminCheck;
-  }, [group, authUser]);
-
-  useEffect(() => {
-    setOnlineUsers(authOnlineUsers || []);
-  }, [authOnlineUsers]);
 
   useEffect(() => {
     if (isOpen) {
@@ -65,22 +37,19 @@ function GroupDetailsModal({ group, isOpen, onClose }) {
 
   if (!isOpen) return null;
 
-  const getMemberObj = (m) => {
-    if (!m) return null;
-    if (typeof m === 'string') {
-      return allContacts.find(c => c._id === m) || { _id: m, fullName: m, profilePic: '/avatar.png' };
-    }
-    if (!m.fullName) {
-      const found = allContacts.find(c => c._id === (m._id || m.id));
-      return found ? found : { ...m, fullName: m._id || 'Member' };
-    }
-    return m;
-  };
-
-  const normalizedMembers = members.map(getMemberObj).filter(Boolean);
-  const totalMembers = normalizedMembers.length;
-  const onlineCount = normalizedMembers.filter(m => onlineUsers.includes(m._id || m.id)).length;
-  const isUserOnline = (userId) => onlineUsers && onlineUsers.includes(userId);
+  // Use groupInfo from hook
+  const {
+    totalMembers,
+    activeMembers,
+    deletedMembers,
+    allMembers,
+    onlineCount,
+    isAdmin,
+    adminId,
+    getMemberStatus,
+    isUserOnline,
+    normalizedMembers
+  } = groupInfo;
 
   const norm = (s = "") => (s || "").toLowerCase();
   const inviteCandidates = (allContacts || [])
@@ -340,75 +309,154 @@ function GroupDetailsModal({ group, isOpen, onClose }) {
 
           {/* Members Tab */}
           {activeTab === 'members' && (
-            <div className="space-y-3 max-w-2xl mx-auto">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold">All Members ({totalMembers})</h3>
-                <div className="text-xs text-base-content/60">
-                  🟢 {onlineCount} online • ⚫ {totalMembers - onlineCount} offline
+            <div className="space-y-4 max-w-2xl mx-auto">
+              {/* Active Members Section */}
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold">Active Members ({totalMembers})</h3>
+                  <div className="text-xs text-base-content/60">
+                    🟢 {onlineCount} online • ⚫ {totalMembers - onlineCount} offline
+                  </div>
                 </div>
+
+                {activeMembers.map((member) => {
+                  const memberId = member._id || member.id;
+                  const isOnline = isUserOnline(memberId);
+                  const memberStatus = getMemberStatus(memberId);
+                  const isMemberAdmin = memberStatus === 'admin';
+
+                  return (
+                    <div key={memberId} className="flex items-center gap-3 p-3 rounded-xl hover:bg-base-200 transition-colors">
+                      <Avatar
+                        src={member.isDeleted ? null : member.profilePic}
+                        name={member.fullName}
+                        alt={member.fullName}
+                        size="w-12 h-12"
+                        showOnlineStatus={!member.isDeleted}
+                        isOnline={isOnline}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={`font-medium truncate ${member.isDeleted ? 'italic text-base-content/50' : ''}`}>
+                            {member.fullName}
+                          </span>
+                          {memberId === authUser._id && (
+                            <span className="badge badge-primary badge-xs">You</span>
+                          )}
+                          {member.isDeleted && (
+                            <span className="badge badge-ghost badge-xs">Deleted</span>
+                          )}
+                        </div>
+                        <div className="text-sm text-base-content/60">
+                          {member.isDeleted ? '❌ Account Deleted' : (isOnline ? '🟢 Online' : '⚫ Offline')}
+                        </div>
+                      </div>
+
+                      {isMemberAdmin && (
+                        <div className="badge badge-warning gap-1">
+                          <Crown className="w-3 h-3" />
+                          Admin
+                        </div>
+                      )}
+
+                      {isAdmin && !isMemberAdmin && memberId !== authUser._id && (
+                        <div className="dropdown dropdown-end">
+                          <div tabIndex={0} role="button" className="btn btn-sm btn-ghost">⋮</div>
+                          <ul tabIndex={0} className="dropdown-content z-[1] menu p-2 shadow-lg bg-base-100 rounded-lg w-48">
+                            {!member.isDeleted && (
+                              <li>
+                                <button
+                                  className="text-warning"
+                                  onClick={() => handlePromoteToAdmin(member._id || member.id)}
+                                >
+                                  <Crown className="w-4 h-4" />
+                                  Make Admin
+                                </button>
+                              </li>
+                            )}
+                            <li>
+                              <button
+                                className="text-error"
+                                onClick={() => handleRemoveMember(member._id || member.id)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                                Remove
+                              </button>
+                            </li>
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
 
-              {normalizedMembers.map((member) => {
-                const isOnline = isUserOnline(member._id || member.id);
-                const isMemberAdmin = group.admin?.toString?.() === (member._id || member.id)?.toString();
-
-                return (
-                  <div key={member._id || member.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-base-200 transition-colors">
-                    <Avatar
-                      src={member.profilePic}
-                      name={member.fullName}
-                      alt={member.fullName}
-                      size="w-12 h-12"
-                      showOnlineStatus={true}
-                      isOnline={isOnline}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium truncate">{member.fullName}</span>
-                        {(member._id || member.id) === authUser._id && (
-                          <span className="badge badge-primary badge-xs">You</span>
-                        )}
-                      </div>
-                      <div className="text-sm text-base-content/60">
-                        {isOnline ? '🟢 Online' : '⚫ Offline'}
-                      </div>
-                    </div>
-
-                    {isMemberAdmin && (
-                      <div className="badge badge-warning gap-1">
-                        <Crown className="w-3 h-3" />
-                        Admin
-                      </div>
-                    )}
-
-                    {isAdmin && !isMemberAdmin && (member._id || member.id) !== authUser._id && (
-                      <div className="dropdown dropdown-end">
-                        <div tabIndex={0} role="button" className="btn btn-sm btn-ghost">⋮</div>
-                        <ul tabIndex={0} className="dropdown-content z-[1] menu p-2 shadow-lg bg-base-100 rounded-lg w-48">
-                          <li>
-                            <button
-                              className="text-warning"
-                              onClick={() => handlePromoteToAdmin(member._id || member.id)}
-                            >
-                              <Crown className="w-4 h-4" />
-                              Make Admin
-                            </button>
-                          </li>
-                          <li>
-                            <button
-                              className="text-error"
-                              onClick={() => handleRemoveMember(member._id || member.id)}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                              Remove
-                            </button>
-                          </li>
-                        </ul>
-                      </div>
-                    )}
+              {/* Deleted Members Section */}
+              {deletedMembers.length > 0 && isAdmin && (
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-semibold text-error">Deleted Users ({deletedMembers.length})</h3>
+                    <button
+                      className="btn btn-error btn-xs"
+                      onClick={async () => {
+                        if (confirm(`Remove all ${deletedMembers.length} deleted users from group?`)) {
+                          try {
+                            const activeIds = activeMembers.map(m => m._id || m.id);
+                            await updateGroup(group._id, { members: activeIds });
+                            setMembers(activeMembers);
+                            toast.success('Deleted users removed');
+                          } catch (err) {
+                            toast.error('Failed to remove deleted users');
+                          }
+                        }
+                      }}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      Remove All
+                    </button>
                   </div>
-                );
-              })}
+
+                  {deletedMembers.map((member) => (
+                    <div key={member._id || member.id} className="flex items-center gap-3 p-3 rounded-xl bg-error/5 border border-error/20">
+                      <Avatar
+                        src={null}
+                        name={member.fullName}
+                        alt={member.fullName}
+                        size="w-12 h-12"
+                        showOnlineStatus={false}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium truncate italic text-base-content/50">
+                            {member.fullName}
+                          </span>
+                          <span className="badge badge-error badge-xs">Deleted</span>
+                        </div>
+                        <div className="text-sm text-base-content/60">
+                          ❌ Account Deleted
+                        </div>
+                      </div>
+                      {isAdmin && (
+                        <button
+                          className="btn btn-error btn-sm"
+                          onClick={async () => {
+                            try {
+                              const updatedMembers = members.filter(m => (m._id || m) !== (member._id || member.id));
+                              await updateGroup(group._id, { members: updatedMembers.map(m => m._id || m) });
+                              setMembers(updatedMembers);
+                              toast.success('Deleted user removed');
+                            } catch (err) {
+                              toast.error('Failed to remove user');
+                            }
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

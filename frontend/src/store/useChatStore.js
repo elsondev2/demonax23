@@ -51,6 +51,7 @@ export const useChatStore = create((set, get) => ({
   allContacts: [],
   chats: [],
   messages: [],
+  messageCache: {}, // Cache for recent conversations: { conversationId: { messages: [], timestamp: Date } }
   activeTab: "chats",
   selectedUser: null,
   selectedGroup: null,
@@ -551,13 +552,17 @@ export const useChatStore = create((set, get) => ({
     try {
       const res = await axiosInstance.get("/api/messages/contacts");
       set({ allContacts: res.data });
-      
-      // Preload contact avatars
+
+      // Preload contact avatars immediately in background
       const { imageCache } = await import('../utils/imageCache');
       const avatarUrls = res.data
         .map(contact => contact.profilePic)
         .filter(url => url && url !== '/avatar.png');
-      imageCache.preloadBatch(avatarUrls).catch(() => {});
+
+      // Don't await - preload in background
+      if (avatarUrls.length > 0) {
+        imageCache.preloadBatch(avatarUrls).catch(() => { });
+      }
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to load contacts");
     } finally {
@@ -570,13 +575,17 @@ export const useChatStore = create((set, get) => ({
     try {
       const res = await axiosInstance.get("/api/messages/chats");
       set({ chats: res.data });
-      
-      // Preload chat avatars (both user and group pics)
+
+      // Preload chat avatars immediately in background (both user and group pics)
       const { imageCache } = await import('../utils/imageCache');
       const avatarUrls = res.data
         .map(chat => chat.isGroup ? chat.groupPic : chat.profilePic)
         .filter(url => url && url !== '/avatar.png');
-      imageCache.preloadBatch(avatarUrls).catch(() => {});
+
+      // Don't await - preload in background
+      if (avatarUrls.length > 0) {
+        imageCache.preloadBatch(avatarUrls).catch(() => { });
+      }
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to load chats");
     } finally {
@@ -584,14 +593,33 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
-  getMessagesByUserId: async (userId, page = 1, limit = 50) => {
+  getMessagesByUserId: async (userId, page = 1, limit = 20) => {
     if (!userId) {
       console.warn('getMessagesByUserId called without userId');
       set({ isMessagesLoading: false });
       return;
     }
 
-    set({ isMessagesLoading: true });
+    // Check cache for instant display (only for first page)
+    if (page === 1) {
+      const cache = get().messageCache[userId];
+      const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+      if (cache && (Date.now() - cache.timestamp < CACHE_DURATION)) {
+        console.log('📦 Using cached messages for user:', userId);
+        // Show cached messages immediately
+        set({
+          messages: cache.messages,
+          messagesPage: 1,
+          hasMoreMessages: cache.hasMore,
+          isMessagesLoading: true // Still show loading indicator for refresh
+        });
+      } else {
+        set({ isMessagesLoading: true });
+      }
+    } else {
+      set({ isMessagesLoading: true });
+    }
 
     try {
       const res = await axiosInstance.get(`/api/messages/${userId}?page=${page}&limit=${limit}`);
@@ -607,23 +635,60 @@ export const useChatStore = create((set, get) => ({
       }
 
       if (page === 1) {
+        const reversedMessages = [...newMessages].reverse();
+
+        // Update cache
+        set({
+          messageCache: {
+            ...get().messageCache,
+            [userId]: {
+              messages: reversedMessages,
+              hasMore,
+              timestamp: Date.now()
+            }
+          }
+        });
+
         // First page - replace all messages (reverse to show chronologically)
         set({
-          messages: [...newMessages].reverse(),
+          messages: reversedMessages,
           messagesPage: 1,
           hasMoreMessages: hasMore,
           isMessagesLoading: false
         });
-        
-        // Preload sender avatars from messages
+
+        // Preload all images (avatars, message images, attachments)
         const { imageCache } = await import('../utils/imageCache');
-        const avatarUrls = newMessages
-          .map(msg => {
-            const sender = typeof msg.senderId === 'object' ? msg.senderId : null;
-            return sender?.profilePic;
-          })
-          .filter(url => url && url !== '/avatar.png');
-        imageCache.preloadBatch(avatarUrls).catch(() => {});
+
+        // Collect all image URLs from messages
+        const imageUrls = [];
+
+        newMessages.forEach(msg => {
+          // Avatar images
+          const sender = typeof msg.senderId === 'object' ? msg.senderId : null;
+          if (sender?.profilePic && sender.profilePic !== '/avatar.png') {
+            imageUrls.push(sender.profilePic);
+          }
+
+          // Message images
+          if (msg.image) {
+            imageUrls.push(msg.image);
+          }
+
+          // Attachment images
+          if (Array.isArray(msg.attachments)) {
+            msg.attachments.forEach(att => {
+              if (att.contentType?.startsWith('image/') && att.url) {
+                imageUrls.push(att.url);
+              }
+            });
+          }
+        });
+
+        // Preload all images in batch
+        if (imageUrls.length > 0) {
+          imageCache.preloadBatch(imageUrls).catch(() => { });
+        }
       } else {
         // Additional pages - prepend older messages to the beginning
         const existingMessages = get().messages;
@@ -661,7 +726,7 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
-  getGroupMessages: async (groupId, page = 1, limit = 50) => {
+  getGroupMessages: async (groupId, page = 1, limit = 20) => {
     if (!groupId) {
       console.warn('getGroupMessages called without groupId');
       set({ isMessagesLoading: false });
@@ -669,7 +734,27 @@ export const useChatStore = create((set, get) => ({
     }
 
     console.log('Loading group messages:', { groupId, page, limit });
-    set({ isMessagesLoading: true });
+
+    // Check cache for instant display (only for first page)
+    if (page === 1) {
+      const cache = get().messageCache[groupId];
+      const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+      if (cache && (Date.now() - cache.timestamp < CACHE_DURATION)) {
+        console.log('📦 Using cached messages for group:', groupId);
+        // Show cached messages immediately
+        set({
+          messages: cache.messages,
+          messagesPage: 1,
+          hasMoreMessages: cache.hasMore,
+          isMessagesLoading: true // Still show loading indicator for refresh
+        });
+      } else {
+        set({ isMessagesLoading: true });
+      }
+    } else {
+      set({ isMessagesLoading: true });
+    }
 
     try {
       const res = await axiosInstance.get(`/api/messages/group/${groupId}?page=${page}&limit=${limit}`);
@@ -685,23 +770,60 @@ export const useChatStore = create((set, get) => ({
       }
 
       if (page === 1) {
+        const reversedMessages = [...newMessages].reverse();
+
+        // Update cache
+        set({
+          messageCache: {
+            ...get().messageCache,
+            [groupId]: {
+              messages: reversedMessages,
+              hasMore,
+              timestamp: Date.now()
+            }
+          }
+        });
+
         // First page - replace all messages (reverse to show chronologically)
         set({
-          messages: [...newMessages].reverse(),
+          messages: reversedMessages,
           messagesPage: 1,
           hasMoreMessages: hasMore,
           isMessagesLoading: false
         });
-        
-        // Preload sender avatars from group messages
+
+        // Preload all images (avatars, message images, attachments)
         const { imageCache } = await import('../utils/imageCache');
-        const avatarUrls = newMessages
-          .map(msg => {
-            const sender = typeof msg.senderId === 'object' ? msg.senderId : null;
-            return sender?.profilePic;
-          })
-          .filter(url => url && url !== '/avatar.png');
-        imageCache.preloadBatch(avatarUrls).catch(() => {});
+
+        // Collect all image URLs from messages
+        const imageUrls = [];
+
+        newMessages.forEach(msg => {
+          // Avatar images
+          const sender = typeof msg.senderId === 'object' ? msg.senderId : null;
+          if (sender?.profilePic && sender.profilePic !== '/avatar.png') {
+            imageUrls.push(sender.profilePic);
+          }
+
+          // Message images
+          if (msg.image) {
+            imageUrls.push(msg.image);
+          }
+
+          // Attachment images
+          if (Array.isArray(msg.attachments)) {
+            msg.attachments.forEach(att => {
+              if (att.contentType?.startsWith('image/') && att.url) {
+                imageUrls.push(att.url);
+              }
+            });
+          }
+        });
+
+        // Preload all images in batch
+        if (imageUrls.length > 0) {
+          imageCache.preloadBatch(imageUrls).catch(() => { });
+        }
       } else {
         // Additional pages - prepend older messages to the beginning
         const existingMessages = get().messages;
@@ -754,9 +876,9 @@ export const useChatStore = create((set, get) => ({
     let optimisticMessage;
     const base = {
       _id: tempId,
-      senderId: authUser._id,
+      senderId: authUser,  // Pass full user object for optimistic message
       text: messageData.text,
-      image: messageData.image,
+      image: messageData.image,  // Keep base64 for instant preview
       attachments: messageData.attachments || [],
       audio: messageData.audio || null,
       quotedMessage: get().quotedMessage || null,
@@ -898,7 +1020,7 @@ export const useChatStore = create((set, get) => ({
           msg._id === messageId ? res.data : msg
         );
         // Set lastRefreshTime to prevent auto-refresh from triggering after edit
-        set({ 
+        set({
           messages: finalMessages,
           lastRefreshTime: Date.now() // Prevent message loss detection from triggering
         });
@@ -916,13 +1038,13 @@ export const useChatStore = create((set, get) => ({
 
   deleteMessage: async (messageId) => {
     const { messages } = get();
-    
+
     console.log('🗑️ Deleting message:', messageId, 'Current messages count:', messages.length);
 
     // Optimistically update the UI
     const updatedMessages = messages.filter(msg => msg._id !== messageId);
     set({ messages: updatedMessages });
-    
+
     console.log('🗑️ After optimistic update, messages count:', updatedMessages.length);
 
     try {
@@ -930,13 +1052,13 @@ export const useChatStore = create((set, get) => ({
       if (response.status === 200) {
         console.log('✅ Message deleted successfully from backend');
         toast.success("Message deleted successfully");
-        
+
         // Ensure the message stays deleted by setting it again
         const currentMessages = get().messages;
         const finalMessages = currentMessages.filter(msg => msg._id !== messageId);
-        
+
         // Set lastRefreshTime to prevent auto-refresh from triggering after delete
-        set({ 
+        set({
           messages: finalMessages,
           lastRefreshTime: Date.now() // Prevent message loss detection from triggering
         });
@@ -1069,13 +1191,13 @@ export const useChatStore = create((set, get) => ({
       if (isRelevantConversation) {
         // Check for duplicates - prioritize exact ID match, then check optimistic messages
         const exactMatch = currentMessages.find(msg => msg._id === newMessage._id);
-        
+
         if (exactMatch) {
           console.log('⚠️ DM message already exists, skipping', { messageId: newMessage._id });
         } else {
           // Check if this is replacing an optimistic message
-          const optimisticIndex = currentMessages.findIndex(msg => 
-            msg.isOptimistic && 
+          const optimisticIndex = currentMessages.findIndex(msg =>
+            msg.isOptimistic &&
             msg.text === newMessage.text &&
             Math.abs(new Date(msg.createdAt) - new Date(newMessage.createdAt)) < 5000
           );
@@ -1111,11 +1233,11 @@ export const useChatStore = create((set, get) => ({
       });
       console.log("🔔 Socket ID:", socket.id);
       console.log("🔔 Socket connected:", socket.connected);
-      
+
       // Normalize groupId (could be object or string)
       const groupId = typeof newMessage.groupId === 'object' ? newMessage.groupId._id : newMessage.groupId;
       const senderId = typeof newMessage.senderId === 'object' ? newMessage.senderId._id : newMessage.senderId;
-      
+
       console.log("📨 Processed group message data:", {
         messageId: newMessage._id,
         groupId: groupId,
@@ -1128,7 +1250,7 @@ export const useChatStore = create((set, get) => ({
         },
         timestamp: new Date().toISOString()
       });
-      
+
       const { selectedGroup } = get();
       const chatsSnapshot = get().chats;
       const isMessageInSelectedGroup = groupId === selectedGroup?._id;
@@ -1176,7 +1298,7 @@ export const useChatStore = create((set, get) => ({
       if (isRelevantGroupConversation) {
         // Check for duplicates - prioritize exact ID match, then check optimistic messages
         const exactMatch = currentMessages.find(msg => msg._id === newMessage._id);
-        
+
         if (exactMatch) {
           console.log('⚠️ Exact message ID already exists, skipping', {
             messageId: newMessage._id,
@@ -1184,8 +1306,8 @@ export const useChatStore = create((set, get) => ({
           });
         } else {
           // Check if this is replacing an optimistic message
-          const optimisticIndex = currentMessages.findIndex(msg => 
-            msg.isOptimistic && 
+          const optimisticIndex = currentMessages.findIndex(msg =>
+            msg.isOptimistic &&
             msg.text === newMessage.text &&
             Math.abs(new Date(msg.createdAt) - new Date(newMessage.createdAt)) < 5000
           );
@@ -1210,10 +1332,10 @@ export const useChatStore = create((set, get) => ({
               currentConversationId,
               messageGroupId: groupId
             });
-            
+
             const updatedMessages = [...currentMessages, newMessage];
             set({ messages: updatedMessages });
-            
+
             console.log('✅ Messages state updated successfully, new count:', updatedMessages.length);
           }
         }
@@ -1257,7 +1379,7 @@ export const useChatStore = create((set, get) => ({
         // For DMs, we need to check BOTH sender and receiver
         const senderId = typeof updatedMessage.senderId === 'object' ? updatedMessage.senderId._id : updatedMessage.senderId;
         const receiverId = typeof updatedMessage.receiverId === 'object' ? updatedMessage.receiverId._id : updatedMessage.receiverId;
-        
+
         // The message is relevant if:
         // 1. We're in a user conversation AND
         // 2. The current conversation is with either the sender or receiver (excluding ourselves)
@@ -1332,10 +1454,10 @@ export const useChatStore = create((set, get) => ({
     socket.on("messageDeleted", (deletedMessageId) => {
       console.log("🗑️ Received messageDeleted event:", deletedMessageId);
       const currentMessages = get().messages;
-      
+
       // Check if this message exists in current conversation
       const messageToDelete = currentMessages.find(msg => msg._id === deletedMessageId);
-      
+
       if (messageToDelete) {
         console.log("📡 Deleting message from current conversation, before:", currentMessages.length);
         const updatedMessages = currentMessages.filter(msg => msg._id !== deletedMessageId);

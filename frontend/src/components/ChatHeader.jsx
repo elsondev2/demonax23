@@ -3,6 +3,8 @@ import { useChatStore } from "../store/useChatStore";
 import { useCallStore } from "../store/useCallStore";
 import { useEffect, useState } from "react";
 import { useAuthStore } from "../store/useAuthStore";
+import { useNavigate } from "react-router";
+import { useGroupInfo } from "../hooks/useGroupInfo";
 
 import Avatar from "./Avatar";
 
@@ -11,6 +13,8 @@ function ChatHeader({ onGroupInfoClick, onUserInfoClick }) {
   const { onlineUsers } = useAuthStore();
   const { startCall, callStatus } = useCallStore();
   const [isMobile, setIsMobile] = useState(false);
+  const navigate = useNavigate();
+  const groupInfo = useGroupInfo(selectedGroup);
 
   useEffect(() => {
     const checkIfMobile = () => {
@@ -41,8 +45,6 @@ function ChatHeader({ onGroupInfoClick, onUserInfoClick }) {
     return () => window.removeEventListener("keydown", handleEscKey);
   }, [setSelectedUser, setSelectedGroup]);
 
-  // Remove unused variable
-
   // Get display information
   const getDisplayName = () => {
     if (selectedUser) return selectedUser.fullName || 'Deleted User';
@@ -52,11 +54,11 @@ function ChatHeader({ onGroupInfoClick, onUserInfoClick }) {
 
   const getDisplayStatus = () => {
     if (selectedUser) return onlineUsers.includes(selectedUser._id) ? "Online" : "Offline";
-    if (selectedGroup) return `${selectedGroup.members?.length || 0} members`;
+    if (selectedGroup) {
+      return `${groupInfo.totalMembers} member${groupInfo.totalMembers !== 1 ? 's' : ''}`;
+    }
     return "";
   };
-
-  
 
   return (
     // DaisyUI navbar structure with proper contrast
@@ -68,6 +70,7 @@ function ChatHeader({ onGroupInfoClick, onUserInfoClick }) {
               onClick={() => {
                 setSelectedUser(null);
                 setSelectedGroup(null);
+                navigate('/chat');
               }}
               className="btn btn-ghost btn-sm btn-circle md:hidden"
             >

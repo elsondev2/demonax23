@@ -8,7 +8,7 @@ import { RefreshCwIcon } from "lucide-react";
 import Avatar from "./Avatar";
 
 function GroupsList() {
-  const { setSelectedUser, setSelectedGroup, selectedGroup } = useChatStore();
+  const { setSelectedUser, setSelectedGroup, selectedGroup, allContacts } = useChatStore();
   const { groups, isGroupsLoading, getGroups, getGroupById } = useGroupStore();
   const {  authUser } = useAuthStore();
   const [lastRefreshed, setLastRefreshed] = useState(Date.now());
@@ -23,23 +23,18 @@ function GroupsList() {
   };
 
   const handleGroupSelect = async (group) => {
-    // Only fetch full group details if we don't already have member information
-    // This prevents unnecessary refetches that cause re-renders
     if (!group.members || group.members.length === 0) {
       try {
         const fullGroup = await getGroupById(group._id);
         setSelectedGroup(fullGroup);
-      } catch (error) {
-        // Fallback to group data if API call fails
+      } catch {
         setSelectedGroup(group);
       }
     } else {
-      // Already have full group data, use it directly
       setSelectedGroup(group);
     }
     setSelectedUser(null);
     
-    // Dispatch a custom event to notify the ChatPage component to hide the sidebar
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('chatSelected', { detail: group }));
     }
@@ -69,14 +64,21 @@ function GroupsList() {
 
   // Function to format last message preview
   const formatLastMessagePreview = (group) => {
-    if (!group.lastMessage) {
+    // Check if lastMessage exists and is not empty
+    if (!group.lastMessage || group.lastMessage.trim() === '') {
+      // If there's a lastMessageTime, it means there was a message (likely attachment/audio)
+      if (group.lastMessageTime) {
+        return "📎 Attachment";
+      }
       return "No messages yet";
     }
 
+    let messageText = group.lastMessage;
+
     // Truncate message to 12 characters max
-    const truncatedMessage = group.lastMessage.length > 12 
-      ? group.lastMessage.substring(0, 12) + "..." 
-      : group.lastMessage;
+    const truncatedMessage = messageText.length > 12 
+      ? messageText.substring(0, 12) + "..." 
+      : messageText;
 
     // Determine sender prefix
     let senderPrefix = "";
@@ -98,6 +100,23 @@ function GroupsList() {
     if (diff < 60) return `${diff}s ago`;
     if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
     return `${Math.floor(diff / 3600)}h ago`;
+  };
+
+  const getActiveMemberCount = (group) => {
+    const getMemberObj = (m) => {
+      if (!m) return null;
+      if (typeof m === 'string') {
+        const found = (allContacts || []).find(c => c._id === m);
+        return found || { _id: m, isDeleted: true };
+      }
+      if (!m.fullName) {
+        const found = (allContacts || []).find(c => c._id === (m._id || m.id));
+        return found || { _id: m._id || m.id, isDeleted: true };
+      }
+      return m;
+    };
+    const normalizedMembers = (group.members || []).map(getMemberObj).filter(Boolean);
+    return normalizedMembers.filter(m => !m.isDeleted).length;
   };
 
 
@@ -142,7 +161,7 @@ function GroupsList() {
                       {group.name}
                     </h4>
                     <div className="badge badge-primary badge-xs">
-                      {group.members?.length || 0}
+                      {getActiveMemberCount(group)}
                     </div>
                   </div>
                   <p className="text-base-content/60 text-xs truncate">

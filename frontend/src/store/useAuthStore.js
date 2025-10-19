@@ -77,14 +77,7 @@ export const useAuthStore = create((set, get) => ({
         });
       }
 
-      // Emit socket event to notify others about profile update
-      const { socket } = get();
-      if (socket?.connected) {
-        socket.emit('profileUpdated', {
-          userId: updatedUser._id,
-          updates: updatedUser
-        });
-      }
+      // No need to emit socket event - backend already broadcasts userUpdated event
 
       toast.success("Profile updated successfully!");
       return { success: true };
@@ -396,7 +389,7 @@ export const useAuthStore = create((set, get) => ({
         if (groupStore.unsubscribeFromGroupMessages) groupStore.unsubscribeFromGroupMessages();
         if (groupStore.subscribeToGroupMessages) groupStore.subscribeToGroupMessages();
       }).catch(() => { });
-    } catch (e) { }
+    } catch (e) { /* empty */ }
 
     // Fetch online users
     socket.emit("getOnlineUsers");
@@ -423,26 +416,35 @@ export const useAuthStore = create((set, get) => ({
         ]);
         
         // Collect all image URLs for preloading
-        const imageUrls = [];
+        const imageUrls = new Set(); // Use Set to avoid duplicates
         
         // Collect from chats
         (chatStore.chats || []).forEach(c => {
-          if (c.isGroup && c.groupPic) imageUrls.push(c.groupPic);
-          if (!c.isGroup && c.profilePic) imageUrls.push(c.profilePic);
+          if (c.isGroup && c.groupPic && c.groupPic !== '/avatar.png') {
+            imageUrls.add(c.groupPic);
+          }
+          if (!c.isGroup && c.profilePic && c.profilePic !== '/avatar.png') {
+            imageUrls.add(c.profilePic);
+          }
         });
         
         // Collect from contacts
         (chatStore.allContacts || []).forEach(u => {
-          if (u.profilePic) imageUrls.push(u.profilePic);
+          if (u.profilePic && u.profilePic !== '/avatar.png') {
+            imageUrls.add(u.profilePic);
+          }
         });
         
         // Preload using image cache utility
-        if (imageUrls.length > 0) {
+        if (imageUrls.size > 0) {
           const { imageCache } = await import('../utils/imageCache');
-          await imageCache.preloadBatch(imageUrls);
+          const urlArray = Array.from(imageUrls);
+          console.log(`🖼️ Preloading ${urlArray.length} unique images...`);
+          await imageCache.preloadBatch(urlArray);
+          console.log('✅ App resources preloaded successfully');
+        } else {
+          console.log('ℹ️ No images to preload');
         }
-        
-        console.log('✅ App resources preloaded successfully');
       });
     } catch (error) {
       console.warn('⚠️ Failed to preload some resources:', error);

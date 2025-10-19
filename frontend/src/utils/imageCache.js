@@ -7,13 +7,16 @@ class ImageCache {
   constructor() {
     this.cache = new Map();
     this.loading = new Set();
-    this.maxCacheSize = 500; // Maximum number of images to cache (increased from 200)
+    this.maxCacheSize = 1000; // Maximum number of images to cache (increased from 500)
     this.stats = {
       hits: 0,
       misses: 0,
       preloaded: 0,
       failed: 0
     };
+    
+    // Preload default avatar to avoid flashing
+    this.preload('/avatar.png').catch(() => {});
   }
 
   /**
@@ -88,15 +91,16 @@ class ImageCache {
     console.log(`🖼️ Preloading ${uniqueUrls.length} images...`);
     const startTime = Date.now();
 
-    // Load in batches of 15 to optimize performance (increased from 10)
-    const batchSize = 15;
+    // Load in batches of 20 to optimize performance (increased from 15)
+    const batchSize = 20;
     for (let i = 0; i < uniqueUrls.length; i += batchSize) {
       const batch = uniqueUrls.slice(i, i + batchSize);
       await Promise.allSettled(batch.map(url => this.preload(url)));
     }
 
     const duration = Date.now() - startTime;
-    console.log(`✅ Preloaded ${uniqueUrls.length} images in ${duration}ms`);
+    const successCount = uniqueUrls.filter(url => this.cache.has(url)).length;
+    console.log(`✅ Preloaded ${successCount}/${uniqueUrls.length} images in ${duration}ms`);
     console.log(`📊 Cache stats:`, this.getStats());
   }
 

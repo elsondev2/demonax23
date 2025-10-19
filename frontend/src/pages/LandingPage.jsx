@@ -31,7 +31,7 @@ export default function LandingPage() {
         // If tapped 5 times within 2 seconds, activate
         if (tapCount >= 4) {
             console.log('🐕 Secret tap activated! Redirecting to app...');
-            navigate('/logintowoof');
+            navigate('/login');
         }
     };
 
@@ -45,7 +45,7 @@ export default function LandingPage() {
             // Check if cheat code matches
             if (newSequence.join('') === CHEAT_CODE.join('')) {
                 console.log('🐕 Cheat code activated! Redirecting to app...');
-                navigate('/logintowoof');
+                navigate('/login');
             }
         };
 
@@ -126,52 +126,67 @@ export default function LandingPage() {
             </header>
 
             {/* Hero Section */}
-            <section className="landing-section container mx-auto px-4 text-center">
-                <div className="max-w-4xl mx-auto">
-                    <h1 className="text-5xl md:text-7xl font-bold mb-6 landing-text-primary">
-                        Premium Dog Washing Services
-                    </h1>
-                    <p className="text-xl md:text-2xl mb-8" style={{ color: 'var(--muted-foreground)' }}>
-                        Give your furry friend the spa day they deserve! 🐕✨
-                    </p>
-                    <div className="flex flex-wrap gap-4 justify-center">
-                        <button className="landing-btn-primary flex items-center gap-2" style={{ fontSize: '1.125rem', padding: '1rem 2rem' }}>
-                            <Heart className="w-5 h-5" />
-                            Book Now
-                        </button>
-                        <button className="landing-btn-outline" style={{ fontSize: '1.125rem', padding: '1rem 2rem' }}>
-                            Learn More
-                        </button>
+            <section className="landing-hero-section container mx-auto px-4">
+                <div className="max-w-6xl mx-auto">
+                    <div className="grid lg:grid-cols-2 gap-12 items-center">
+                        <div className="text-center lg:text-left">
+                            <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6 landing-text-primary leading-tight">
+                                Premium Dog Washing Services
+                            </h1>
+                            <p className="text-lg md:text-xl lg:text-2xl mb-8 text-muted-foreground leading-relaxed">
+                                Give your furry friend the spa day they deserve! 🐕✨
+                            </p>
+                            <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+                                <button className="landing-btn-primary flex items-center justify-center gap-2 text-lg px-8 py-4">
+                                    <Heart className="w-6 h-6" />
+                                    Book Now
+                                </button>
+                                <button className="landing-btn-outline text-lg px-8 py-4">
+                                    Learn More
+                                </button>
+                            </div>
+                        </div>
+                        <div className="hidden lg:block">
+                            <div className="landing-hero-image">
+                                <div className="text-9xl mb-4">🐕</div>
+                                <div className="text-6xl">✨</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
 
             {/* Features Section */}
             <section className="landing-section container mx-auto px-4">
-                <h2 className="text-4xl font-bold text-center mb-12">Why Choose PawSpa?</h2>
-                <div className="grid md:grid-cols-3 gap-8">
-                    <div className="landing-card p-6 text-center">
-                        <div className="landing-feature-icon primary mx-auto">
-                            <Sparkles className="w-8 h-8" />
+                <div className="text-center mb-16">
+                    <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 landing-text-primary">Why Choose PawSpa?</h2>
+                    <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                        Experience the difference with our premium dog grooming services
+                    </p>
+                </div>
+                <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+                    <div className="landing-card p-8 text-center hover:scale-105 transition-transform duration-300">
+                        <div className="landing-feature-icon primary mx-auto mb-6">
+                            <Sparkles className="w-10 h-10" />
                         </div>
-                        <h3 className="text-xl font-bold mb-2">Premium Products</h3>
-                        <p style={{ color: 'var(--muted-foreground)' }}>We use only the finest, pet-safe shampoos and conditioners</p>
+                        <h3 className="text-2xl font-bold mb-4 landing-text-primary">Premium Products</h3>
+                        <p className="text-muted-foreground leading-relaxed">We use only the finest, pet-safe shampoos and conditioners formulated for your dog's specific needs</p>
                     </div>
 
-                    <div className="landing-card p-6 text-center">
-                        <div className="landing-feature-icon accent mx-auto">
-                            <Heart className="w-8 h-8" />
+                    <div className="landing-card p-8 text-center hover:scale-105 transition-transform duration-300">
+                        <div className="landing-feature-icon accent mx-auto mb-6">
+                            <Heart className="w-10 h-10" />
                         </div>
-                        <h3 className="text-xl font-bold mb-2">Loving Care</h3>
-                        <p style={{ color: 'var(--muted-foreground)' }}>Our trained professionals treat every dog like family</p>
+                        <h3 className="text-2xl font-bold mb-4 landing-text-primary">Loving Care</h3>
+                        <p className="text-muted-foreground leading-relaxed">Our trained professionals treat every dog like family, ensuring a stress-free and enjoyable experience</p>
                     </div>
 
-                    <div className="landing-card p-6 text-center">
-                        <div className="landing-feature-icon secondary mx-auto">
-                            <Star className="w-8 h-8" />
+                    <div className="landing-card p-8 text-center hover:scale-105 transition-transform duration-300">
+                        <div className="landing-feature-icon secondary mx-auto mb-6">
+                            <Star className="w-10 h-10" />
                         </div>
-                        <h3 className="text-xl font-bold mb-2">5-Star Service</h3>
-                        <p style={{ color: 'var(--muted-foreground)' }}>Rated #1 dog washing service in the area</p>
+                        <h3 className="text-2xl font-bold mb-4 landing-text-primary">5-Star Service</h3>
+                        <p className="text-muted-foreground leading-relaxed">Rated #1 dog washing service in the area with hundreds of happy customers and their pampered pups</p>
                     </div>
                 </div>
             </section>
@@ -179,26 +194,38 @@ export default function LandingPage() {
             {/* Services Section */}
             <section className="landing-section" style={{ background: 'var(--secondary)' }}>
                 <div className="container mx-auto px-4">
-                    <h2 className="text-4xl font-bold text-center mb-12">Our Services</h2>
-                    <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="text-center mb-16">
+                        <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 landing-text-primary">Our Services</h2>
+                        <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                            Choose the perfect package for your furry friend's grooming needs
+                        </p>
+                    </div>
+                    <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
                         {[
-                            { name: 'Basic Bath', price: '$25', features: ['Shampoo', 'Rinse', 'Dry'] },
-                            { name: 'Deluxe Spa', price: '$45', features: ['Bath', 'Conditioning', 'Nail Trim', 'Ear Cleaning'] },
-                            { name: 'Premium Package', price: '$65', features: ['Full Spa', 'Teeth Brushing', 'Paw Massage', 'Bow Tie'] },
-                            { name: 'Puppy Special', price: '$20', features: ['Gentle Bath', 'Soft Dry', 'Treats'] }
+                            { name: 'Basic Bath', price: '$25', features: ['Shampoo', 'Rinse', 'Dry'], popular: false },
+                            { name: 'Deluxe Spa', price: '$45', features: ['Bath', 'Conditioning', 'Nail Trim', 'Ear Cleaning'], popular: true },
+                            { name: 'Premium Package', price: '$65', features: ['Full Spa', 'Teeth Brushing', 'Paw Massage', 'Bow Tie'], popular: false },
+                            { name: 'Puppy Special', price: '$20', features: ['Gentle Bath', 'Soft Dry', 'Treats'], popular: false }
                         ].map((service, idx) => (
-                            <div key={idx} className="landing-card p-6 transition-all hover:scale-105">
-                                <h3 className="text-2xl font-bold mb-2">{service.name}</h3>
-                                <p className="text-3xl font-bold mb-4" style={{ color: 'var(--primary)' }}>{service.price}</p>
-                                <ul className="space-y-2 mb-4">
+                            <div key={idx} className={`landing-card p-8 transition-all hover:scale-105 relative ${service.popular ? 'ring-2 ring-primary' : ''}`}>
+                                {service.popular && (
+                                    <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                                        <span className="bg-primary text-primary-foreground px-3 py-1 rounded-full text-sm font-semibold">
+                                            Most Popular
+                                        </span>
+                                    </div>
+                                )}
+                                <h3 className="text-2xl font-bold mb-3 landing-text-primary">{service.name}</h3>
+                                <p className="text-4xl font-bold mb-6 landing-text-primary">{service.price}</p>
+                                <ul className="space-y-3 mb-8">
                                     {service.features.map((feature, i) => (
-                                        <li key={i} className="flex items-center gap-2">
-                                            <div className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--primary)' }}></div>
-                                            <span style={{ color: 'var(--muted-foreground)' }}>{feature}</span>
+                                        <li key={i} className="flex items-center gap-3">
+                                            <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0"></div>
+                                            <span className="text-muted-foreground">{feature}</span>
                                         </li>
                                     ))}
                                 </ul>
-                                <button className="landing-btn-primary w-full" style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}>Select</button>
+                                <button className="landing-btn-primary w-full py-3 text-lg font-semibold">Select Package</button>
                             </div>
                         ))}
                     </div>
@@ -207,24 +234,35 @@ export default function LandingPage() {
 
             {/* Process Section */}
             <section className="landing-section container mx-auto px-4">
-                <h2 className="text-4xl font-bold text-center mb-12">Our Washing Process</h2>
-                <div className="max-w-4xl mx-auto space-y-8">
-                    {[
-                        { step: '01', title: 'Check-In & Assessment', desc: 'We greet your pup and assess their coat condition, temperament, and any special needs.' },
-                        { step: '02', title: 'Pre-Wash Brush', desc: 'Gentle brushing removes loose fur and tangles, preparing the coat for a thorough wash.' },
-                        { step: '03', title: 'Luxury Bath', desc: 'Using premium, pet-safe products tailored to your dog\'s coat type and skin sensitivity.' },
-                        { step: '04', title: 'Conditioning Treatment', desc: 'Deep conditioning leaves the coat soft, shiny, and healthy.' },
-                        { step: '05', title: 'Blow Dry & Style', desc: 'Professional drying and styling to make your pup look their absolute best.' },
-                        { step: '06', title: 'Final Touches', desc: 'Nail trim, ear cleaning, and a spritz of pet-safe cologne.' }
-                    ].map((item, idx) => (
-                        <div key={idx} className="landing-card p-6 flex gap-6 items-start">
-                            <div className="text-4xl font-bold" style={{ color: 'var(--primary)', minWidth: '4rem' }}>{item.step}</div>
-                            <div className="flex-1">
-                                <h3 className="text-xl font-bold mb-2">{item.title}</h3>
-                                <p style={{ color: 'var(--muted-foreground)' }}>{item.desc}</p>
+                <div className="text-center mb-16">
+                    <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 landing-text-primary">Our Washing Process</h2>
+                    <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                        A step-by-step journey to your dog's perfect pampering experience
+                    </p>
+                </div>
+                <div className="max-w-5xl mx-auto">
+                    <div className="grid md:grid-cols-2 gap-8">
+                        {[
+                            { step: '01', title: 'Check-In & Assessment', desc: 'We greet your pup and assess their coat condition, temperament, and any special needs.' },
+                            { step: '02', title: 'Pre-Wash Brush', desc: 'Gentle brushing removes loose fur and tangles, preparing the coat for a thorough wash.' },
+                            { step: '03', title: 'Luxury Bath', desc: 'Using premium, pet-safe products tailored to your dog\'s coat type and skin sensitivity.' },
+                            { step: '04', title: 'Conditioning Treatment', desc: 'Deep conditioning leaves the coat soft, shiny, and healthy.' },
+                            { step: '05', title: 'Blow Dry & Style', desc: 'Professional drying and styling to make your pup look their absolute best.' },
+                            { step: '06', title: 'Final Touches', desc: 'Nail trim, ear cleaning, and a spritz of pet-safe cologne.' }
+                        ].map((item, idx) => (
+                            <div key={idx} className="landing-card p-8 flex gap-6 items-start hover:shadow-lg transition-shadow duration-300">
+                                <div className="flex-shrink-0">
+                                    <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                                        <span className="text-2xl font-bold landing-text-primary">{item.step}</span>
+                                    </div>
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="text-xl font-bold mb-3 landing-text-primary">{item.title}</h3>
+                                    <p className="text-muted-foreground leading-relaxed">{item.desc}</p>
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        ))}
+                    </div>
                 </div>
             </section>
 
@@ -257,25 +295,43 @@ export default function LandingPage() {
 
             {/* Breed Specialties */}
             <section className="landing-section container mx-auto px-4">
-                <h2 className="text-4xl font-bold text-center mb-12">Breed-Specific Expertise</h2>
-                <p className="text-center mb-12 text-lg" style={{ color: 'var(--muted-foreground)' }}>
-                    We understand that every breed has unique grooming needs
-                </p>
-                <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-6">
+                <div className="text-center mb-16">
+                    <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 landing-text-primary">Breed-Specific Expertise</h2>
+                    <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
+                        We understand that every breed has unique grooming needs. Our experienced team specializes in all breeds, from tiny companions to large athletic dogs.
+                    </p>
+                </div>
+                <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
                     {[
-                        'Golden Retrievers', 'Poodles', 'German Shepherds', 'Bulldogs',
-                        'Labrador Retrievers', 'Huskies', 'Yorkies', 'Beagles',
-                        'Dachshunds', 'Shih Tzus', 'Boxers', 'Chihuahuas'
+                        { name: 'Golden Retrievers', emoji: '🐕', specialty: 'Double coats' },
+                        { name: 'Poodles', emoji: '🐩', specialty: 'Curly coats' },
+                        { name: 'German Shepherds', emoji: '🐕', specialty: 'Thick undercoats' },
+                        { name: 'Bulldogs', emoji: '🐕', specialty: 'Wrinkle care' },
+                        { name: 'Labrador Retrievers', emoji: '🐕', specialty: 'Water-resistant coats' },
+                        { name: 'Huskies', emoji: '🐺', specialty: 'Siberian coats' },
+                        { name: 'Yorkies', emoji: '🐕', specialty: 'Long silky hair' },
+                        { name: 'Beagles', emoji: '🐕', specialty: 'Hound ears' },
+                        { name: 'Dachshunds', emoji: '🐕', specialty: 'Long backs' },
+                        { name: 'Shih Tzus', emoji: '🐕', specialty: 'Luxurious coats' },
+                        { name: 'Boxers', emoji: '🐕', specialty: 'Short coats' },
+                        { name: 'Chihuahuas', emoji: '🐕', specialty: 'Tiny but mighty' }
                     ].map((breed, idx) => (
-                        <div key={idx} className="landing-card p-4 text-center hover:scale-105 transition-transform">
-                            <div className="text-3xl mb-2">🐕</div>
-                            <div className="font-semibold">{breed}</div>
+                        <div key={idx} className="landing-card p-6 text-center hover:scale-105 hover:shadow-lg transition-all duration-300 group cursor-pointer">
+                            <div className="text-4xl mb-3 group-hover:scale-110 transition-transform duration-300">{breed.emoji}</div>
+                            <div className="font-bold text-lg mb-2 landing-text-primary">{breed.name}</div>
+                            <div className="text-sm text-muted-foreground group-hover:text-primary transition-colors">{breed.specialty}</div>
                         </div>
                     ))}
                 </div>
-                <p className="text-center mt-8" style={{ color: 'var(--muted-foreground)' }}>
-                    ...and many more! Don't see your breed? We handle all dogs with expert care.
-                </p>
+                <div className="text-center mt-12">
+                    <div className="inline-flex items-center gap-3 px-6 py-3 bg-primary/10 rounded-full">
+                        <span className="text-2xl">✨</span>
+                        <p className="text-muted-foreground font-medium">
+                            Don't see your breed? We handle all dogs with expert care and personalized attention!
+                        </p>
+                        <span className="text-2xl">✨</span>
+                    </div>
+                </div>
             </section>
 
             {/* Add-On Services */}
@@ -305,30 +361,37 @@ export default function LandingPage() {
 
             {/* Testimonials */}
             <section className="landing-section container mx-auto px-4">
-                <h2 className="text-4xl font-bold text-center mb-12">Happy Customers</h2>
-                <div className="grid md:grid-cols-3 gap-6">
+                <div className="text-center mb-16">
+                    <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 landing-text-primary">Happy Customers</h2>
+                    <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                        Don't just take our word for it - hear from our satisfied customers
+                    </p>
+                </div>
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
                     {[
-                        { name: 'Sarah M.', dog: 'Max', text: 'Max loves coming here! The staff is amazing and he always comes home smelling great! Been coming for 2 years now.' },
-                        { name: 'John D.', dog: 'Bella', text: 'Best dog washing service ever! Bella gets so excited when we pull up. The de-shedding treatment is a game changer!' },
-                        { name: 'Emily R.', dog: 'Charlie', text: 'Professional, caring, and affordable. Highly recommend! They handle my anxious pup with such patience.' },
-                        { name: 'Michael T.', dog: 'Luna', text: 'Luna has sensitive skin and they use special hypoallergenic products. No more itching! Thank you PawSpa!' },
-                        { name: 'Jessica L.', dog: 'Rocky', text: 'Rocky is a 90lb German Shepherd and they handle him like a pro. Great facility and friendly staff!' },
-                        { name: 'David K.', dog: 'Milo', text: 'Worth every penny! Milo looks and smells amazing. The nail grinding service is perfect for his active lifestyle.' }
+                        { name: 'Sarah M.', dog: 'Max', text: 'Max loves coming here! The staff is amazing and he always comes home smelling great! Been coming for 2 years now.', rating: 5 },
+                        { name: 'John D.', dog: 'Bella', text: 'Best dog washing service ever! Bella gets so excited when we pull up. The de-shedding treatment is a game changer!', rating: 5 },
+                        { name: 'Emily R.', dog: 'Charlie', text: 'Professional, caring, and affordable. Highly recommend! They handle my anxious pup with such patience.', rating: 5 },
+                        { name: 'Michael T.', dog: 'Luna', text: 'Luna has sensitive skin and they use special hypoallergenic products. No more itching! Thank you PawSpa!', rating: 5 },
+                        { name: 'Jessica L.', dog: 'Rocky', text: 'Rocky is a 90lb German Shepherd and they handle him like a pro. Great facility and friendly staff!', rating: 5 },
+                        { name: 'David K.', dog: 'Milo', text: 'Worth every penny! Milo looks and smells amazing. The nail grinding service is perfect for his active lifestyle.', rating: 5 }
                     ].map((review, idx) => (
-                        <div key={idx} className="landing-card p-6">
-                            <div className="flex gap-1 mb-3">
-                                {[...Array(5)].map((_, i) => (
-                                    <Star key={i} className="w-4 h-4" style={{ fill: 'var(--chart-5)', color: 'var(--chart-5)' }} />
+                        <div key={idx} className="landing-card p-8 hover:shadow-xl transition-shadow duration-300">
+                            <div className="flex gap-1 mb-4">
+                                {[...Array(review.rating)].map((_, i) => (
+                                    <Star key={i} className="w-5 h-5" style={{ fill: 'var(--chart-5)', color: 'var(--chart-5)' }} />
                                 ))}
                             </div>
-                            <p className="mb-4" style={{ color: 'var(--muted-foreground)' }}>"{review.text}"</p>
-                            <div className="flex items-center gap-3">
-                                <div className="rounded-full w-10 h-10 flex items-center justify-center" style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}>
-                                    <span className="text-lg font-bold">{review.name[0]}</span>
+                            <blockquote className="mb-6 text-muted-foreground italic leading-relaxed">
+                                "{review.text}"
+                            </blockquote>
+                            <div className="flex items-center gap-4">
+                                <div className="rounded-full w-12 h-12 flex items-center justify-center bg-primary text-primary-foreground font-bold text-lg">
+                                    {review.name[0]}
                                 </div>
                                 <div>
-                                    <p className="font-semibold">{review.name}</p>
-                                    <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>Owner of {review.dog}</p>
+                                    <p className="font-semibold text-lg">{review.name}</p>
+                                    <p className="text-sm text-muted-foreground">Owner of {review.dog}</p>
                                 </div>
                             </div>
                         </div>
@@ -339,64 +402,115 @@ export default function LandingPage() {
             {/* FAQ Section */}
             <section className="landing-section" style={{ background: 'var(--muted)' }}>
                 <div className="container mx-auto px-4">
-                    <h2 className="text-4xl font-bold text-center mb-12">Frequently Asked Questions</h2>
-                    <div className="max-w-3xl mx-auto space-y-4">
-                        {[
-                            { q: 'How long does a typical wash take?', a: 'Most washes take 45-60 minutes depending on your dog\'s size and coat condition. We never rush - your pup\'s comfort is our priority!' },
-                            { q: 'Do I need an appointment?', a: 'We recommend booking ahead to guarantee your preferred time slot, but we also accept walk-ins based on availability.' },
-                            { q: 'What if my dog is anxious or aggressive?', a: 'Our staff is trained in handling anxious and reactive dogs. We use positive reinforcement and take breaks as needed. Your dog\'s safety and comfort come first.' },
-                            { q: 'What products do you use?', a: 'We use premium, pet-safe, hypoallergenic products. All shampoos are pH-balanced and free from harsh chemicals. We can accommodate special requests for sensitive skin.' },
-                            { q: 'Can I stay with my dog during the wash?', a: 'While we understand the concern, dogs typically do better when owners aren\'t present. However, you\'re welcome to watch through our viewing window!' },
-                            { q: 'Do you offer packages or memberships?', a: 'Yes! We offer monthly membership plans with discounted rates. Ask our staff about our loyalty program - every 10th wash is 50% off!' },
-                            { q: 'What age can puppies start?', a: 'Puppies can start as early as 8 weeks old after their first vaccinations. We offer gentle puppy introductions to make it a positive experience.' },
-                            { q: 'Do you handle large breeds?', a: 'Absolutely! We have specialized equipment and experienced staff for dogs of all sizes, from tiny Chihuahuas to giant Great Danes.' }
-                        ].map((faq, idx) => (
-                            <div key={idx} className="landing-card p-6">
-                                <h3 className="font-bold text-lg mb-2 landing-text-primary">{faq.q}</h3>
-                                <p style={{ color: 'var(--muted-foreground)' }}>{faq.a}</p>
-                            </div>
-                        ))}
+                    <div className="text-center mb-16">
+                        <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 landing-text-primary">Frequently Asked Questions</h2>
+                        <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                            Everything you need to know about our dog washing services
+                        </p>
+                    </div>
+                    <div className="max-w-4xl mx-auto">
+                        <div className="grid md:grid-cols-2 gap-6">
+                            {[
+                                { q: 'How long does a typical wash take?', a: 'Most washes take 45-60 minutes depending on your dog\'s size and coat condition. We never rush - your pup\'s comfort is our priority!', icon: '⏱️' },
+                                { q: 'Do I need an appointment?', a: 'We recommend booking ahead to guarantee your preferred time slot, but we also accept walk-ins based on availability.', icon: '📅' },
+                                { q: 'What if my dog is anxious or aggressive?', a: 'Our staff is trained in handling anxious and reactive dogs. We use positive reinforcement and take breaks as needed. Your dog\'s safety and comfort come first.', icon: '🐕' },
+                                { q: 'What products do you use?', a: 'We use premium, pet-safe, hypoallergenic products. All shampoos are pH-balanced and free from harsh chemicals. We can accommodate special requests for sensitive skin.', icon: '🧴' },
+                                { q: 'Can I stay with my dog during the wash?', a: 'While we understand the concern, dogs typically do better when owners aren\'t present. However, you\'re welcome to watch through our viewing window!', icon: '👀' },
+                                { q: 'Do you offer packages or memberships?', a: 'Yes! We offer monthly membership plans with discounted rates. Ask our staff about our loyalty program - every 10th wash is 50% off!', icon: '💎' },
+                                { q: 'What age can puppies start?', a: 'Puppies can start as early as 8 weeks old after their first vaccinations. We offer gentle puppy introductions to make it a positive experience.', icon: '🐾' },
+                                { q: 'Do you handle large breeds?', a: 'Absolutely! We have specialized equipment and experienced staff for dogs of all sizes, from tiny Chihuahuas to giant Great Danes.', icon: '💪' }
+                            ].map((faq, idx) => (
+                                <div key={idx} className="landing-card p-6 hover:shadow-lg transition-all duration-300 group">
+                                    <div className="flex items-start gap-4">
+                                        <div className="text-3xl mb-2 group-hover:scale-110 transition-transform duration-300">
+                                            {faq.icon}
+                                        </div>
+                                        <div className="flex-1">
+                                            <h3 className="font-bold text-lg mb-3 landing-text-primary group-hover:text-primary transition-colors">
+                                                {faq.q}
+                                            </h3>
+                                            <p className="text-muted-foreground leading-relaxed">{faq.a}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
             </section>
 
             {/* Hours & Location */}
             <section className="landing-section container mx-auto px-4">
-                <h2 className="text-4xl font-bold text-center mb-12">Visit Us</h2>
-                <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-                    <div className="landing-card p-8">
-                        <h3 className="text-2xl font-bold mb-6 landing-text-primary">Hours</h3>
-                        <div className="space-y-3">
+                <div className="text-center mb-16">
+                    <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 landing-text-primary">Visit Us</h2>
+                    <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                        Come experience the PawSpa difference in person
+                    </p>
+                </div>
+                <div className="grid lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
+                    <div className="landing-card p-8 hover:shadow-xl transition-shadow duration-300">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                                <span className="text-2xl">🕐</span>
+                            </div>
+                            <h3 className="text-2xl font-bold landing-text-primary">Hours of Operation</h3>
+                        </div>
+                        <div className="space-y-4">
                             {[
-                                { day: 'Monday - Friday', hours: '8:00 AM - 7:00 PM' },
-                                { day: 'Saturday', hours: '9:00 AM - 6:00 PM' },
-                                { day: 'Sunday', hours: '10:00 AM - 5:00 PM' },
-                                { day: 'Holidays', hours: 'Call for hours' }
+                                { day: 'Monday - Friday', hours: '8:00 AM - 7:00 PM', status: 'open' },
+                                { day: 'Saturday', hours: '9:00 AM - 6:00 PM', status: 'open' },
+                                { day: 'Sunday', hours: '10:00 AM - 5:00 PM', status: 'open' },
+                                { day: 'Holidays', hours: 'Call for hours', status: 'special' }
                             ].map((schedule, idx) => (
-                                <div key={idx} className="flex justify-between items-center pb-3 border-b" style={{ borderColor: 'var(--border)' }}>
-                                    <span className="font-semibold">{schedule.day}</span>
-                                    <span style={{ color: 'var(--muted-foreground)' }}>{schedule.hours}</span>
+                                <div key={idx} className="flex justify-between items-center p-3 rounded-lg hover:bg-muted/50 transition-colors">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-3 h-3 rounded-full ${schedule.status === 'open' ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+                                        <span className="font-semibold">{schedule.day}</span>
+                                    </div>
+                                    <span className="text-muted-foreground font-medium">{schedule.hours}</span>
                                 </div>
                             ))}
                         </div>
+                        <div className="mt-6 p-4 bg-primary/5 rounded-lg">
+                            <p className="text-sm text-muted-foreground">
+                                <strong>Pro tip:</strong> Book ahead during peak hours (10 AM - 2 PM) for the best experience!
+                            </p>
+                        </div>
                     </div>
-                    <div className="landing-card p-8">
-                        <h3 className="text-2xl font-bold mb-6 landing-text-primary">Location</h3>
-                        <div className="space-y-4">
-                            <div>
-                                <div className="font-semibold mb-1">Address</div>
-                                <div style={{ color: 'var(--muted-foreground)' }}>123 Bark Street<br />Dogtown, DT 12345</div>
+                    <div className="landing-card p-8 hover:shadow-xl transition-shadow duration-300">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                                <span className="text-2xl">📍</span>
                             </div>
-                            <div>
-                                <div className="font-semibold mb-1">Phone</div>
-                                <div style={{ color: 'var(--muted-foreground)' }}>(555) DOG-WASH</div>
+                            <h3 className="text-2xl font-bold landing-text-primary">Location & Contact</h3>
+                        </div>
+                        <div className="space-y-6">
+                            <div className="flex items-start gap-3">
+                                <MapPin className="w-5 h-5 text-primary mt-1 flex-shrink-0" />
+                                <div>
+                                    <div className="font-semibold mb-1">Address</div>
+                                    <div className="text-muted-foreground">123 Bark Street<br />Dogtown, DT 12345</div>
+                                </div>
                             </div>
-                            <div>
-                                <div className="font-semibold mb-1">Email</div>
-                                <div style={{ color: 'var(--muted-foreground)' }}>hello@pawspa.com</div>
+                            <div className="flex items-center gap-3">
+                                <Phone className="w-5 h-5 text-primary flex-shrink-0" />
+                                <div>
+                                    <div className="font-semibold mb-1">Phone</div>
+                                    <div className="text-muted-foreground">(555) DOG-WASH</div>
+                                </div>
                             </div>
-                            <div className="pt-4">
-                                <button className="landing-btn-primary w-full">Get Directions</button>
+                            <div className="flex items-center gap-3">
+                                <Mail className="w-5 h-5 text-primary flex-shrink-0" />
+                                <div>
+                                    <div className="font-semibold mb-1">Email</div>
+                                    <div className="text-muted-foreground">hello@pawspa.com</div>
+                                </div>
+                            </div>
+                            <div className="pt-4 border-t border-border">
+                                <button className="landing-btn-primary w-full flex items-center justify-center gap-2 py-3">
+                                    <MapPin className="w-5 h-5" />
+                                    Get Directions
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -406,33 +520,55 @@ export default function LandingPage() {
             {/* Contact Section */}
             <section className="landing-section" style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}>
                 <div className="container mx-auto px-4 text-center">
-                    <h2 className="text-4xl font-bold mb-8">Ready to Pamper Your Pup?</h2>
-                    <p className="text-xl mb-8">Book your appointment today!</p>
-                    <div className="flex flex-wrap gap-6 justify-center mb-12">
-                        <div className="flex items-center gap-2">
-                            <Phone className="w-5 h-5" />
-                            <span>(555) DOG-WASH</span>
+                    <div className="max-w-4xl mx-auto">
+                        <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6">Ready to Pamper Your Pup?</h2>
+                        <p className="text-lg md:text-xl mb-12 opacity-90">Book your appointment today and give your furry friend the royal treatment they deserve!</p>
+                        <div className="grid md:grid-cols-3 gap-8 mb-12 max-w-3xl mx-auto">
+                            <div className="flex flex-col items-center gap-3 p-6 rounded-lg bg-white/10 backdrop-blur-sm">
+                                <Phone className="w-8 h-8" />
+                                <div>
+                                    <p className="font-semibold text-lg">(555) DOG-WASH</p>
+                                    <p className="text-sm opacity-75">Call us anytime</p>
+                                </div>
+                            </div>
+                            <div className="flex flex-col items-center gap-3 p-6 rounded-lg bg-white/10 backdrop-blur-sm">
+                                <Mail className="w-8 h-8" />
+                                <div>
+                                    <p className="font-semibold text-lg">hello@pawspa.com</p>
+                                    <p className="text-sm opacity-75">Email us</p>
+                                </div>
+                            </div>
+                            <div className="flex flex-col items-center gap-3 p-6 rounded-lg bg-white/10 backdrop-blur-sm">
+                                <MapPin className="w-8 h-8" />
+                                <div>
+                                    <p className="font-semibold text-lg">123 Bark Street</p>
+                                    <p className="text-sm opacity-75">Dogtown, DT 12345</p>
+                                </div>
+                            </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <Mail className="w-5 h-5" />
-                            <span>hello@pawspa.com</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <MapPin className="w-5 h-5" />
-                            <span>123 Bark Street, Dogtown</span>
+                        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                            <button
+                                className="landing-btn-primary text-lg px-8 py-4 font-semibold"
+                                style={{
+                                    background: 'var(--card)',
+                                    color: 'var(--primary)',
+                                    border: 'none'
+                                }}
+                            >
+                                Book Appointment Now
+                            </button>
+                            <button
+                                className="landing-btn-outline text-lg px-8 py-4 font-semibold"
+                                style={{
+                                    background: 'transparent',
+                                    color: 'var(--card)',
+                                    border: '2px solid var(--card)'
+                                }}
+                            >
+                                Call (555) DOG-WASH
+                            </button>
                         </div>
                     </div>
-                    <button
-                        className="landing-btn-primary"
-                        style={{
-                            background: 'var(--card)',
-                            color: 'var(--primary)',
-                            fontSize: '1.125rem',
-                            padding: '1rem 2rem'
-                        }}
-                    >
-                        Book Appointment
-                    </button>
                 </div>
             </section>
 

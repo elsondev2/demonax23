@@ -3,6 +3,7 @@ import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import { ENV } from "../lib/env.js";
 import { uploadBase64ImageToSupabase } from "../lib/supabase.js";
+import { cacheInvalidate } from "../lib/cache.js";
 
 export const signup = async (req, res) => {
   // Handle both FormData (with file) and JSON (without file)
@@ -241,6 +242,9 @@ export const updateProfile = async (req, res) => {
     }
 
     await user.save();
+    
+    // Invalidate user cache
+    cacheInvalidate(`user:${user._id}`);
 
     // Broadcast live update so UIs refresh cached images/details
     io.emit("userUpdated", {
@@ -281,6 +285,7 @@ export const uploadBackground = async (req, res) => {
     if (user) {
       user.customBackground = uploaded.url;
       await user.save();
+      cacheInvalidate(`user:${user._id}`);
     }
 
     res.status(200).json({ backgroundUrl: uploaded.url });
@@ -516,5 +521,29 @@ export const checkVerificationStatus = async (req, res) => {
   } catch (error) {
     console.error("Error in checkVerificationStatus:", error);
     res.status(500).json({ message: "Failed to check verification status" });
+  }
+};
+
+/**
+ * Check if user exists by email
+ * POST /api/auth/check-user
+ */
+export const checkUserExists = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
+
+    return res.status(200).json({ 
+      exists: !!user,
+      message: user ? "User exists" : "User not found"
+    });
+  } catch (error) {
+    console.error("Error checking user existence:", error);
+    return res.status(500).json({ message: "Internal server error" });
   }
 };

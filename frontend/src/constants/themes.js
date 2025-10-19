@@ -436,7 +436,7 @@ export const isDarkTheme = (themeName) => {
 };
 
 // Default theme
-export const DEFAULT_THEME = "dark";
+export const DEFAULT_THEME = "synthwave";
 
 // Theme search and filtering utilities
 export const searchThemes = (query) => {

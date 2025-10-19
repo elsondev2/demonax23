@@ -19,6 +19,7 @@ import followRoutes from "./routes/follow.route.js";
 import donationRoutes from "./routes/donation.route.js";
 import featureRequestRoutes from "./routes/featureRequest.route.js";
 import mentionRoutes from "./routes/mention.route.js";
+import linkPreviewRoutes from "./routes/linkPreview.route.js";
 import { app, server } from "./lib/socket.js";
 import { startStatusCleanupJob } from "./lib/statusCleanup.js";
 import { startPostCleanupJob } from "./lib/postCleanup.js";
@@ -77,6 +78,7 @@ app.use("/api/follow", followRoutes);
 app.use("/api/donations", donationRoutes);
 app.use("/api/feature-requests", featureRequestRoutes);
 app.use("/api/mentions", mentionRoutes);
+app.use("/api/link", linkPreviewRoutes);
 
 if (ENV.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "../frontend/dist")));

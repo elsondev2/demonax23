@@ -177,8 +177,13 @@ export const getGroups = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    // Find all groups where the user is a member
-    let groups = await Group.find({ members: userId })
+    // Find all groups where the user is a member OR admin
+    let groups = await Group.find({ 
+      $or: [
+        { members: userId },
+        { admin: userId }
+      ]
+    })
       .populate("members admin", "fullName profilePic")
       .sort({ updatedAt: -1 });
 
@@ -210,7 +215,13 @@ export const getGroupById = async (req, res) => {
     const { id: groupId } = req.params;
     const userId = req.user._id;
 
-    const group = await Group.findOne({ _id: groupId, members: userId })
+    const group = await Group.findOne({ 
+      _id: groupId,
+      $or: [
+        { members: userId },
+        { admin: userId }
+      ]
+    })
       .populate("members admin", "fullName profilePic");
 
     if (!group) {

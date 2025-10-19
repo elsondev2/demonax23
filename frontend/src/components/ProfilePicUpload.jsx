@@ -28,20 +28,16 @@ const ProfilePicUpload = ({ onImageSelect, selectedImage }) => {
                 onClick={handleClick}
             >
                 {previewUrl ? (
-                    <div className="avatar">
-                        <div className="w-24 h-24 rounded-full border-2 border-dashed border-base-300 hover:border-primary">
-                            <img
-                                src={previewUrl}
-                                alt="Profile preview"
-                                className="w-full h-full rounded-full object-cover"
-                            />
-                        </div>
+                    <div className="w-24 h-24 rounded-full border-2 border-dashed border-base-300 hover:border-primary overflow-hidden">
+                        <img
+                            src={previewUrl}
+                            alt="Profile preview"
+                            className="w-full h-full object-cover"
+                        />
                     </div>
                 ) : (
-                    <div className="avatar placeholder">
-                        <div className="w-24 h-24 rounded-full border-2 border-dashed border-base-300 hover:border-primary bg-base-200 text-base-content">
-                            <User className="w-8 h-8" />
-                        </div>
+                    <div className="w-24 h-24 rounded-full border-2 border-dashed border-base-300 hover:border-primary bg-base-200 text-base-content flex items-center justify-center">
+                        <User className="w-10 h-10" />
                     </div>
                 )}
 

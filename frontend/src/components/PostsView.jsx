@@ -5,11 +5,14 @@ import { axiosInstance } from "../lib/axios";
 import { useAuthStore } from "../store/useAuthStore";
 import useStatusStore from "../store/useStatusStore";
 import { useChatStore } from "../store/useChatStore";
-import { ChevronRight, ChevronLeft, Download, FileIcon, ImageIcon, Plus, Search, Trash2, X, Menu, Heart, MessageCircle, Eye, ChevronDown, ChevronUp, Edit2, MoreVertical } from "lucide-react";
+import { ChevronRight, ChevronLeft, Download, FileIcon, ImageIcon, Plus, Search, Trash2, X, Menu, Heart, MessageCircle, Eye, ChevronDown, ChevronUp, Edit2, MoreVertical, Sparkles } from "lucide-react";
 import IOSModal from "./IOSModal";
 import Avatar from "./Avatar";
-import FollowButton, { FollowerCount } from "./FollowButton";
-import CaptionMaker from "./caption/CaptionMaker";
+import FollowButton from "./FollowButton";
+import CaptionImageModal from "./CaptionImageModal";
+import LinkifiedText from "./LinkifiedText";
+import { generateCaptionImage } from "../utils/captionImageGenerator";
+import MentionTextarea from "./mentions/MentionTextarea";
 
 function PostsBackground() {
   const { chatBackground } = useChatStore();
@@ -22,6 +25,145 @@ function PostsBackground() {
         zIndex: -1,
       }}
     />
+  );
+}
+
+// Delete Confirmation Modal
+function DeleteConfirmModal({ isOpen, onClose, onConfirm, title = "Delete", message = "Are you sure you want to delete this?" }) {
+  if (!isOpen) return null;
+
+  return (
+    <dialog className="modal modal-open">
+      <div className="modal-box">
+        <h3 className="font-bold text-lg flex items-center gap-2">
+          <Trash2 className="w-5 h-5 text-error" />
+          {title}
+        </h3>
+        <p className="py-4 text-base-content/80">{message}</p>
+        <div className="modal-action">
+          <button className="btn btn-ghost" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="btn btn-error" onClick={() => { onConfirm(); onClose(); }}>
+            Delete
+          </button>
+        </div>
+      </div>
+      <form method="dialog" className="modal-backdrop">
+        <button onClick={onClose}>close</button>
+      </form>
+    </dialog>
+  );
+}
+
+// Download Modal - Shows file info and download options
+function DownloadModal({ isOpen, onClose, post }) {
+  if (!isOpen || !post) return null;
+
+  const formatFileSize = (bytes) => {
+    if (!bytes) return 'Unknown size';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+  };
+
+  const getFileExtension = (filename) => {
+    return filename?.split('.').pop()?.toUpperCase() || 'FILE';
+  };
+
+  const handleDownload = (item) => {
+    const link = document.createElement('a');
+    link.href = item.url;
+    link.download = item.filename || 'download';
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleDownloadAll = () => {
+    post.items?.forEach((item, index) => {
+      setTimeout(() => handleDownload(item), index * 500);
+    });
+  };
+
+  return (
+    <dialog className="modal modal-open">
+      <div className="modal-box max-w-2xl">
+        <button
+          className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
+          onClick={onClose}
+        >
+          <X className="w-4 h-4" />
+        </button>
+
+        <h3 className="font-bold text-lg flex items-center gap-2 mb-4">
+          <Download className="w-5 h-5 text-primary" />
+          Download Files
+        </h3>
+
+        {/* Post Info */}
+        <div className="mb-4 p-3 bg-base-200 rounded-lg">
+          <h4 className="font-semibold text-base-content">{post.title || 'Untitled Post'}</h4>
+          {post.caption && (
+            <p className="text-sm text-base-content/70 mt-1 line-clamp-2">{post.caption}</p>
+          )}
+          <div className="text-xs text-base-content/60 mt-2">
+            {post.items?.length || 0} {post.items?.length === 1 ? 'file' : 'files'}
+          </div>
+        </div>
+
+        {/* Files List */}
+        <div className="max-h-96 overflow-y-auto space-y-2">
+          {post.items?.map((item, index) => (
+            <div key={index} className="flex items-center gap-3 p-3 bg-base-100 border border-base-300 rounded-lg hover:bg-base-200 transition-colors">
+              <div className="flex-shrink-0">
+                {item.contentType?.startsWith('image/') ? (
+                  <div className="w-12 h-12 rounded overflow-hidden bg-base-300">
+                    <img src={item.url} alt={item.filename} className="w-full h-full object-cover" />
+                  </div>
+                ) : (
+                  <div className="w-12 h-12 rounded bg-primary/10 flex items-center justify-center">
+                    <FileIcon className="w-6 h-6 text-primary" />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-sm truncate">{item.filename || 'Unnamed file'}</div>
+                <div className="flex items-center gap-2 text-xs text-base-content/60 mt-1">
+                  <span className="badge badge-sm">{getFileExtension(item.filename)}</span>
+                  <span>{formatFileSize(item.size)}</span>
+                </div>
+              </div>
+
+              <button
+                className="btn btn-sm btn-primary"
+                onClick={() => handleDownload(item)}
+              >
+                <Download className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {/* Actions */}
+        <div className="modal-action">
+          <button className="btn btn-ghost" onClick={onClose}>
+            Close
+          </button>
+          {post.items?.length > 1 && (
+            <button className="btn btn-primary" onClick={handleDownloadAll}>
+              <Download className="w-4 h-4 mr-2" />
+              Download All ({post.items.length})
+            </button>
+          )}
+        </div>
+      </div>
+      <form method="dialog" className="modal-backdrop">
+        <button onClick={onClose}>close</button>
+      </form>
+    </dialog>
   );
 }
 
@@ -171,7 +313,9 @@ function PreviewModal({ post, index, onClose, onPrev, onNext }) {
 
           <div className="mt-4 text-white text-center">
             <div className="font-medium">{post.title || 'Untitled'}</div>
-            <div className="text-sm opacity-70">{post.caption}</div>
+            <div className="text-sm opacity-70">
+              <LinkifiedText text={post.caption} />
+            </div>
             <div className="text-xs opacity-50 mt-2">
               {index + 1} / {post.items?.length || 0}
             </div>
@@ -191,6 +335,15 @@ function PulseViewer({ user, onClose }) {
   const [index, setIndex] = useState(0);
   const [progress, setProgress] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detect mobile
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => { if (user?._id) fetchUserStatuses(user._id).then(setItems); }, [user, fetchUserStatuses]);
   useEffect(() => { const cur = items[index]; if (cur) markSeen(cur._id); }, [items, index, markSeen]);
@@ -285,15 +438,16 @@ function PulseViewer({ user, onClose }) {
           {/* Header with user info */}
           <div className="absolute top-4 left-0 right-0 z-10 flex items-center justify-between px-4">
             <div className="flex items-center gap-2">
-              <Avatar
-                src={user?.profilePic}
-                name={user?.fullName}
-                alt={user?.fullName}
-                size="w-8 h-8"
-                className="border-2 border-white"
-                textSize="text-xs"
-                loading="lazy"
-              />
+              <div className="w-8 h-8 rounded-full border-2 border-white overflow-hidden flex-shrink-0">
+                <Avatar
+                  src={user?.profilePic}
+                  name={user?.fullName}
+                  alt={user?.fullName}
+                  size="w-8 h-8"
+                  textSize="text-xs"
+                  loading="lazy"
+                />
+              </div>
               <div className="flex flex-col">
                 <span className="text-white font-semibold text-sm drop-shadow-lg">{user?.fullName || 'User'}</span>
                 <span className="text-white/80 text-xs drop-shadow-lg">{formatTimeAgo(cur.createdAt)}</span>
@@ -307,10 +461,12 @@ function PulseViewer({ user, onClose }) {
           {/* Story content - 9:16 aspect ratio */}
           <div
             className="relative w-full h-full bg-black select-none"
-            onMouseDown={() => setIsPaused(true)}
-            onMouseUp={() => setIsPaused(false)}
-            onTouchStart={() => { setIsPaused(true); }}
-            onTouchEnd={() => { setIsPaused(false); }}
+            onClick={() => {
+              // Only toggle pause on desktop, not mobile
+              if (!isMobile) {
+                setIsPaused(prev => !prev);
+              }
+            }}
           >
             {isVideo ? (
               <video
@@ -333,10 +489,23 @@ function PulseViewer({ user, onClose }) {
               />
             )}
 
+            {/* Pause indicator - desktop only */}
+            {isPaused && !isMobile && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="bg-black/60 backdrop-blur-sm rounded-full p-4">
+                  <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+                  </svg>
+                </div>
+              </div>
+            )}
+
             {/* Caption if exists */}
             {cur.caption && (
               <div className="absolute bottom-20 left-0 right-0 px-4">
-                <p className="text-white text-sm drop-shadow-lg">{cur.caption}</p>
+                <p className="text-white text-sm drop-shadow-lg">
+                  <LinkifiedText text={cur.caption} />
+                </p>
               </div>
             )}
           </div>
@@ -370,8 +539,24 @@ function ReplyItem({ reply, postId, commentId, level = 1, onReplyAdded, authUser
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(reply.text);
   const [showMenu, setShowMenu] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const menuRef = useRef(null);
   const canReply = level < 5;
   const isOwner = reply.user?._id === authUser?._id || reply.user?._id?.toString() === authUser?._id?.toString();
+
+  // Click outside to close menu
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setShowMenu(false);
+      }
+    };
+
+    if (showMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showMenu]);
 
   useEffect(() => {
     setIsLiked(reply.likes?.some(id => id === authUser?._id || id.toString() === authUser?._id?.toString()) || false);
@@ -417,7 +602,6 @@ function ReplyItem({ reply, postId, commentId, level = 1, onReplyAdded, authUser
   };
 
   const handleDelete = async () => {
-    if (!confirm('Delete this reply?')) return;
     try {
       await axiosInstance.delete(`/api/posts/${postId}/comments/${reply._id}`);
       setShowMenu(false);
@@ -442,14 +626,16 @@ function ReplyItem({ reply, postId, commentId, level = 1, onReplyAdded, authUser
   return (
     <div className={`${level > 1 ? 'ml-8 mt-2' : 'mt-2'}`}>
       <div className="flex items-start gap-2">
-        <Avatar
-          src={reply.user?.profilePic}
-          name={reply.user?.fullName}
-          alt={reply.user?.fullName || 'User'}
-          size="w-8 h-8"
-          className="flex-shrink-0 ring-1 ring-base-300"
-          textSize="text-xs"
-        />
+        <div className="flex-shrink-0 w-8 h-8 rounded-full ring-1 ring-base-300 p-0.5">
+          <Avatar
+            src={reply.user?.profilePic}
+            name={reply.user?.fullName}
+            alt={reply.user?.fullName || 'User'}
+            size="w-full h-full"
+            className="rounded-full"
+            textSize="text-xs"
+          />
+        </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="font-semibold text-sm text-base-content">{reply.user?.fullName || 'User'}</span>
@@ -487,7 +673,7 @@ function ReplyItem({ reply, postId, commentId, level = 1, onReplyAdded, authUser
               </button>
             )}
             {isOwner && !isEditing && (
-              <div className="relative">
+              <div className="relative" ref={menuRef}>
                 <button
                   className="text-xs text-base-content/60 hover:text-base-content"
                   onClick={() => setShowMenu(!showMenu)}
@@ -495,7 +681,7 @@ function ReplyItem({ reply, postId, commentId, level = 1, onReplyAdded, authUser
                   <MoreVertical className="w-3 h-3" />
                 </button>
                 {showMenu && (
-                  <div className="absolute left-0 top-full mt-1 bg-base-100 border border-base-300 rounded shadow-lg z-10 min-w-[100px]">
+                  <div className="absolute left-0 top-full mt-1 bg-base-100 border border-base-300 rounded shadow-lg z-10 min-w-[100px] animate-in fade-in slide-in-from-top-2 duration-200">
                     <button
                       className="btn btn-ghost btn-xs justify-start w-full"
                       onClick={() => { setIsEditing(true); setShowMenu(false); }}
@@ -504,7 +690,7 @@ function ReplyItem({ reply, postId, commentId, level = 1, onReplyAdded, authUser
                     </button>
                     <button
                       className="btn btn-ghost btn-xs justify-start w-full text-error hover:bg-error/10"
-                      onClick={handleDelete}
+                      onClick={() => { setShowDeleteModal(true); setShowMenu(false); }}
                     >
                       <Trash2 className="w-3 h-3" /> Delete
                     </button>
@@ -549,6 +735,13 @@ function ReplyItem({ reply, postId, commentId, level = 1, onReplyAdded, authUser
           ))}
         </div>
       )}
+      <DeleteConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDelete}
+        title="Delete Reply"
+        message="Are you sure you want to delete this reply? This action cannot be undone."
+      />
     </div>
   );
 }
@@ -563,7 +756,23 @@ function CommentItem({ comment, postId, onReplyAdded, authUser }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(comment.text);
   const [showMenu, setShowMenu] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const menuRef = useRef(null);
   const isOwner = comment.user?._id === authUser?._id || comment.user?._id?.toString() === authUser?._id?.toString();
+
+  // Click outside to close menu
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setShowMenu(false);
+      }
+    };
+
+    if (showMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showMenu]);
 
   useEffect(() => {
     setIsLiked(comment.likes?.some(id => id === authUser?._id || id.toString() === authUser?._id?.toString()) || false);
@@ -608,7 +817,6 @@ function CommentItem({ comment, postId, onReplyAdded, authUser }) {
   };
 
   const handleDelete = async () => {
-    if (!confirm('Delete this comment?')) return;
     try {
       await axiosInstance.delete(`/api/posts/${postId}/comments/${comment._id}`);
       setShowMenu(false);
@@ -633,13 +841,15 @@ function CommentItem({ comment, postId, onReplyAdded, authUser }) {
   return (
     <div className="py-3 border-b border-base-300 last:border-b-0">
       <div className="flex items-start gap-3">
-        <Avatar
-          src={comment.user?.profilePic}
-          name={comment.user?.fullName}
-          alt={comment.user?.fullName || 'User'}
-          size="w-10 h-10"
-          className="flex-shrink-0 ring-1 ring-base-300"
-        />
+        <div className="flex-shrink-0 w-10 h-10 rounded-full ring-1 ring-base-300 p-0.5">
+          <Avatar
+            src={comment.user?.profilePic}
+            name={comment.user?.fullName}
+            alt={comment.user?.fullName || 'User'}
+            size="w-full h-full"
+            className="rounded-full"
+          />
+        </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="font-semibold text-sm text-base-content">{comment.user?.fullName || 'User'}</span>
@@ -675,7 +885,7 @@ function CommentItem({ comment, postId, onReplyAdded, authUser }) {
               Reply
             </button>
             {isOwner && !isEditing && (
-              <div className="relative">
+              <div className="relative" ref={menuRef}>
                 <button
                   className="text-xs text-base-content/60 hover:text-base-content"
                   onClick={() => setShowMenu(!showMenu)}
@@ -683,7 +893,7 @@ function CommentItem({ comment, postId, onReplyAdded, authUser }) {
                   <MoreVertical className="w-4 h-4" />
                 </button>
                 {showMenu && (
-                  <div className="absolute left-0 top-full mt-1 bg-base-100 border border-base-300 rounded shadow-lg z-10 min-w-[100px]">
+                  <div className="absolute left-0 top-full mt-1 bg-base-100 border border-base-300 rounded shadow-lg z-10 min-w-[100px] animate-in fade-in slide-in-from-top-2 duration-200">
                     <button
                       className="btn btn-ghost btn-sm justify-start w-full"
                       onClick={() => { setIsEditing(true); setShowMenu(false); }}
@@ -692,7 +902,7 @@ function CommentItem({ comment, postId, onReplyAdded, authUser }) {
                     </button>
                     <button
                       className="btn btn-ghost btn-sm justify-start w-full text-error hover:bg-error/10"
-                      onClick={handleDelete}
+                      onClick={() => { setShowDeleteModal(true); setShowMenu(false); }}
                     >
                       <Trash2 className="w-4 h-4" /> Delete
                     </button>
@@ -737,6 +947,188 @@ function CommentItem({ comment, postId, onReplyAdded, authUser }) {
           ))}
         </div>
       )}
+      <DeleteConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDelete}
+        title="Delete Comment"
+        message="Are you sure you want to delete this comment? This action cannot be undone."
+      />
+    </div>
+  );
+}
+
+// Post Card with Carousel for multiple files
+function PostCard({ post, authUser, onPreview, onLike, onComment, onDownload, onEdit, onDelete, onFollowChange }) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const hasMultipleFiles = post.items?.length > 1;
+
+  const goToPrevious = (e) => {
+    e.stopPropagation();
+    setCurrentIndex((prev) => (prev > 0 ? prev - 1 : post.items.length - 1));
+  };
+
+  const goToNext = (e) => {
+    e.stopPropagation();
+    setCurrentIndex((prev) => (prev < post.items.length - 1 ? prev + 1 : 0));
+  };
+
+  const currentItem = post.items?.[currentIndex];
+
+  return (
+    <div className="bg-base-100 rounded-none border border-base-300 overflow-hidden flex flex-col">
+      {/* Image/File Preview with Carousel */}
+      <div className="relative aspect-square bg-base-200 flex items-center justify-center overflow-hidden group">
+        <button
+          className="w-full h-full flex items-center justify-center"
+          onClick={() => onPreview(post, currentIndex)}
+        >
+          {currentItem?.contentType?.startsWith('image/') ? (
+            <img
+              loading="lazy"
+              src={currentItem.url}
+              alt={post.title || 'Post'}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="text-base-content/60 flex flex-col items-center">
+              <FileIcon className="w-12 h-12" />
+              <div className="text-xs mt-1">{currentItem?.filename || 'Document'}</div>
+            </div>
+          )}
+        </button>
+
+        {/* Navigation Buttons - Only show if multiple files */}
+        {hasMultipleFiles && (
+          <>
+            <button
+              className="absolute left-2 top-1/2 -translate-y-1/2 btn btn-circle btn-sm bg-base-100/80 hover:bg-base-100 border-none opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={goToPrevious}
+              aria-label="Previous"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              className="absolute right-2 top-1/2 -translate-y-1/2 btn btn-circle btn-sm bg-base-100/80 hover:bg-base-100 border-none opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={goToNext}
+              aria-label="Next"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+
+            {/* Progress Dots */}
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+              {post.items.map((_, index) => (
+                <button
+                  key={index}
+                  className={`w-1.5 h-1.5 rounded-full transition-all ${index === currentIndex
+                    ? 'bg-primary w-2'
+                    : 'bg-base-100/60 hover:bg-base-100/80'
+                    }`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCurrentIndex(index);
+                  }}
+                  aria-label={`Go to file ${index + 1}`}
+                />
+              ))}
+            </div>
+
+            {/* File Counter */}
+            <div className="absolute top-3 right-3 bg-base-100/80 backdrop-blur-sm px-2 py-1 rounded-full text-xs font-medium">
+              {currentIndex + 1} / {post.items.length}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Post Content */}
+      <div className="p-3 flex-1 flex flex-col">
+        <div className="flex items-center gap-2 mb-2">
+          <Avatar
+            src={post.postedBy?.profilePic}
+            name={post.postedBy?.fullName}
+            alt={post.postedBy?.fullName || 'User'}
+            size="w-8 h-8"
+            textSize="text-xs"
+            loading="lazy"
+          />
+          <div className="text-sm font-medium truncate">{post.postedBy?.fullName || 'User'}</div>
+          <FollowButton
+            userId={post.postedBy?._id}
+            size="xs"
+            className="ml-2"
+            onFollowChange={onFollowChange}
+          />
+          <div className="ml-auto text-xs text-base-content/60">
+            {new Date(post.createdAt).toLocaleString([], { month: 'short', day: 'numeric' })}
+          </div>
+        </div>
+        <div className="font-medium truncate">{post.title || 'Untitled'}</div>
+        <div className="text-sm text-base-content/70 line-clamp-2">
+          <LinkifiedText text={post.caption} />
+        </div>
+        <div className="mt-auto pt-2 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <button
+              className={`btn btn-sm btn-ghost rounded-none ${post.likedByMe ? 'text-primary' : ''}`}
+              title="Like"
+              aria-label="Like"
+              onClick={() => onLike(post)}
+            >
+              <Heart className="w-4 h-4" />
+              {typeof post.likesCount === 'number' && <span className="ml-1 text-xs">{post.likesCount}</span>}
+            </button>
+            <button
+              className="btn btn-sm btn-ghost rounded-none"
+              title="Comments"
+              aria-label="Comments"
+              onClick={() => onComment(post)}
+            >
+              <MessageCircle className="w-4 h-4" />
+              {typeof post.commentsCount === 'number' && <span className="ml-1 text-xs">{post.commentsCount}</span>}
+            </button>
+            <button
+              className="btn btn-sm btn-ghost rounded-none"
+              title="Preview"
+              aria-label="Preview"
+              onClick={() => onPreview(post, 0)}
+            >
+              <Eye className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              className="btn btn-sm btn-ghost rounded-none"
+              title="Download"
+              aria-label="Download"
+              onClick={() => onDownload(post)}
+            >
+              <Download className="w-4 h-4" />
+            </button>
+            {((post.postedBy?._id || post.postedBy) === authUser?._id || authUser?.role === 'admin') && (
+              <>
+                <button
+                  className="btn btn-sm btn-ghost rounded-none"
+                  title="Edit"
+                  aria-label="Edit"
+                  onClick={() => onEdit(post)}
+                >
+                  <Edit2 className="w-4 h-4" />
+                </button>
+                <button
+                  className="btn btn-sm btn-ghost rounded-none text-error hover:bg-error/10"
+                  title="Delete"
+                  aria-label="Delete"
+                  onClick={() => onDelete(post)}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -811,75 +1203,72 @@ function CommentsModal({ post, onClose, onCommentAdded }) {
 
   return (
     <IOSModal isOpen={true} onClose={onClose} className="max-w-2xl">
-      <div className="flex flex-col h-full relative">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-base-300 bg-base-100 flex-shrink-0">
-          <h3 className="font-semibold text-lg text-base-content">Comments</h3>
-          <button className="btn btn-ghost btn-sm btn-circle hover:bg-base-200" onClick={onClose}>
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+      {/* Header */}
+      <div className="flex items-center justify-between px-6 py-4 border-b border-base-300 bg-base-100 flex-shrink-0">
+        <h3 className="font-semibold text-lg text-base-content">Comments</h3>
+        <button className="btn btn-ghost btn-sm btn-circle hover:bg-base-200" onClick={onClose}>
+          <X className="w-5 h-5" />
+        </button>
+      </div>
 
-        {/* Comments List - This will be the scrollable content that IOSModal tracks */}
-        <div className="flex-1 overflow-y-auto px-6 bg-base-100" style={{ paddingBottom: '80px' }}>
-          {loading ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="flex items-center gap-2">
-                <span className="loading loading-spinner loading-sm"></span>
-                <span className="text-sm text-base-content/60">Loading comments...</span>
-              </div>
+      {/* Comments List - Scrollable content */}
+      <div className="flex-1 overflow-y-auto px-6 bg-base-100 pb-24">
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="flex items-center gap-2">
+              <span className="loading loading-spinner loading-sm"></span>
+              <span className="text-sm text-base-content/60">Loading comments...</span>
             </div>
-          ) : comments.length === 0 ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center">
-                <MessageCircle className="w-12 h-12 mx-auto mb-2 text-base-content/30" />
-                <p className="text-sm text-base-content/60">No comments yet.</p>
-                <p className="text-xs text-base-content/50 mt-1">Be the first to comment!</p>
-              </div>
+          </div>
+        ) : comments.length === 0 ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <MessageCircle className="w-12 h-12 mx-auto mb-2 text-base-content/30" />
+              <p className="text-sm text-base-content/60">No comments yet.</p>
+              <p className="text-xs text-base-content/50 mt-1">Be the first to comment!</p>
             </div>
-          ) : (
-            <div className="py-4">
-              {comments.map((comment, idx) => (
-                <CommentItem
-                  key={comment._id || idx}
-                  comment={comment}
-                  postId={post._id}
-                  onReplyAdded={loadComments}
-                  authUser={authUser}
-                />
-              ))}
-            </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="py-4">
+            {comments.map((comment, idx) => (
+              <CommentItem
+                key={comment._id || idx}
+                comment={comment}
+                postId={post._id}
+                onReplyAdded={loadComments}
+                authUser={authUser}
+              />
+            ))}
+          </div>
+        )}
+      </div>
 
-        {/* Comment Input - Fixed at bottom */}
-        <div className="absolute bottom-0 left-0 right-0 px-6 py-4 border-t border-base-300 flex items-center gap-3 bg-base-100 flex-shrink-0">
-          <Avatar
-            src={authUser?.profilePic}
-            name={authUser?.fullName}
-            alt={authUser?.fullName || 'You'}
-            size="w-10 h-10"
-            className="flex-shrink-0"
-            loading="lazy"
-          />
-          <input
-            className="input input-bordered flex-1 focus:outline-none focus:ring-2 focus:ring-primary"
-            placeholder="Add a comment..."
-            value={text}
-            onChange={e => setText(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addComment(); } }}
-          />
-          <button
-            className="btn btn-primary"
-            onClick={addComment}
-            disabled={!text.trim()}
-          >
-            Post
-          </button>
-        </div>
+      {/* Comment Input - Fixed at bottom */}
+      <div className="px-6 py-4 border-t border-base-300 flex items-center gap-3 bg-base-100 flex-shrink-0">
+        <Avatar
+          src={authUser?.profilePic}
+          name={authUser?.fullName}
+          alt={authUser?.fullName || 'You'}
+          size="w-10 h-10"
+          className="flex-shrink-0"
+          loading="lazy"
+        />
+        <input
+          className="input input-bordered flex-1 focus:outline-none focus:ring-2 focus:ring-primary"
+          placeholder="Add a comment..."
+          value={text}
+          onChange={e => setText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addComment(); } }}
+        />
+        <button
+          className="btn btn-primary"
+          onClick={addComment}
+          disabled={!text.trim()}
+        >
+          Post
+        </button>
       </div>
     </IOSModal>
-
   );
 }
 
@@ -888,20 +1277,39 @@ function PulseComposer({ onClose }) {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [caption, setCaption] = useState("");
+  const [, setMentions] = useState([]);
   const [audience, setAudience] = useState("public");
+  const [showCaptionImageModal, setShowCaptionImageModal] = useState(false);
 
   const onFile = async (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    
+
     // Silently compress in background (images and videos)
     const { compressFile } = await import('../utils/imageCompression');
     const compressed = await compressFile(f);
-    
+
     const reader = new FileReader();
     reader.onloadend = () => setPreview(reader.result?.toString() || null);
     reader.readAsDataURL(compressed);
     setFile(compressed);
+  };
+
+  const handleCaptionImageGenerate = async (options) => {
+    try {
+      const blob = await generateCaptionImage(options);
+      const reader = new FileReader();
+      reader.readAsDataURL(blob);
+      reader.onloadend = () => {
+        setPreview(reader.result?.toString() || null);
+        setFile(blob);
+        setCaption(options.text);
+        setShowCaptionImageModal(false);
+      };
+    } catch (error) {
+      console.error('Failed to generate caption image:', error);
+      alert('Failed to generate image. Please try again.');
+    }
   };
 
   const onSubmit = async () => {
@@ -917,7 +1325,7 @@ function PulseComposer({ onClose }) {
   return (
     <IOSModal isOpen={true} onClose={onClose} className="max-w-md">
       {/* Header */}
-      <div className="flex items-center justify-between p-6 border-b border-base-300 bg-base-100">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-base-300 bg-base-100 flex-shrink-0">
         <h3 className="font-bold text-lg">Create Pulse</h3>
         <button className="btn btn-sm btn-circle btn-ghost hover:bg-base-200" onClick={onClose}>
           <X className="w-4 h-4" />
@@ -925,17 +1333,26 @@ function PulseComposer({ onClose }) {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+      <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-base-100">
         <div className="form-control">
           <label className="label">
             <span className="label-text">Select media</span>
           </label>
-          <input
-            type="file"
-            accept="image/*,video/*"
-            onChange={onFile}
-            className="file-input file-input-bordered w-full focus:outline-none focus:ring-2 focus:ring-primary"
-          />
+          <div className="flex gap-2">
+            <input
+              type="file"
+              accept="image/*,video/*"
+              onChange={onFile}
+              className="file-input file-input-bordered flex-1 focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            <button
+              className="btn btn-square btn-ghost"
+              onClick={() => setShowCaptionImageModal(true)}
+              title="Create Caption Image"
+            >
+              <Sparkles className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {preview && (
@@ -965,14 +1382,18 @@ function PulseComposer({ onClose }) {
           <label className="label">
             <span className="label-text">Caption (optional)</span>
           </label>
-          <CaptionMaker
-            mode="quick"
-            context="pulse"
-            initialValue={caption}
-            onSave={(captionData) => setCaption(captionData.text)}
-            placeholder="Add a caption..."
-            allowedFormats={['emoji', 'mention', 'hashtag']}
+          <MentionTextarea
+            value={caption}
+            onChange={setCaption}
+            onMentionsChange={setMentions}
+            placeholder="Add a caption... (Type @ to mention)"
+            className="textarea textarea-bordered w-full resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+            rows={3}
+            maxLength={280}
           />
+          <div className="label">
+            <span className="label-text-alt text-base-content/60">{caption.length}/280</span>
+          </div>
         </div>
 
         <div className="form-control">
@@ -991,7 +1412,7 @@ function PulseComposer({ onClose }) {
       </div>
 
       {/* Actions */}
-      <div className="flex justify-end gap-3 p-6 border-t border-base-300 bg-base-100">
+      <div className="flex justify-end gap-3 px-6 py-4 border-t border-base-300 bg-base-100 flex-shrink-0">
         <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
         <button
           className="btn btn-primary"
@@ -1008,6 +1429,15 @@ function PulseComposer({ onClose }) {
           )}
         </button>
       </div>
+
+      {/* Caption Image Modal */}
+      {showCaptionImageModal && (
+        <CaptionImageModal
+          isOpen={showCaptionImageModal}
+          onClose={() => setShowCaptionImageModal(false)}
+          onGenerate={handleCaptionImageGenerate}
+        />
+      )}
     </IOSModal>
   );
 }
@@ -1021,9 +1451,11 @@ export default function PostsView() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPulseOpen, setIsPulseOpen] = useState(false);
+  const [isCaptionImageModalOpen, setIsCaptionImageModalOpen] = useState(false);
   const [files, setFiles] = useState([]); // [{file, preview, type, size, ok, err, readDone}]
   const [title, setTitle] = useState("");
   const [caption, setCaption] = useState("");
+  const [, setPostMentions] = useState([]);
   const [visibility, setVisibility] = useState("public");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
@@ -1035,6 +1467,7 @@ export default function PostsView() {
   const [previewIndex, setPreviewIndex] = useState(0); // which item within post
   const [pulseViewer, setPulseViewer] = useState({ open: false, user: null });
   const [commentsFor, setCommentsFor] = useState(null); // post for comments
+  const [downloadPost, setDownloadPost] = useState(null); // post for download modal
   const [typeFilter] = useState(""); // '', 'images', 'docs'
   const [skip, setSkip] = useState(0);
   const [limit] = useState(30);
@@ -1049,6 +1482,7 @@ export default function PostsView() {
   const sentinelRef = useRef(null);
   const likingRef = useRef(new Set());
   const scrollContainerRef = useRef(null);
+  const hasAutoLoadedRef = useRef(false);
 
   // Preload next posts function - declared early for fastRefresh dependency
   const preloadNextPosts = useCallback(async (nextSkip) => {
@@ -1157,7 +1591,112 @@ export default function PostsView() {
     setIsLoading(false);
   }, []);
 
+  // Filter change with full refresh - moved up for auto-load effect
+  const handleFilterChange = useCallback(async (newScope, path) => {
+    setIsLoading(true);
+    setLoadingProgress(0);
+
+    try {
+      // Quick progress animation
+      const progressInterval = setInterval(() => {
+        setLoadingProgress(prev => Math.min(prev + 15, 85));
+      }, 40);
+
+      // Navigate first
+      navigate(path);
+
+      const params = new URLSearchParams();
+      params.set('limit', String(limit));
+      params.set('skip', '0');
+      if (typeFilter) params.set('type', typeFilter);
+      params.set('scope', newScope);
+
+      const res = await axiosInstance.get(`/api/posts/feed?${params.toString()}`);
+      clearInterval(progressInterval);
+      setLoadingProgress(95);
+
+      // Reset everything
+      setFeed(res.data);
+      setSkip(0);
+      setHasMore(res.data.length === limit);
+
+      // Clear cache and preload next posts
+      setCachedPosts(new Map());
+      if (res.data.length > 0) {
+        preloadNextPosts(limit);
+      }
+
+      // Scroll to top
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+
+      setLoadingProgress(100);
+      setTimeout(() => setLoadingProgress(0), 200);
+    } catch (e) {
+      console.error('Filter change failed:', e);
+      setLoadingProgress(0);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [navigate, limit, typeFilter, preloadNextPosts]);
+
   useEffect(() => { resetAndLoad(); }, [scope, typeFilter, resetAndLoad]);
+
+  // Auto-trigger "All Traks" load every time component mounts or route changes
+  useEffect(() => {
+    // Only auto-load if we're on the 'all' scope and haven't loaded yet
+    if (scope === 'all' && !hasAutoLoadedRef.current && feed.length === 0) {
+      hasAutoLoadedRef.current = true;
+      console.log('🔄 Auto-triggering posts load...');
+
+      // Directly load posts without navigation to avoid loops
+      const loadPosts = async () => {
+        setIsLoading(true);
+        setLoadingProgress(0);
+
+        try {
+          const progressInterval = setInterval(() => {
+            setLoadingProgress(prev => Math.min(prev + 20, 90));
+          }, 50);
+
+          const params = new URLSearchParams();
+          params.set('limit', String(limit));
+          params.set('skip', '0');
+          params.set('scope', 'all');
+
+          console.log('📡 Fetching posts from API...');
+          const res = await axiosInstance.get(`/api/posts/feed?${params.toString()}`);
+          clearInterval(progressInterval);
+
+          console.log('✅ Posts loaded:', res.data.length);
+          setLoadingProgress(95);
+
+          setFeed(res.data);
+          setSkip(0);
+          setHasMore(res.data.length === limit);
+          setCachedPosts(new Map());
+
+          setLoadingProgress(100);
+          setTimeout(() => setLoadingProgress(0), 200);
+        } catch (error) {
+          console.error('❌ Failed to load posts:', error);
+          console.error('Error details:', error.response?.data || error.message);
+          setLoadingProgress(0);
+          setHasMore(false);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      loadPosts();
+    }
+
+    // Reset the ref when component unmounts so it triggers again on next mount
+    return () => {
+      hasAutoLoadedRef.current = false;
+    };
+  }, [scope, feed.length, limit]);
 
 
   // Smart loading with progress and caching
@@ -1217,7 +1756,7 @@ export default function PostsView() {
 
           setTimeout(() => setLoadingProgress(0), 500);
         }
-      } catch (e) {
+      } catch {
         if (!cancelled) {
           setHasMore(false);
           setLoadingProgress(0);
@@ -1265,55 +1804,7 @@ export default function PostsView() {
   }, []);
 
 
-  // Filter change with full refresh
-  const handleFilterChange = useCallback(async (newScope, path) => {
-    setIsLoading(true);
-    setLoadingProgress(0);
-
-    try {
-      // Quick progress animation
-      const progressInterval = setInterval(() => {
-        setLoadingProgress(prev => Math.min(prev + 15, 85));
-      }, 40);
-
-      // Navigate first
-      navigate(path);
-
-      const params = new URLSearchParams();
-      params.set('limit', String(limit));
-      params.set('skip', '0');
-      if (typeFilter) params.set('type', typeFilter);
-      params.set('scope', newScope);
-
-      const res = await axiosInstance.get(`/api/posts/feed?${params.toString()}`);
-      clearInterval(progressInterval);
-      setLoadingProgress(95);
-
-      // Reset everything
-      setFeed(res.data);
-      setSkip(0);
-      setHasMore(res.data.length === limit);
-
-      // Clear cache and preload next posts
-      setCachedPosts(new Map());
-      if (res.data.length > 0) {
-        preloadNextPosts(limit);
-      }
-
-      // Scroll to top
-      if (scrollContainerRef.current) {
-        scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-      }
-
-      setLoadingProgress(100);
-      setTimeout(() => setLoadingProgress(0), 200);
-    } catch (e) {
-      console.error('Filter change failed:', e);
-      setLoadingProgress(0);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [navigate, limit, typeFilter, preloadNextPosts]);
+  // handleFilterChange moved up before auto-load effect
 
   // Subscribe to realtime likes and comments only (no post creation/deletion)
   useEffect(() => {
@@ -1376,6 +1867,40 @@ export default function PostsView() {
     setFiles(prev => [...prev, ...next]);
   }
 
+  async function handleCaptionImageGenerate(options) {
+    try {
+      const blob = await generateCaptionImage(options);
+
+      // Convert blob to base64
+      const reader = new FileReader();
+      reader.readAsDataURL(blob);
+      reader.onloadend = () => {
+        const base64 = reader.result;
+        const filename = `caption-${Date.now()}.png`;
+
+        // Add to files array
+        const newFile = {
+          file: blob,
+          preview: base64,
+          type: 'image/png',
+          size: blob.size,
+          name: filename,
+          ok: true,
+          err: '',
+          readDone: true
+        };
+
+        setFiles(prev => [...prev, newFile]);
+        setCaption(options.text); // Set caption text
+        setIsCaptionImageModalOpen(false);
+        setIsModalOpen(true); // Open post modal
+      };
+    } catch (error) {
+      console.error('Failed to generate caption image:', error);
+      alert('Failed to generate image. Please try again.');
+    }
+  }
+
   async function submitPost() {
     const ready = files.filter(f => f.ok && f.readDone);
     if (!ready.length) return;
@@ -1401,14 +1926,54 @@ export default function PostsView() {
     }
   }
 
+  const [deleteConfirm, setDeleteConfirm] = useState(null); // {postId, postTitle}
+  const [editingPost, setEditingPost] = useState(null); // post object being edited
+
   async function deletePost(id) {
-    if (!confirm('Delete this post?')) return;
     try {
       await axiosInstance.delete(`/api/posts/${id}`);
       setFeed(arr => arr.filter(p => p._id !== id));
+      setDeleteConfirm(null);
     } catch (e) {
       alert(e?.response?.data?.message || 'Delete failed');
     }
+  }
+
+  async function updatePost() {
+    if (!editingPost) return;
+    setIsUploading(true);
+    try {
+      const ready = files.filter(f => f.ok && f.readDone);
+      const items = ready.map(it => ({ base64: it.preview, filename: it.name }));
+
+      const res = await axiosInstance.put(`/api/posts/${editingPost._id}`, {
+        title,
+        caption,
+        visibility,
+        items: items.length > 0 ? items : undefined
+      });
+
+      setFeed(prev => prev.map(p => p._id === editingPost._id ? res.data : p));
+      setEditingPost(null);
+      setFiles([]);
+      setTitle('');
+      setCaption('');
+      setVisibility('members');
+      setUploadProgress(0);
+    } catch (e) {
+      alert(e?.response?.data?.message || 'Failed to update post');
+    } finally {
+      setIsUploading(false);
+    }
+  }
+
+  function startEditPost(post) {
+    setEditingPost(post);
+    setTitle(post.title || '');
+    setCaption(post.caption || '');
+    setVisibility(post.visibility || 'members');
+    setFiles([]);
+    setIsModalOpen(true);
   }
 
   async function toggleLike(post) {
@@ -1421,7 +1986,7 @@ export default function PostsView() {
       const res = await axiosInstance.post(`/api/posts/${id}/like`);
       const { liked, likesCount } = res.data || {};
       setFeed(prev => prev.map(p => p._id === id ? { ...p, likedByMe: liked ?? p.likedByMe, likesCount: typeof likesCount === 'number' ? likesCount : p.likesCount } : p));
-    } catch (e) {
+    } catch {
       // revert on error
       setFeed(prev => prev.map(p => p._id === id ? { ...p, likedByMe: !p.likedByMe, likesCount: Math.max(0, (p.likesCount || 0) + (p.likedByMe ? 1 : -1)) } : p));
     } finally {
@@ -1457,7 +2022,13 @@ export default function PostsView() {
           </div>
         </div>
         <div className="flex-1 flex items-center justify-center">
-          <div className="cassisiacum-logo text-xl text-base-content">Cassisiacum</div>
+          <button
+            className="cassisiacum-logo text-xl text-base-content hover:text-primary transition-colors cursor-pointer"
+            onClick={fastRefresh}
+            title="Click to refresh feed"
+          >
+            Cassisiacum
+          </button>
         </div>
         <div className="flex items-center gap-2">
           {/* Desktop search bar */}
@@ -1475,6 +2046,13 @@ export default function PostsView() {
             <Search className="w-4 h-4" />
           </button>
 
+          <button
+            className="btn btn-sm btn-ghost"
+            onClick={() => setIsCaptionImageModalOpen(true)}
+            title="Create Caption Image"
+          >
+            <Sparkles className="w-4 h-4" />
+          </button>
           <button className="btn btn-sm btn-primary" onClick={() => setIsModalOpen(true)}><Plus className="w-4 h-4 mr-1" />New Post</button>
         </div>
       </div>
@@ -1571,61 +2149,22 @@ export default function PostsView() {
         )}
         <div className="grid grid-cols-1 gap-5 max-w-xl mx-auto">
           {filtered.map(post => (
-            <div key={post._id} className="bg-base-100 rounded-none border border-base-300 overflow-hidden flex flex-col">
-              <button className="aspect-square bg-base-200 flex items-center justify-center overflow-hidden" onClick={() => { setPreviewPost(post); setPreviewIndex(0); }}>
-                {post.items?.[0]?.contentType?.startsWith('image/') ? (
-                  <img loading="lazy" src={post.items[0].url} alt={post.title || 'Post'} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="text-base-content/60 flex flex-col items-center">
-                    <FileIcon className="w-12 h-12" />
-                    <div className="text-xs mt-1">{post.items?.[0]?.filename || 'Document'}</div>
-                  </div>
-                )}
-              </button>
-              <div className="p-3 flex-1 flex flex-col">
-                <div className="flex items-center gap-2 mb-2">
-                  <Avatar
-                    src={post.postedBy?.profilePic}
-                    name={post.postedBy?.fullName}
-                    alt={post.postedBy?.fullName || 'User'}
-                    size="w-8 h-8"
-                    textSize="text-xs"
-                    loading="lazy"
-                  />
-                  <div className="text-sm font-medium truncate">{post.postedBy?.fullName || 'User'}</div>
-                  <FollowButton userId={post.postedBy?._id} size="xs" className="ml-2" onFollowChange={() => {
-                    // Refresh posts to update follower counts
-                    setTimeout(() => {
-                      window.dispatchEvent(new CustomEvent('postsAutoRefresh'));
-                    }, 1000);
-                  }} />
-                  <div className="ml-auto text-xs text-base-content/60">{new Date(post.createdAt).toLocaleString([], { month: 'short', day: 'numeric' })}</div>
-                </div>
-                <div className="font-medium truncate">{post.title || 'Untitled'}</div>
-                <div className="text-sm text-base-content/70 line-clamp-2">{post.caption}</div>
-                <div className="mt-auto pt-2 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <button className={`btn btn-sm btn-ghost rounded-none ${post.likedByMe ? 'text-primary' : ''}`} title="Like" aria-label="Like" onClick={() => toggleLike(post)}>
-                      <Heart className="w-4 h-4" />
-                      {typeof post.likesCount === 'number' && <span className="ml-1 text-xs">{post.likesCount}</span>}
-                    </button>
-                    <button className="btn btn-sm btn-ghost rounded-none" title="Comments" aria-label="Comments" onClick={() => setCommentsFor(post)}>
-                      <MessageCircle className="w-4 h-4" />
-                      {typeof post.commentsCount === 'number' && <span className="ml-1 text-xs">{post.commentsCount}</span>}
-                    </button>
-                    <button className="btn btn-sm btn-ghost rounded-none" title="Preview" aria-label="Preview" onClick={() => { setPreviewPost(post); setPreviewIndex(0); }}>
-                      <Eye className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <a className="btn btn-sm btn-ghost rounded-none" title="Download" aria-label="Download" href={post.items?.[0]?.url} download target="_blank" rel="noreferrer"><Download className="w-4 h-4" /></a>
-                    {((post.postedBy?._id || post.postedBy) === authUser?._id || authUser?.role === 'admin') && (
-                      <button className="btn btn-sm btn-error rounded-none" title="Delete" aria-label="Delete" onClick={() => deletePost(post._id)}><Trash2 className="w-4 h-4" /></button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
+            <PostCard
+              key={post._id}
+              post={post}
+              authUser={authUser}
+              onPreview={(p, index) => { setPreviewPost(p); setPreviewIndex(index); }}
+              onLike={toggleLike}
+              onComment={setCommentsFor}
+              onDownload={setDownloadPost}
+              onEdit={startEditPost}
+              onDelete={(p) => setDeleteConfirm({ postId: p._id, postTitle: p.title || 'this post' })}
+              onFollowChange={() => {
+                setTimeout(() => {
+                  window.dispatchEvent(new CustomEvent('postsAutoRefresh'));
+                }, 1000);
+              }}
+            />
           ))}
         </div>
         {/* Infinite scroll sentinel */}
@@ -1689,19 +2228,39 @@ export default function PostsView() {
         document.body
       )}
 
-      {/* Modal for creating a post */}
+      {/* Download Modal */}
+      {downloadPost && createPortal(
+        <DownloadModal
+          isOpen={!!downloadPost}
+          onClose={() => setDownloadPost(null)}
+          post={downloadPost}
+        />,
+        document.body
+      )}
+
+      {/* Caption Image Modal */}
+      {isCaptionImageModalOpen && createPortal(
+        <CaptionImageModal
+          isOpen={isCaptionImageModalOpen}
+          onClose={() => setIsCaptionImageModalOpen(false)}
+          onGenerate={handleCaptionImageGenerate}
+        />,
+        document.body
+      )}
+
+      {/* Modal for creating/editing a post */}
       {isModalOpen && (
-        <IOSModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} className="max-w-xl">
+        <IOSModal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); setEditingPost(null); }} className="max-w-xl">
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-base-300 bg-base-100">
-            <h3 className="font-bold text-lg">Create Trak</h3>
-            <button className="btn btn-sm btn-circle btn-ghost hover:bg-base-200" onClick={() => setIsModalOpen(false)}>
+          <div className="flex items-center justify-between px-6 py-4 border-b border-base-300 bg-base-100 flex-shrink-0">
+            <h3 className="font-bold text-lg">{editingPost ? 'Edit Trak' : 'Create Trak'}</h3>
+            <button className="btn btn-sm btn-circle btn-ghost hover:bg-base-200" onClick={() => { setIsModalOpen(false); setEditingPost(null); }}>
               <X className="w-4 h-4" />
             </button>
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-base-100">
             <div className="form-control">
               <label className="label">
                 <span className="label-text">Title (optional)</span>
@@ -1716,14 +2275,15 @@ export default function PostsView() {
 
             <div className="form-control">
               <label className="label">
-                <span className="label-text">Caption</span>
+                <span className="label-text">Caption (Type @ to mention)</span>
               </label>
-              <textarea
+              <MentionTextarea
+                value={caption}
+                onChange={setCaption}
+                onMentionsChange={setPostMentions}
+                placeholder="Say something... (Type @ to mention)"
                 className="textarea textarea-bordered w-full focus:outline-none focus:ring-2 focus:ring-primary"
                 rows={3}
-                placeholder="Say something..."
-                value={caption}
-                onChange={e => setCaption(e.target.value)}
               />
             </div>
 
@@ -1752,13 +2312,22 @@ export default function PostsView() {
               </label>
               <div className="rounded-xl border border-dashed border-base-300 bg-base-200/50 p-4 text-center hover:bg-base-200/70 transition-colors">
                 <div className="mb-2 text-base-content/80">Drag & drop files here</div>
-                <input
-                  type="file"
-                  multiple
-                  onChange={onBrowse}
-                  className="file-input file-input-bordered w-full"
-                  accept={Array.from(ALLOWED_TYPES).join(',')}
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="file"
+                    multiple
+                    onChange={onBrowse}
+                    className="file-input file-input-bordered flex-1"
+                    accept={Array.from(ALLOWED_TYPES).join(',')}
+                  />
+                  <button
+                    className="btn btn-square btn-ghost"
+                    onClick={() => setIsCaptionImageModalOpen(true)}
+                    title="Create Caption Image"
+                  >
+                    <Sparkles className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1796,24 +2365,54 @@ export default function PostsView() {
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 p-6 border-t border-base-300 bg-base-100">
-            <button className="btn btn-ghost" onClick={() => setIsModalOpen(false)}>Cancel</button>
+          <div className="flex justify-end gap-3 px-6 py-4 border-t border-base-300 bg-base-100 flex-shrink-0">
+            <button className="btn btn-ghost" onClick={() => { setIsModalOpen(false); setEditingPost(null); }}>Cancel</button>
             <button
               className="btn btn-primary"
-              onClick={submitPost}
-              disabled={isUploading || files.filter(f => f.ok && f.readDone).length === 0}
+              onClick={editingPost ? updatePost : submitPost}
+              disabled={isUploading || (!editingPost && files.filter(f => f.ok && f.readDone).length === 0)}
             >
               {isUploading ? (
                 <>
                   <span className="loading loading-spinner loading-sm"></span>
-                  Publishing...
+                  {editingPost ? 'Updating...' : 'Publishing...'}
                 </>
               ) : (
-                "Publish Trak"
+                editingPost ? 'Update Trak' : 'Publish Trak'
               )}
             </button>
           </div>
         </IOSModal>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && createPortal(
+        <IOSModal isOpen={true} onClose={() => setDeleteConfirm(null)} className="max-w-md">
+          {/* Header */}
+          <div className="px-6 py-4 border-b border-base-300 bg-base-100 flex-shrink-0">
+            <h3 className="font-bold text-lg">Delete Post?</h3>
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto p-6 bg-base-100">
+            <p className="text-base-content/70">
+              Are you sure you want to delete "{deleteConfirm.postTitle}"? This action cannot be undone.
+            </p>
+          </div>
+
+          {/* Actions */}
+          <div className="flex justify-end gap-3 px-6 py-4 border-t border-base-300 bg-base-100 flex-shrink-0">
+            <button className="btn btn-ghost" onClick={() => setDeleteConfirm(null)}>Cancel</button>
+            <button
+              className="btn btn-error"
+              onClick={() => deletePost(deleteConfirm.postId)}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete
+            </button>
+          </div>
+        </IOSModal>,
+        document.body
       )}
     </div>
   );

@@ -9,7 +9,8 @@ import {
   googleAuth,
   sendOTP,
   verifyOTPCode,
-  checkVerificationStatus
+  checkVerificationStatus,
+  checkUserExists
 } from "../controllers/auth.controller.js";
 import { protectRoute } from "../middleware/auth.middleware.js";
 import { arcjetProtection } from "../middleware/arcjet.middleware.js";
@@ -40,6 +41,7 @@ router.post("/signup", upload.single('profilePic'), signup);
 router.post("/login", login);
 router.post("/logout", logout);
 router.post("/google", googleAuth); // Google OAuth route
+router.post("/check-user", checkUserExists); // Check if user exists
 
 router.put("/update-profile", protectRoute, updateProfile);
 router.post("/upload-background", protectRoute, uploadBackground);

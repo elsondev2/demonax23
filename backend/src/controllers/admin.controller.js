@@ -203,6 +203,7 @@ export const updateUser = async (req, res) => {
     await user.save();
     res.json({ message: 'Updated', user });
     cacheInvalidate('admin:');
+    cacheInvalidate(`user:${id}`); // Invalidate user cache
   } catch (e) {
     res.status(500).json({ message: "Failed to update user" });
   }
@@ -213,7 +214,102 @@ export const deleteUser = async (req, res) => {
     const { id } = req.params;
     const user = await User.findByIdAndDelete(id);
     if (!user) return res.status(404).json({ message: "User not found" });
-    
+    cacheInvalidate(`user:${id}`); // Invalidate user cache
+
+    // Remove user from all groups
+    try {
+      const updatedGroups = await Group.updateMany(
+        { members: id },
+        { $pull: { members: id } }
+      );
+      console.log(`Removed user ${id} from ${updatedGroups.modifiedCount} groups`);
+
+      // Remove admin role from groups where user was admin
+      const groupsWhereAdmin = await Group.find({ admin: id });
+      for (const group of groupsWhereAdmin) {
+        // Assign admin to first remaining member or delete group if no members left
+        if (group.members.length > 0) {
+          group.admin = group.members[0];
+          await group.save();
+          console.log(`Transferred admin of group ${group._id} to ${group.members[0]}`);
+        } else {
+          await Group.findByIdAndDelete(group._id);
+          console.log(`Deleted empty group ${group._id}`);
+        }
+      }
+    } catch (groupErr) {
+      console.error('Failed to remove user from groups:', groupErr);
+    }
+
+    // Mark user's messages as deleted user and remove media immediately
+    try {
+      // Get all messages with media to delete from storage
+      const messagesWithMedia = await Message.find({
+        senderId: id,
+        $or: [
+          { image: { $exists: true, $ne: "" } },
+          { "attachments.0": { $exists: true } },
+          { "audio.url": { $exists: true, $ne: "" } }
+        ]
+      });
+
+      // Delete media from storage
+      for (const msg of messagesWithMedia) {
+        // Delete image
+        if (msg.imageStorageKey) {
+          try {
+            await removeFromSupabase(msg.imageStorageKey);
+            console.log(`Deleted image: ${msg.imageStorageKey}`);
+          } catch (err) {
+            console.error(`Failed to delete image ${msg.imageStorageKey}:`, err);
+          }
+        }
+
+        // Delete attachments
+        if (msg.attachments && msg.attachments.length > 0) {
+          for (const att of msg.attachments) {
+            if (att.storageKey) {
+              try {
+                await removeFromSupabase(att.storageKey);
+                console.log(`Deleted attachment: ${att.storageKey}`);
+              } catch (err) {
+                console.error(`Failed to delete attachment ${att.storageKey}:`, err);
+              }
+            }
+          }
+        }
+
+        // Delete audio
+        if (msg.audio?.storageKey) {
+          try {
+            await removeFromSupabase(msg.audio.storageKey);
+            console.log(`Deleted audio: ${msg.audio.storageKey}`);
+          } catch (err) {
+            console.error(`Failed to delete audio ${msg.audio.storageKey}:`, err);
+          }
+        }
+      }
+
+      // Update messages to mark sender as deleted and remove media references
+      const updatedMessages = await Message.updateMany(
+        { senderId: id },
+        {
+          $set: {
+            senderDeleted: true,
+            senderDeletedAt: new Date(),
+            image: "",
+            imageStorageKey: "",
+            attachments: [],
+            audio: null
+          }
+        }
+      );
+      console.log(`Marked ${updatedMessages.modifiedCount} messages as from deleted user ${id}`);
+      console.log(`Removed media from ${messagesWithMedia.length} messages`);
+    } catch (messageErr) {
+      console.error('Failed to mark user messages:', messageErr);
+    }
+
     // Delete all posts created by this user
     try {
       const Post = (await import('../models/Post.js')).default;
@@ -222,7 +318,7 @@ export const deleteUser = async (req, res) => {
     } catch (postErr) {
       console.error('Failed to delete user posts:', postErr);
     }
-    
+
     // Delete all statuses created by this user
     try {
       const Status = (await import('../models/Status.js')).default;
@@ -231,10 +327,11 @@ export const deleteUser = async (req, res) => {
     } catch (statusErr) {
       console.error('Failed to delete user statuses:', statusErr);
     }
-    
+
     res.json({ message: 'User deleted successfully' });
     cacheInvalidate('admin:');
   } catch (e) {
+    console.error('Error deleting user:', e);
     res.status(500).json({ message: "Failed to delete user" });
   }
 };
@@ -319,14 +416,30 @@ export const deleteGroup = async (req, res) => {
 export const updateGroup = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description } = req.body;
+    const { name, description, admin } = req.body;
     const group = await Group.findById(id);
     if (!group) return res.status(404).json({ message: "Group not found" });
+
     if (typeof name === 'string') group.name = name;
     if (typeof description === 'string') group.description = description;
+
+    // Handle admin change
+    if (admin) {
+      // Verify new admin is a member of the group
+      const isMember = group.members.some(m => m.toString() === admin.toString());
+      if (!isMember) {
+        return res.status(400).json({ message: "New admin must be a member of the group" });
+      }
+      group.admin = admin;
+      console.log(`Admin changed for group ${id} to ${admin}`);
+    }
+
     await group.save();
+    await group.populate('members admin', 'fullName profilePic');
     res.json({ message: 'Group updated', group });
+    cacheInvalidate('admin:');
   } catch (e) {
+    console.error('Error updating group:', e);
     res.status(500).json({ message: "Failed to update group" });
   }
 };
@@ -367,7 +480,7 @@ export const listConversations = async (req, res) => {
         }
       },
       { $sort: { createdAt: -1 } },
-      { $group: { _id: "$participants", lastMessage: { $first: "$$ROOT" } } },
+      { $group: { _id: "$participants", lastMessage: { $first: "$$ROOT" }, count: { $sum: 1 } } },
       { $skip: parseInt(skip) },
       { $limit: parseInt(limit) },
       { $lookup: { from: "users", localField: "lastMessage.senderId", foreignField: "_id", as: "sender" } },
@@ -378,6 +491,7 @@ export const listConversations = async (req, res) => {
         $project: {
           participants: "$_id",
           lastMessage: 1,
+          count: 1,
           sender: { _id: "$sender._id", fullName: "$sender.fullName", email: "$sender.email", profilePic: "$sender.profilePic" },
           receiver: { _id: "$receiver._id", fullName: "$receiver.fullName", email: "$receiver.email", profilePic: "$receiver.profilePic" }
         }
@@ -748,6 +862,81 @@ export const deleteComment = async (req, res) => {
   }
 };
 
+// Cleanup old deleted user messages (120 days)
+export const cleanupDeletedUserMessages = async (req, res) => {
+  try {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - 120); // 120 days ago
+
+    // Find messages from deleted users older than 120 days
+    const oldDeletedMessages = await Message.find({
+      senderDeleted: true,
+      senderDeletedAt: { $lt: cutoffDate }
+    });
+
+    console.log(`Found ${oldDeletedMessages.length} messages to clean up`);
+
+    // Replace text content with placeholder
+    const result = await Message.updateMany(
+      {
+        senderDeleted: true,
+        senderDeletedAt: { $lt: cutoffDate }
+      },
+      {
+        $set: {
+          text: "[Message unavailable]",
+          quotedMessage: null,
+          // Ensure media is removed (in case it wasn't)
+          image: "",
+          imageStorageKey: "",
+          attachments: [],
+          audio: null
+        }
+      }
+    );
+
+    console.log(`Cleaned up ${result.modifiedCount} old deleted user messages`);
+
+    res.json({
+      message: 'Cleanup completed successfully',
+      messagesFound: oldDeletedMessages.length,
+      messagesCleaned: result.modifiedCount,
+      cutoffDate: cutoffDate.toISOString()
+    });
+
+    cacheInvalidate('admin:');
+  } catch (e) {
+    console.error('Error cleaning up deleted user messages:', e);
+    res.status(500).json({ message: "Failed to cleanup messages" });
+  }
+};
+
+// Get cleanup statistics
+export const getCleanupStats = async (req, res) => {
+  try {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - 120);
+
+    const stats = {
+      totalDeletedUserMessages: await Message.countDocuments({ senderDeleted: true }),
+      messagesReadyForCleanup: await Message.countDocuments({
+        senderDeleted: true,
+        senderDeletedAt: { $lt: cutoffDate }
+      }),
+      messagesWithinGracePeriod: await Message.countDocuments({
+        senderDeleted: true,
+        senderDeletedAt: { $gte: cutoffDate }
+      }),
+      cutoffDate: cutoffDate.toISOString()
+    };
+
+    res.json(stats);
+  } catch (e) {
+    console.error('Error getting cleanup stats:', e);
+    res.status(500).json({ message: "Failed to get cleanup stats" });
+  }
+};
+
 export const deleteReply = async (req, res) => {
   try {
     const { postId, commentId, replyId } = req.params;
@@ -788,7 +977,7 @@ export const listCommunityGroups = async (req, res) => {
       .populate('createdBy', 'fullName email profilePic')
       .populate('members', 'fullName email profilePic')
       .sort({ createdAt: -1 });
-    
+
     res.json(groups);
   } catch (e) {
     console.error('Error listing community groups:', e);
@@ -799,17 +988,17 @@ export const listCommunityGroups = async (req, res) => {
 export const createCommunityGroup = async (req, res) => {
   try {
     const { name, description, groupPic } = req.body;
-    
+
     if (!name || !name.trim()) {
       return res.status(400).json({ message: "Group name is required" });
     }
 
     // Check if community group with same name exists
-    const existingGroup = await Group.findOne({ 
-      name: name.trim(), 
-      isCommunity: true 
+    const existingGroup = await Group.findOne({
+      name: name.trim(),
+      isCommunity: true
     });
-    
+
     if (existingGroup) {
       return res.status(400).json({ message: "A community group with this name already exists" });
     }
@@ -840,7 +1029,7 @@ export const updateCommunityGroup = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, description, groupPic } = req.body;
-    
+
     const group = await Group.findOne({ _id: id, isCommunity: true });
     if (!group) {
       return res.status(404).json({ message: "Community group not found" });
@@ -848,12 +1037,12 @@ export const updateCommunityGroup = async (req, res) => {
 
     // Check if name is being changed and if it conflicts with another community group
     if (name && name.trim() !== group.name) {
-      const existingGroup = await Group.findOne({ 
-        name: name.trim(), 
+      const existingGroup = await Group.findOne({
+        name: name.trim(),
         isCommunity: true,
         _id: { $ne: id }
       });
-      
+
       if (existingGroup) {
         return res.status(400).json({ message: "A community group with this name already exists" });
       }
@@ -883,7 +1072,7 @@ export const updateCommunityGroup = async (req, res) => {
 export const deleteCommunityGroup = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const group = await Group.findOne({ _id: id, isCommunity: true });
     if (!group) {
       return res.status(404).json({ message: "Community group not found" });
@@ -916,7 +1105,7 @@ export const deleteCommunityGroup = async (req, res) => {
 export const getFollowLeaderboard = async (req, res) => {
   try {
     const { limit = 50 } = req.query;
-    
+
     // Get users sorted by follower count
     const users = await User.find({})
       .select('fullName email username profilePic followers following')

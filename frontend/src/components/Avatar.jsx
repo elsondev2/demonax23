@@ -11,22 +11,39 @@ function Avatar({
   onClick,
   showOnlineStatus = false,
   isOnline = false,
-  loading = 'lazy'
+  loading = 'eager' // Changed default to 'eager' for instant loading
 }) {
   const [imageError, setImageError] = useState(false);
-  const [, setImageLoaded] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [currentSrc, setCurrentSrc] = useState(src);
 
   // Preload image when src changes
   useEffect(() => {
-    if (src && src !== '/avatar.png') {
-      setImageLoaded(false);
-      setImageError(false);
+    // Only reset if src actually changed
+    if (src !== currentSrc) {
+      setCurrentSrc(src);
       
-      imageCache.preload(src)
-        .then(() => setImageLoaded(true))
-        .catch(() => setImageError(true));
+      if (src && src !== '/avatar.png') {
+        // Check if already cached for instant display (no flicker)
+        if (imageCache.isCached(src)) {
+          setImageLoaded(true);
+          setImageError(false);
+        } else {
+          // Only reset loaded state if not cached
+          setImageLoaded(false);
+          setImageError(false);
+          
+          // Preload if not cached
+          imageCache.preload(src)
+            .then(() => setImageLoaded(true))
+            .catch(() => setImageError(true));
+        }
+      } else {
+        setImageLoaded(false);
+        setImageError(false);
+      }
     }
-  }, [src]);
+  }, [src, currentSrc]);
 
   // Generate initials from name
   const getInitials = (fullName) => {
@@ -89,9 +106,14 @@ function Avatar({
           <img
             src={src}
             alt={alt || name || 'Avatar'}
-            className="w-full h-full object-cover"
+            className={`w-full h-full object-cover transition-opacity duration-200 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
             loading={loading}
+            onLoad={() => setImageLoaded(true)}
             onError={() => setImageError(true)}
+            style={{ 
+              // Force browser to cache the image
+              imageRendering: 'auto'
+            }}
           />
         ) : (
           <span className={`font-semibold ${textSize}`} style={{

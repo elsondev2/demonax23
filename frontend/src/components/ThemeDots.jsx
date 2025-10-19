@@ -37,7 +37,7 @@ const THEME_ICONS = [
 ];
 
 function ThemeIcons({ className = "" }) {
-    const { currentTheme, setTheme } = useThemeStore();
+    const { currentTheme, setTheme, isChangingTheme } = useThemeStore();
     const [hoveredTheme, setHoveredTheme] = useState(null);
 
     const handleThemeChange = (themeName) => {
@@ -45,8 +45,16 @@ function ThemeIcons({ className = "" }) {
     };
 
     return (
-        <div className={`flex items-center justify-center gap-3 ${className}`}>
-            <span className="text-xs text-base-content/50 mr-2">Themes:</span>
+        <div className={`flex flex-col gap-2 ${className}`}>
+            {/* Progress bar */}
+            {isChangingTheme && (
+                <div className="w-full h-1 bg-base-300 rounded-full overflow-hidden">
+                    <div className="h-full bg-primary animate-pulse" style={{ width: '100%', animation: 'pulse 0.75s ease-in-out' }} />
+                </div>
+            )}
+            
+            <div className="flex items-center justify-center gap-3">
+                <span className="text-xs text-base-content/50 mr-2">Themes:</span>
             <div className="flex items-center gap-2">
                 {THEME_ICONS.map((theme) => {
                     const isActive = currentTheme === theme.name;
@@ -98,6 +106,7 @@ function ThemeIcons({ className = "" }) {
                         </button>
                     );
                 })}
+            </div>
             </div>
         </div>
     );

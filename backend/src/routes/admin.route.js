@@ -29,7 +29,9 @@ import {
   createCommunityGroup,
   updateCommunityGroup,
   deleteCommunityGroup,
-  getFollowLeaderboard
+  getFollowLeaderboard,
+  cleanupDeletedUserMessages,
+  getCleanupStats
 } from "../controllers/admin.controller.js";
 
 const router = express.Router();
@@ -81,5 +83,9 @@ router.delete("/community-groups/:id", protectRoute, requireAdmin, deleteCommuni
 
 // Follow Leaderboard
 router.get("/follow-leaderboard", protectRoute, requireAdmin, getFollowLeaderboard);
+
+// Cleanup Management
+router.get("/cleanup/stats", protectRoute, requireAdmin, getCleanupStats);
+router.post("/cleanup/deleted-messages", protectRoute, requireAdmin, cleanupDeletedUserMessages);
 
 export default router;

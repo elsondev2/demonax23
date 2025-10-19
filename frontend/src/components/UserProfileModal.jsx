@@ -52,7 +52,7 @@ function UserProfileModal({ user, isOpen, onClose }) {
   };
 
   return (
-    <IOSModal isOpen={isOpen} onClose={onClose}>
+    <IOSModal isOpen={isOpen} onClose={onClose} className="max-w-2xl">
       <div className="flex flex-col h-full">
         {/* Enhanced Header with gradient and status indicator */}
         <div className="relative bg-gradient-to-br from-primary/10 via-secondary/5 to-accent/10 p-6 pb-24">

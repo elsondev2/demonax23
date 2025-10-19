@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import { ENV } from "../lib/env.js";
+import { cacheWrap } from "../lib/cache.js";
 
 export const socketAuthMiddleware = async (socket, next) => {
   try {
@@ -46,8 +47,13 @@ export const socketAuthMiddleware = async (socket, next) => {
       return next(new Error("Unauthorized - Invalid Token"));
     }
 
-    // find the user from db
-    const user = await User.findById(decoded.userId).select("-password");
+    // find the user from db (with caching)
+    const user = await cacheWrap(
+      `user:${decoded.userId}`,
+      300000,
+      async () => await User.findById(decoded.userId).select("-password")
+    );
+    
     if (!user) {
       console.log("Socket connection rejected: User not found");
       return next(new Error("User not found"));

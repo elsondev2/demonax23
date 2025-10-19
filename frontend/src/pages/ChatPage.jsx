@@ -1,7 +1,7 @@
 import { useChatStore } from "../store/useChatStore";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useAuthStore } from "../store/useAuthStore";
-import { useNavigate, useLocation } from "react-router";
+import { useNavigate, useLocation, useParams } from "react-router";
 
 import BorderAnimatedContainer from "../components/BorderAnimatedContainer";
 import SwipeableViews from "../components/SwipeableViews";
@@ -20,7 +20,7 @@ import { useCallStore } from "../store/useCallStore";
 
 
 function ChatPage() {
-  const { selectedUser, selectedGroup, getMyChatPartners } = useChatStore();
+  const { selectedUser, selectedGroup, getMyChatPartners, setSelectedUser, setSelectedGroup, chats } = useChatStore();
   const { socket, connectSocket, authUser, isConnecting } = useAuthStore();
   const { showTour, completeTour, skipTour } = useWelcomeTour();
   const [manualTourOpen, setManualTourOpen] = useState(false);
@@ -28,6 +28,8 @@ function ChatPage() {
 
   const navigate = useNavigate();
   const location = useLocation();
+  const { userId, groupId } = useParams();
+  const [isAuthorizationChecked, setIsAuthorizationChecked] = useState(false);
 
   const isPostsRoute = location.pathname === '/posts' || location.pathname === '/posts/public' || location.pathname === '/posts/mine';
   const isNoticesRoute = location.pathname === '/notices';
@@ -156,14 +158,67 @@ function ChatPage() {
     };
   }, [isMobile]);
 
-  // Also watch selectedUser/Group to switch to Chat view and route; update lastRight
+  // Handle URL params to select chat with authorization check
+  useEffect(() => {
+    // Wait for chats to load before checking authorization
+    if (chats.length === 0) {
+      setIsAuthorizationChecked(false);
+      return;
+    }
+
+    if (userId) {
+      // Check if user is authorized to access this chat
+      const chat = chats.find(c => !c.isGroup && c._id === userId);
+      if (chat) {
+        // User has access to this chat
+        setSelectedUser(chat);
+        setIsAuthorizationChecked(true);
+      } else {
+        // Unauthorized or chat doesn't exist - redirect to /chat
+        console.warn('⛔ Unauthorized access attempt to user chat:', userId);
+        console.warn('Available chats:', chats.map(c => ({ id: c._id, isGroup: c.isGroup })));
+        navigate('/chat', { replace: true });
+        setIsAuthorizationChecked(true);
+      }
+    } else if (groupId) {
+      // Check if user is authorized to access this group
+      const chat = chats.find(c => c.isGroup && c._id === groupId);
+      if (chat) {
+        // User is a member of this group
+        setSelectedGroup(chat);
+        setIsAuthorizationChecked(true);
+      } else {
+        // Unauthorized or group doesn't exist - redirect to /chat
+        console.warn('⛔ Unauthorized access attempt to group chat:', groupId);
+        console.warn('Available groups:', chats.filter(c => c.isGroup).map(c => c._id));
+        navigate('/chat', { replace: true });
+        setIsAuthorizationChecked(true);
+      }
+    } else {
+      // No specific chat in URL
+      setIsAuthorizationChecked(true);
+    }
+  }, [userId, groupId, chats, setSelectedUser, setSelectedGroup, navigate]);
+
+  // Also watch selectedUser/Group to switch to Chat view and update URL
   useEffect(() => {
     if (selectedUser || selectedGroup) {
       setLastRightView(1);
-      if (isFeatureRoute) navigate('/', { replace: true });
+      // Only navigate away from feature routes if user explicitly selected a chat
+      // Don't auto-navigate when just visiting feature routes
       if (isMobile) setCurrentViewIndex(1);
+
+      // Update URL to match selected chat
+      if (selectedUser && location.pathname !== `/chat/user/${selectedUser._id}`) {
+        navigate(`/chat/user/${selectedUser._id}`, { replace: true });
+      } else if (selectedGroup && location.pathname !== `/chat/group/${selectedGroup._id}`) {
+        navigate(`/chat/group/${selectedGroup._id}`, { replace: true });
+      }
+    } else if (!userId && !groupId && !isFeatureRoute && location.pathname !== '/chat') {
+      // No chat selected and not on a feature route, go back to /chat
+      navigate('/chat', { replace: true });
     }
-  }, [selectedUser, selectedGroup, isMobile, isFeatureRoute, navigate]);
+  }, [selectedUser, selectedGroup, isMobile, isFeatureRoute, navigate, location.pathname, userId, groupId]);
 
   // Handle direct switch to feature views in mobile
   useEffect(() => {
@@ -218,6 +273,18 @@ function ChatPage() {
     console.log('🔍 ChatPage.jsx Debug - Current mobile state:', isMobile);
     console.log('🔍 ChatPage.jsx Debug - Current view index:', currentViewIndex);
   });
+
+  // Show loading while checking authorization for URL-based chat access
+  if ((userId || groupId) && !isAuthorizationChecked) {
+    return (
+      <div className="w-full h-screen flex items-center justify-center bg-base-100">
+        <div className="flex flex-col items-center gap-4">
+          <span className="loading loading-spinner loading-lg text-primary"></span>
+          <p className="text-base-content/70">Verifying access...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full h-screen md:h-screen">

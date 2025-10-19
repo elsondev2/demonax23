@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
+import { Sparkles } from "lucide-react";
 import useStatusStore from "../store/useStatusStore";
 import { useAuthStore } from "../store/useAuthStore";
 import Avatar from "./Avatar";
 import CaptionMaker from "./caption/CaptionMaker";
+import CaptionImageModal from "./CaptionImageModal";
+import { generateCaptionImage } from "../utils/captionImageGenerator";
 
 function StatusAvatar({ user, onClick }) {
   const name = user?.fullName || user?.name || 'User';
   const image = user?.profilePic || user?.groupPic;
-  
+
   return (
     <button onClick={onClick} className="flex flex-col items-center gap-1">
       <Avatar
@@ -84,7 +87,7 @@ export default function StatusTab() {
 
       <StatusComposerModal open={composerOpen} onClose={() => setComposerOpen(false)} />
       {viewer.open && (
-        <StatusViewerModal userId={viewer.userId} user={grouped.find(g=>g.userId===viewer.userId)?.user} onClose={() => setViewer({ open: false, userId: null })} />
+        <StatusViewerModal userId={viewer.userId} user={grouped.find(g => g.userId === viewer.userId)?.user} onClose={() => setViewer({ open: false, userId: null })} />
       )}
     </div>
   );
@@ -96,20 +99,35 @@ function StatusComposerModal({ open, onClose }) {
   const [preview, setPreview] = useState(null);
   const [caption, setCaption] = useState("");
   const [audience, setAudience] = useState("contacts");
-  const [bgAudioPreview, setBgAudioPreview] = useState(null);
-  const [bgAudioBase64, setBgAudioBase64] = useState(null);
-  const [bgAudioDuration, setBgAudioDuration] = useState(0);
+  const [showCaptionImageModal, setShowCaptionImageModal] = useState(false);
 
   if (!open) return null;
+
+  const handleCaptionImageGenerate = async (options) => {
+    try {
+      const blob = await generateCaptionImage(options);
+      const reader = new FileReader();
+      reader.readAsDataURL(blob);
+      reader.onloadend = () => {
+        setPreview(reader.result?.toString() || null);
+        setFile(blob);
+        setCaption(options.text);
+        setShowCaptionImageModal(false);
+      };
+    } catch (error) {
+      console.error('Failed to generate caption image:', error);
+      alert('Failed to generate image. Please try again.');
+    }
+  };
 
   const onFile = async (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    
+
     // Silently compress in background (images and videos)
     const { compressFile } = await import('../utils/imageCompression');
     const compressed = await compressFile(f);
-    
+
     const reader = new FileReader();
     reader.onloadend = () => setPreview(reader.result?.toString() || null);
     reader.readAsDataURL(compressed);
@@ -118,41 +136,27 @@ function StatusComposerModal({ open, onClose }) {
 
   const onSubmit = async () => {
     if (!preview) return;
-    // Guard image statuses to 15s view (handled in viewer); background audio max 15s enforced here
-    if (bgAudioDuration > 15) return;
     const mediaType = file?.type?.startsWith('video/') ? 'video' : 'image';
-    const res = await postStatus({ base64Media: preview, mediaType, caption, audience, bgAudioBase64, bgAudioDurationSec: bgAudioDuration });
+    const res = await postStatus({ base64Media: preview, mediaType, caption, audience });
     if (res) {
       onClose();
-      setFile(null); setPreview(null); setCaption(""); setBgAudioBase64(null); setBgAudioPreview(null); setBgAudioDuration(0);
+      setFile(null); setPreview(null); setCaption("");
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center" onClick={(e)=>{ if(e.target===e.currentTarget) onClose(); }}>
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="bg-base-100 rounded-xl p-4 w-full max-w-md">
         <div className="font-semibold mb-2">New Status</div>
-        <input type="file" accept="image/*,video/*" onChange={onFile} className="file-input file-input-bordered w-full mb-2" />
-        <div className="mb-2">
-          <label className="label"><span className="label-text text-xs">Optional background music (max 15s)</span></label>
-          <input type="file" accept="audio/*" className="file-input file-input-bordered w-full" onChange={async (e)=>{
-            const f = e.target.files?.[0]; if (!f) return;
-            const url = URL.createObjectURL(f); setBgAudioPreview(url);
-            const a = new Audio(); a.src = url; await a.load?.();
-            a.addEventListener('loadedmetadata', async ()=>{
-              const dur = isFinite(a.duration) ? a.duration : 0;
-              setBgAudioDuration(Math.round(dur));
-            });
-            // Audio files don't need compression
-            const reader = new FileReader(); 
-            reader.readAsDataURL(f);
-            await new Promise((r)=> (reader.onloadend = r));
-            setBgAudioBase64(reader.result?.toString() || null);
-          }} />
-          {bgAudioPreview && (
-            <audio src={bgAudioPreview} controls className="w-full mt-2" />
-          )}
-          {bgAudioDuration > 15 && <div className="text-error text-xs mt-1">Audio must be 15 seconds or less.</div>}
+        <div className="flex gap-2 mb-2">
+          <input type="file" accept="image/*,video/*" onChange={onFile} className="file-input file-input-bordered flex-1" />
+          <button
+            className="btn btn-square btn-ghost"
+            onClick={() => setShowCaptionImageModal(true)}
+            title="Create Caption Image"
+          >
+            <Sparkles className="w-5 h-5" />
+          </button>
         </div>
         {preview && (
           file?.type?.startsWith('video/') ? (
@@ -174,7 +178,7 @@ function StatusComposerModal({ open, onClose }) {
             allowedFormats={['emoji', 'mention']}
           />
         </div>
-        <select className="select select-bordered w-full mb-4" value={audience} onChange={e=>setAudience(e.target.value)}>
+        <select className="select select-bordered w-full mb-4" value={audience} onChange={e => setAudience(e.target.value)}>
           <option value="contacts">Contacts</option>
           <option value="public">Public</option>
         </select>
@@ -189,6 +193,15 @@ function StatusComposerModal({ open, onClose }) {
           </button>
         </div>
       </div>
+
+      {/* Caption Image Modal */}
+      {showCaptionImageModal && (
+        <CaptionImageModal
+          isOpen={showCaptionImageModal}
+          onClose={() => setShowCaptionImageModal(false)}
+          onGenerate={handleCaptionImageGenerate}
+        />
+      )}
     </div>
   );
 }
@@ -246,12 +259,12 @@ function StatusViewerModal({ userId, user, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 bg-base-300/80 backdrop-blur-sm flex items-center justify-center" onClick={onClose}>
-      <div className="w-full max-w-[420px]" onClick={e=>e.stopPropagation()}>
+      <div className="w-full max-w-[420px]" onClick={e => e.stopPropagation()}>
         {/* progress bar segments */}
         <div className="h-1 w-full flex gap-1 mb-2 relative">
-          {items.map((_,i)=> (
+          {items.map((_, i) => (
             <div key={i} className="h-1 flex-1 bg-base-content/30 rounded overflow-hidden">
-              <div className={`h-full bg-primary ${i<index? 'w-full' : i===index? '' : 'w-0'}`} style={i===index? { width: `${Math.round(progress*100)}%`, transition: 'width 80ms linear' } : {}} />
+              <div className={`h-full bg-primary ${i < index ? 'w-full' : i === index ? '' : 'w-0'}`} style={i === index ? { width: `${Math.round(progress * 100)}%`, transition: 'width 80ms linear' } : {}} />
             </div>
           ))}
           <button aria-label="Close" onClick={onClose} className="absolute -top-2 right-0 btn btn-xs btn-ghost btn-circle">×</button>
@@ -276,8 +289,8 @@ function StatusViewerModal({ userId, user, onClose }) {
           {/* media */}
           <div className="pt-12">
             {cur.mediaType === 'video' ? (
-              <video src={cur.mediaUrl} autoPlay controls onPlay={()=>setPaused(false)} onPause={()=>setPaused(true)} className="w-full max-h-[70vh]" onTimeUpdate={(e)=>{
-                const el = e.currentTarget; if (el.duration>0) setProgress(el.currentTime/el.duration);
+              <video src={cur.mediaUrl} autoPlay controls onPlay={() => setPaused(false)} onPause={() => setPaused(true)} className="w-full max-h-[70vh]" onTimeUpdate={(e) => {
+                const el = e.currentTarget; if (el.duration > 0) setProgress(el.currentTime / el.duration);
               }} onEnded={onNext} />
             ) : (
               <img src={cur.mediaUrl} alt="status" className="w-full max-h-[70vh] object-contain" />
@@ -315,12 +328,12 @@ function StatusViewerModal({ userId, user, onClose }) {
 
 function Caption({ text }) {
   const [expanded, setExpanded] = useState(false);
-  const short = text.length > 120 ? text.slice(0,120) + '…' : text;
+  const short = text.length > 120 ? text.slice(0, 120) + '…' : text;
   return (
     <div className="text-sm">
       {expanded ? text : short}
       {text.length > 120 && (
-        <button className="ml-2 text-primary text-xs" onClick={()=>setExpanded(e=>!e)}>{expanded? 'Read less':'Read more'}</button>
+        <button className="ml-2 text-primary text-xs" onClick={() => setExpanded(e => !e)}>{expanded ? 'Read less' : 'Read more'}</button>
       )}
     </div>
   );

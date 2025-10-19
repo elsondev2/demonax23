@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import { ENV } from "../lib/env.js";
+import { cacheWrap } from "../lib/cache.js";
 
 export const protectRoute = async (req, res, next) => {
   try {
@@ -17,7 +18,13 @@ export const protectRoute = async (req, res, next) => {
     const decoded = jwt.verify(token, ENV.JWT_SECRET);
     if (!decoded) return res.status(401).json({ message: "Unauthorized - Invalid token" });
 
-    const user = await User.findById(decoded.userId).select("-password");
+    // Cache user lookup for 5 minutes (300000ms)
+    const user = await cacheWrap(
+      `user:${decoded.userId}`,
+      300000,
+      async () => await User.findById(decoded.userId).select("-password")
+    );
+    
     if (!user) return res.status(404).json({ message: "User not found" });
 
     req.user = user;

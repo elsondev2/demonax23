@@ -735,3 +735,102 @@ hin scrollbar styles - nearly invisible */
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Context menu animations for mobile long press */
+@keyframes slideInFromBottom {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.slide-in-from-bottom-4 {
+  animation: slideInFromBottom 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.animate-in {
+  animation-fill-mode: both;
+}
+
+.fade-in {
+  animation: fadeInUp 0.2s ease-out;
+}
+
+/* Dropdown menu smooth animation - downward */
+@keyframes dropdownSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Dropdown menu smooth animation - upward */
+@keyframes dropdownSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.dropdown-menu-animate {
+  animation: dropdownSlideIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: top;
+}
+
+.dropdown-menu-animate-up {
+  animation: dropdownSlideUp 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: bottom;
+}
+
+/* Smooth transitions for dropdown items */
+.dropdown-menu-animate button,
+.dropdown-menu-animate-up button {
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dropdown-menu-animate button:hover,
+.dropdown-menu-animate-up button:hover {
+  transform: translateX(2px);
+}
+
+/* Back to Bottom button animation */
+@keyframes backToBottomSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.back-to-bottom-animate {
+  animation: backToBottomSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Shimmer animation for announcement cards */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 3s infinite;
+}

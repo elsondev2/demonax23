@@ -113,14 +113,16 @@ export const useCallStore = create((set, get) => ({
       // Create peer connection
       const peerConnection = new RTCPeerConnection(rtcConfiguration);
 
-      // Get local media stream with enhanced audio settings
+      // Get local media stream with reduced noise suppression
       const constraints = {
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
           sampleRate: 48000,
-          channelCount: 1
+          channelCount: 1,
+          // Reduce noise suppression intensity
+          advanced: [{ noiseSuppression: { ideal: 0.3 } }]
         },
         video: get().callType === 'video'
       };

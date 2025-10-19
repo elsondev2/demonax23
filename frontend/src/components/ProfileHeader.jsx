@@ -26,6 +26,30 @@ function ProfileHeader({ onShowTour }) {
     fetchRequests().catch(() => { });
   }, [fetchRequests]);
 
+  // Listen for profile updates from socket to update avatar live
+  useEffect(() => {
+    const { socket } = useAuthStore.getState();
+    if (!socket) return;
+
+    const handleUserUpdated = (data) => {
+      // Update local state if it's the current user's profile
+      if (data._id === authUser._id) {
+        setSelectedImg(data.profilePic);
+      }
+    };
+
+    socket.on('userUpdated', handleUserUpdated);
+
+    return () => {
+      socket.off('userUpdated', handleUserUpdated);
+    };
+  }, [authUser._id]);
+
+  // Sync selectedImg with authUser.profilePic when it changes
+  useEffect(() => {
+    setSelectedImg(authUser.profilePic);
+  }, [authUser.profilePic]);
+
 
 
   const fileInputRef = useRef(null);

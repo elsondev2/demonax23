@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { ShieldCheckIcon, UserIcon, LockIcon, EyeIcon, EyeOffIcon, ArrowRightIcon, SettingsIcon, DatabaseIcon, UsersIcon } from "lucide-react";
+import { ShieldCheckIcon, UserIcon, LockIcon, EyeIcon, EyeOffIcon } from "lucide-react";
 import { axiosInstance } from "../lib/axios";
 import { useAuthStore } from "../store/useAuthStore";
 import AppLogo from "../components/AppLogo";
+import ThemeIcons from "../components/ThemeDots";
 import toast from "react-hot-toast";
+import { useThemeStore } from "../store/useThemeStore";
 
 function AdminLoginPageNew() {
   const [formData, setFormData] = useState({ username: "", password: "" });
@@ -12,10 +14,33 @@ function AdminLoginPageNew() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const navigate = useNavigate();
   const { authUser, setAuthUser } = useAuthStore();
+  const currentTheme = useThemeStore((state) => state.currentTheme);
+
+  // Get theme-specific text color
+  const getTextColor = () => {
+    switch (currentTheme) {
+      case 'light':
+        return '#1a1a1a'; // Dark black for light theme
+      case 'synthwave':
+        return '#e779c1'; // Synthwave pink
+      case 'dracula':
+        return '#f8f8f2'; // Dracula white
+      default:
+        return undefined; // Use theme's default primary-content
+    }
+  };
+
+  // Get theme-specific text shadow
+  const getTextShadow = () => {
+    if (currentTheme === 'cyberpunk') {
+      return 'none'; // No shadow for cyberpunk
+    }
+    return '0 2px 10px rgba(0,0,0,0.3), 0 0 20px rgba(0,0,0,0.2)';
+  };
 
   // Redirect if already logged in as admin
   useEffect(() => {
-    if (authUser && authUser.role === "admin") {
+    if (authUser?.role === "admin") {
       navigate("/admin");
     }
   }, [authUser, navigate]);
@@ -27,11 +52,23 @@ function AdminLoginPageNew() {
     try {
       const res = await axiosInstance.post("/api/admin/login", formData);
 
-      // Update auth store with admin user
-      setAuthUser(res.data);
+      // Store token in localStorage for Authorization header
+      if (res.data.token) {
+        localStorage.setItem("jwt-token", res.data.token);
+        console.log("✅ Admin token stored in localStorage");
+      }
+
+      // Update auth store with admin user (without token in the user object)
+      const { token: _token, ...userData } = res.data;
+      setAuthUser(userData);
+      console.log("✅ Admin user set in auth store:", userData);
 
       toast.success("Admin login successful!");
-      navigate("/admin");
+
+      // Small delay to ensure state is updated before navigation
+      setTimeout(() => {
+        navigate("/admin");
+      }, 100);
     } catch (error) {
       console.error("Admin login error:", error);
       toast.error(error.response?.data?.message || "Invalid admin credentials");
@@ -41,190 +78,120 @@ function AdminLoginPageNew() {
   };
 
   return (
-    <div className="min-h-screen bg-base-300 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="w-full max-w-6xl grid lg:grid-cols-2 gap-8 items-center min-h-screen lg:min-h-0 py-8">
-
-        {/* Left Side - Admin Features */}
-        <div className="hidden lg:flex flex-col items-center justify-center p-12 space-y-8">
-          <div className="text-center space-y-6">
-            <div className="w-32 h-32 mx-auto bg-gradient-to-br from-error to-warning rounded-3xl flex items-center justify-center shadow-2xl">
-              <AppLogo className="w-20 h-20" />
-            </div>
-            <div className="space-y-2">
-              <h1 className="text-4xl font-bold text-error">
-                Admin Portal
-              </h1>
-              <p className="text-lg text-base-content/70">
-                Secure access to system management
-              </p>
-            </div>
+    <div className="w-full min-h-screen flex flex-col md:flex-row bg-base-100">
+      {/* LEFT PANEL - Welcome Section */}
+      <div className="hidden md:flex md:w-1/2 flex-col items-center relative overflow-hidden bg-gradient-to-br from-primary/90 to-secondary/90" style={{ minHeight: '100vh', paddingTop: '20vh' }}>
+        {/* Decorative Circles */}
+        <div className="absolute top-20 left-20 w-32 h-32 rounded-full bg-white/20 backdrop-blur-md shadow-lg"></div>
+        <div className="absolute top-1/3 left-1/2 transform -translate-x-1/2 w-48 h-48 rounded-full bg-white/15 backdrop-blur-md shadow-lg"></div>
+        <div className="absolute bottom-32 left-16 w-40 h-40 rounded-full bg-white/20 backdrop-blur-md shadow-lg"></div>
+        <div className="absolute bottom-1/4 right-20 w-28 h-28 rounded-full bg-white/25 backdrop-blur-md shadow-lg"></div>
+        
+        {/* Content */}
+        <div className="text-center space-y-5 p-10 relative z-10" style={{ color: getTextColor(), textShadow: getTextShadow() }}>
+          <div className="mb-6">
+            <AppLogo className="w-24 h-24 mx-auto" />
           </div>
-
-          {/* Admin features */}
-          <div className="grid grid-cols-1 gap-4 w-full max-w-md">
-            <div className="flex items-center gap-3 p-4 bg-base-200/50 rounded-xl border border-base-300/50">
-              <div className="w-10 h-10 bg-error/20 rounded-full flex items-center justify-center">
-                <UsersIcon className="w-5 h-5 text-error" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-sm text-base-content">User Management</h3>
-                <p className="text-xs text-base-content/60">Manage users and permissions</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-4 bg-base-200/50 rounded-xl border border-base-300/50">
-              <div className="w-10 h-10 bg-info/20 rounded-full flex items-center justify-center">
-                <DatabaseIcon className="w-5 h-5 text-info" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-sm text-base-content">System Analytics</h3>
-                <p className="text-xs text-base-content/60">Monitor system performance</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-4 bg-base-200/50 rounded-xl border border-base-300/50">
-              <div className="w-10 h-10 bg-warning/20 rounded-full flex items-center justify-center">
-                <SettingsIcon className="w-5 h-5 text-warning" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-sm text-base-content">Configuration</h3>
-                <p className="text-xs text-base-content/60">System settings and controls</p>
-              </div>
-            </div>
-          </div>
+          <h1 className="text-6xl font-bold tracking-tight">Admin Access</h1>
+          <p className="text-lg font-light opacity-90">Secure portal for system management and oversight.</p>
         </div>
+      </div>
 
-        {/* Right Side - Admin Login Form */}
-        <div className="w-full max-w-md mx-auto lg:mx-0">
-          <div className="bg-base-100 rounded-3xl shadow-2xl border border-base-300/50 p-8 space-y-6 max-h-[90vh] overflow-y-auto scrollbar-hide">
-
-            {/* Header */}
-            <div className="text-center space-y-4">
-              <div className="lg:hidden w-16 h-16 mx-auto bg-gradient-to-br from-error to-warning rounded-2xl flex items-center justify-center shadow-lg mb-4">
-                <AppLogo className="w-12 h-12" />
-              </div>
-              <div className="space-y-2">
-                <h2 className="text-3xl font-bold text-base-content">Admin Access</h2>
-                <p className="text-base-content/60">Secure login to the admin dashboard</p>
-              </div>
-
-              {/* Security Badge */}
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-error/10 border border-error/20 rounded-full">
-                <ShieldCheckIcon className="w-4 h-4 text-error" />
-                <span className="text-xs text-error font-medium">Secure Access Required</span>
-              </div>
-            </div>
-
-            {/* Admin Login Form */}
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="form-control">
-                <label className="label">
-                  <span className="label-text font-medium">Admin Username</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    className="input input-bordered w-full pl-12 focus:input-error transition-all duration-200"
-                    placeholder="Enter admin username"
-                    value={formData.username}
-                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                    autoComplete="username"
-                    required
-                  />
-                  <UserIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-base-content/40" />
+      {/* RIGHT PANEL - Form Section - SCROLLABLE */}
+      <div className="w-full md:w-1/2 bg-base-100">
+        <div className="h-screen overflow-y-auto">
+          <div className="flex items-center justify-center p-8 min-h-screen">
+            <div className="w-full max-w-md py-6">
+              <div className="text-center mb-6">
+                <div className="flex justify-center mb-3">
+                  <ShieldCheckIcon className="w-14 h-14 text-error" />
                 </div>
+                <h2 className="text-2xl font-bold text-base-content mb-2">Admin Portal</h2>
+                <p className="text-sm text-base-content/60">Secure access to the dashboard</p>
               </div>
 
-              <div className="form-control">
-                <label className="label">
-                  <span className="label-text font-medium">Admin Password</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    className="input input-bordered w-full pl-12 pr-12 focus:input-error transition-all duration-200"
-                    placeholder="Enter admin password"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    autoComplete="current-password"
-                    required
-                  />
-                  <LockIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-base-content/40" />
-                  <button
-                    type="button"
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-base-content/40 hover:text-base-content transition-colors"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOffIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
-                  </button>
+              {/* FORM */}
+              <form onSubmit={handleSubmit} className="space-y-5">
+                {/* USERNAME INPUT */}
+                <div className="form-control w-full">
+                  <label className="label">
+                    <span className="label-text text-base-content/70">Username</span>
+                  </label>
+                  <label className="input input-bordered flex items-center gap-2 bg-base-200 w-full">
+                    <UserIcon className="w-4 h-4 opacity-70" />
+                    <input
+                      type="text"
+                      value={formData.username}
+                      onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                      className="grow"
+                      placeholder="Enter admin username"
+                      autoComplete="username"
+                      required
+                    />
+                  </label>
                 </div>
-              </div>
 
-              <button
-                type="submit"
-                className={`btn btn-error w-full gap-2 ${isLoggingIn ? 'loading' : ''}`}
-                disabled={isLoggingIn}
-              >
-                {isLoggingIn ? (
-                  <>
-                    <span className="loading loading-spinner loading-sm"></span>
-                    Authenticating...
-                  </>
-                ) : (
-                  <>
-                    <ShieldCheckIcon className="w-4 h-4" />
-                    Access Admin Panel
-                    <ArrowRightIcon className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-            </form>
-
-            {/* Security Notice */}
-            <div className="bg-warning/10 border border-warning/30 rounded-xl p-4">
-              <div className="flex items-start gap-3">
-                <ShieldCheckIcon className="w-5 h-5 text-warning mt-0.5 flex-shrink-0" />
-                <div className="space-y-1">
-                  <h4 className="text-sm font-medium text-base-content">Security Notice</h4>
-                  <p className="text-xs text-base-content/60">
-                    This is a restricted area. All access attempts are logged and monitored.
-                  </p>
+                {/* PASSWORD INPUT */}
+                <div className="form-control w-full">
+                  <label className="label">
+                    <span className="label-text text-base-content/70">Password</span>
+                  </label>
+                  <label className="input input-bordered flex items-center gap-2 bg-base-200 w-full">
+                    <LockIcon className="w-4 h-4 opacity-70" />
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      className="grow"
+                      placeholder="Enter admin password"
+                      autoComplete="current-password"
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="text-base-content/40 hover:text-base-content transition-colors"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOffIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+                    </button>
+                  </label>
                 </div>
-              </div>
-            </div>
 
-            {/* Footer Links */}
-            <div className="text-center space-y-4">
-              <div className="text-sm text-base-content/60">
-                Not an admin?{" "}
+                {/* SUBMIT BUTTON */}
                 <button
-                  onClick={() => navigate('/login')}
-                  className="link link-error font-medium"
+                  className={`btn btn-error w-full mt-6 ${isLoggingIn ? 'btn-disabled' : ''}`}
+                  type="submit"
+                  disabled={isLoggingIn}
                 >
-                  Go to user login
+                  {isLoggingIn ? (
+                    <span className="loading loading-spinner loading-sm"></span>
+                  ) : (
+                    "Admin Sign In"
+                  )}
                 </button>
+              </form>
+
+              <div className="mt-8 text-center text-sm text-base-content/60">
+                Not an admin? <button onClick={() => navigate('/login')} className="text-primary hover:underline">Go to user sign in</button>
               </div>
 
-              <div className="flex justify-center gap-4 text-xs">
-                <button 
-                  onClick={() => toast.info("To access admin panel, please sign in as admin first")}
-                  className="link link-hover text-base-content/50"
-                >
-                  System Status
-                </button>
-                <span className="text-base-content/30">•</span>
-                <a 
-                  href="https://justelson-help.vercel.app/" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="link link-hover text-base-content/50"
-                >
-                  Support
-                </a>
+              {/* Security Notice */}
+              <div className="mt-8 bg-warning/10 border border-warning/30 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <ShieldCheckIcon className="w-5 h-5 text-warning mt-0.5 flex-shrink-0" />
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-medium text-base-content">Security Notice</h4>
+                    <p className="text-xs text-base-content/60">
+                      This is a restricted area. All access attempts are logged and monitored.
+                    </p>
+                  </div>
+                </div>
               </div>
-            </div>
 
-            {/* Terms */}
-            <div className="text-xs text-center text-base-content/50 pt-4 border-t border-base-300/30">
-              Authorized personnel only. Unauthorized access is prohibited.
+              {/* Theme Picker */}
+              <div className="mt-8 pt-6 border-t border-base-300">
+                <ThemeIcons />
+              </div>
             </div>
           </div>
         </div>

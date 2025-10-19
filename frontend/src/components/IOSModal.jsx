@@ -9,10 +9,8 @@ const IOSModal = ({ isOpen, onClose, children, className = "" }) => {
   const [dragY, setDragY] = useState(0);
   const [isClosing, setIsClosing] = useState(false);
   const modalRef = useRef(null);
-  const contentRef = useRef(null);
   const startY = useRef(0);
   const currentY = useRef(0);
-  const startScrollTop = useRef(0);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -28,79 +26,67 @@ const IOSModal = ({ isOpen, onClose, children, className = "" }) => {
     if (isOpen) {
       setShouldRender(true);
       setIsClosing(false);
-      // Small delay to trigger animation
-      setTimeout(() => setIsAnimating(true), 50);
+      // Faster animation trigger
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setIsAnimating(true);
+        });
+      });
       // Prevent body scroll on mobile
       if (isMobile) {
         document.body.style.overflow = 'hidden';
       }
-    } else {
+    } else if (shouldRender) {
       // Start closing animation
       setIsClosing(true);
       setIsDragging(false);
       setDragY(0);
-
-      // Wait a bit then start the out animation
-      setTimeout(() => {
-        setIsAnimating(false);
-      }, 50);
+      setIsAnimating(false);
 
       // Wait for animation to complete before unmounting
       setTimeout(() => {
         setShouldRender(false);
         setIsClosing(false);
-      }, 550);
+      }, 350);
 
       // Restore body scroll
       document.body.style.overflow = '';
     }
-  }, [isOpen, isMobile]);
+  }, [isOpen, isMobile, shouldRender]);
 
   if (!shouldRender) return null;
 
+  // Animated close - triggers animation then calls onClose
+  const handleAnimatedClose = () => {
+    setIsClosing(true);
+    setIsAnimating(false);
+    setTimeout(() => {
+      onClose();
+    }, 200);
+  };
+
   const handleBackdropClick = (e) => {
     if (e.target === e.currentTarget) {
-      if (isMobile) {
-        // Trigger smooth swipe-down animation on mobile
-        setIsClosing(true);
-        setTimeout(() => {
-          onClose();
-        }, 300); // Match the transition duration
-      } else {
-        // Immediate close on desktop
-        onClose();
-      }
+      handleAnimatedClose();
     }
   };
 
-  // Touch event handlers for swipe-to-close (only from handle bar or when content is at top)
+  // Touch event handlers for swipe-to-close (ONLY from handle bar)
   const handleTouchStart = (e) => {
     if (!isMobile) return;
 
     const touch = e.touches[0];
     const target = e.target;
 
-    // Check if touch started on handle bar
+    // Check if touch started on handle bar ONLY
     const isHandleBar = target.closest('.modal-handle-bar');
 
-    // Find the scrollable content element (could be nested)
-    let scrollableElement = contentRef.current;
-    if (scrollableElement) {
-      // Look for nested scrollable elements
-      const nestedScrollable = scrollableElement.querySelector('.overflow-y-auto, .overflow-auto');
-      if (nestedScrollable) {
-        scrollableElement = nestedScrollable;
-      }
-    }
-
-    const isContentAtTop = scrollableElement ? scrollableElement.scrollTop <= 5 : true;
-
-    // Only allow drag from handle bar or when content is at the very top
-    if (isHandleBar || isContentAtTop) {
+    // Only allow drag from handle bar - this prevents accidental closes while scrolling
+    if (isHandleBar) {
       startY.current = touch.clientY;
       currentY.current = touch.clientY;
-      startScrollTop.current = scrollableElement ? scrollableElement.scrollTop : 0;
       setIsDragging(true);
+      e.preventDefault(); // Prevent scroll when dragging handle
     }
   };
 
@@ -111,11 +97,10 @@ const IOSModal = ({ isOpen, onClose, children, className = "" }) => {
     currentY.current = touch.clientY;
     const deltaY = currentY.current - startY.current;
 
-    // Only allow downward swipes and only if we started from the top
-    if (deltaY > 0 && startScrollTop.current <= 5) {
+    // Only allow downward swipes
+    if (deltaY > 0) {
       setDragY(deltaY);
-      // Note: preventDefault() removed to avoid passive listener warning
-      // The modal drag functionality still works correctly without it
+      e.preventDefault(); // Prevent scroll when dragging
     }
   };
 
@@ -123,9 +108,9 @@ const IOSModal = ({ isOpen, onClose, children, className = "" }) => {
     if (!isMobile || !isDragging) return;
 
     const deltaY = currentY.current - startY.current;
-    const threshold = 100; // Minimum swipe distance to close
+    const threshold = 120; // Minimum swipe distance to close (increased for better UX)
 
-    if (deltaY > threshold && startScrollTop.current <= 5) {
+    if (deltaY > threshold) {
       // Close the modal
       onClose();
     } else {
@@ -136,34 +121,36 @@ const IOSModal = ({ isOpen, onClose, children, className = "" }) => {
     setIsDragging(false);
     startY.current = 0;
     currentY.current = 0;
-    startScrollTop.current = 0;
   };
 
-  // On desktop, use regular modal behavior
+  // On desktop, use regular modal behavior with sharp corners
   if (!isMobile) {
     return createPortal(
       <div
-        className={`fixed inset-0 z-[60] flex items-center justify-center transition-all duration-500 ease-out ${isAnimating && !isClosing ? 'bg-black/50 backdrop-blur-sm' : 'bg-black/0 backdrop-blur-none'
+        className={`fixed inset-0 z-[60] flex items-center justify-center transition-all duration-200 ${isAnimating && !isClosing ? 'bg-black/50 backdrop-blur-sm' : 'bg-black/0 backdrop-blur-none'
           }`}
         onClick={handleBackdropClick}
         style={{
-          transitionTimingFunction: isAnimating && !isClosing ? 'cubic-bezier(0.16, 1, 0.3, 1)' : 'cubic-bezier(0.4, 0, 0.2, 1)'
+          transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
+          willChange: 'opacity, backdrop-filter'
         }}
       >
         <div
-          className={`w-full max-w-2xl mx-4 bg-base-100 rounded-2xl shadow-2xl transition-all duration-500 ease-out transform ${isAnimating && !isClosing
+          className={`w-full mx-4 bg-base-100 shadow-2xl transition-all duration-200 transform ${isAnimating && !isClosing
             ? 'scale-100 opacity-100 translate-y-0'
-            : 'scale-85 opacity-0 translate-y-8'
+            : 'scale-95 opacity-0 translate-y-2'
             } ${className}`}
           style={{
             maxHeight: 'calc(100vh - 4rem)',
             minHeight: '200px',
-            transitionTimingFunction: isAnimating && !isClosing ? 'cubic-bezier(0.16, 1, 0.3, 1)' : 'cubic-bezier(0.4, 0, 0.2, 1)'
+            display: 'flex',
+            flexDirection: 'column',
+            transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
+            borderRadius: '0', // Sharp corners for desktop
+            willChange: 'transform, opacity'
           }}
         >
-          <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 4rem)' }}>
-            {children}
-          </div>
+          {children}
         </div>
       </div>,
       document.body
@@ -173,39 +160,43 @@ const IOSModal = ({ isOpen, onClose, children, className = "" }) => {
   // On mobile, use iOS-style slide up animation
   return createPortal(
     <div
-      className={`fixed inset-0 z-[60] flex items-end justify-center transition-all duration-300 ${isAnimating ? 'bg-black/50 backdrop-blur-sm' : 'bg-transparent'
+      className={`fixed inset-0 z-[60] flex items-end justify-center transition-all duration-200 ${isAnimating && !isClosing ? 'bg-black/50 backdrop-blur-sm' : 'bg-transparent'
         }`}
       onClick={handleBackdropClick}
+      style={{
+        transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
+        willChange: 'opacity, backdrop-filter'
+      }}
     >
       <div
         ref={modalRef}
-        className={`w-full bg-base-100 rounded-t-3xl shadow-2xl ease-out transform ${isDragging ? '' : 'transition-all duration-300'
-          } ${isAnimating && !isDragging && !isClosing ? 'translate-y-0 opacity-100' :
-            isDragging ? '' : 'translate-y-full opacity-0'
+        className={`w-full bg-base-100 rounded-t-3xl shadow-2xl overflow-hidden ${isDragging ? '' : 'transition-all duration-200'
           } ${className}`}
         style={{
-          height: '93vh',
-          minHeight: '520px',
-          maxHeight: '820px',
+          height: '95vh',
+          minHeight: '600px',
+          maxHeight: '95vh',
+          display: 'flex',
+          flexDirection: 'column',
           transform: isDragging
             ? `translateY(${dragY}px)`
             : isAnimating && !isClosing
               ? 'translateY(0px)'
-              : 'translateY(100%)'
+              : 'translateY(100%)',
+          transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
+          willChange: 'transform'
         }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
         {/* iOS-style handle bar */}
-        <div className="modal-handle-bar flex justify-center pt-3 pb-2 cursor-grab active:cursor-grabbing">
-          <div className="w-10 h-1 bg-base-content/20 rounded-full"></div>
+        <div className="modal-handle-bar flex justify-center items-center pt-3 pb-2 cursor-grab active:cursor-grabbing flex-shrink-0 bg-base-100">
+          <div className="w-10 h-1 bg-base-content/30 rounded-full"></div>
         </div>
 
-        {/* Modal content */}
-        <div ref={contentRef} className="overflow-y-auto h-full pb-6">
-          {children}
-        </div>
+        {/* Modal content - children should handle their own layout */}
+        {children}
       </div>
     </div>,
     document.body

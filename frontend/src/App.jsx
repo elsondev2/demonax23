@@ -4,7 +4,7 @@ import LoginPageNew from "./pages/LoginPageNew";
 import SignUpPageNew from "./pages/SignUpPageNew";
 import EmailVerificationPage from "./pages/EmailVerificationPage";
 import JoinGroupPage from "./pages/JoinGroupPage";
-import AdminPage from "./pages/AdminPage";
+import AdminPage from "./pages/admin/AdminPage";
 import AdminLoginPageNew from "./pages/AdminLoginPageNew";
 import TermsOfServicePage from "./pages/TermsOfServicePage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
@@ -16,6 +16,7 @@ import PageLoader from "./components/PageLoader";
 import ThemeProvider from "./components/ThemeProvider";
 import AppearanceModal from "./components/AppearanceModal";
 import ProtectedRoute from "./components/ProtectedRoute";
+import AdminProtectedRoute from "./components/AdminProtectedRoute";
 import AnnouncementBanner from "./components/AnnouncementBanner";
 
 import { Toaster } from "react-hot-toast";
@@ -53,7 +54,16 @@ function AppContent() {
               <ChatPage />
             </ProtectedRoute>
           } />
-          <Route path="/logintowoof" element={authUser ? <Navigate to="/chat" replace /> : <LoginPageNew />} />
+          <Route path="/chat/user/:userId" element={
+            <ProtectedRoute>
+              <ChatPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/chat/group/:groupId" element={
+            <ProtectedRoute>
+              <ChatPage />
+            </ProtectedRoute>
+          } />
           <Route path="/login" element={authUser ? <Navigate to="/chat" replace /> : <LoginPageNew />} />
           <Route path="/signin" element={authUser ? <Navigate to="/chat" replace /> : <LoginPageNew />} />
           <Route path="/signup" element={authUser ? <Navigate to="/chat" replace /> : <SignUpPageNew />} />
@@ -65,10 +75,10 @@ function AppContent() {
             </ProtectedRoute>
           } />
           <Route path="/admin/login" element={<AdminLoginPageNew />} />
-          <Route path="/admin" element={
-            <ProtectedRoute>
+          <Route path="/admin/*" element={
+            <AdminProtectedRoute>
               <AdminPage />
-            </ProtectedRoute>
+            </AdminProtectedRoute>
           } />
           <Route path="/posts" element={
             <ProtectedRoute redirectTo="/login">

@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Heart, Coffee, DollarSign, Send, Star, TrendingUp, Zap, Gift, CheckCircle, Users, MessageSquare, ThumbsUp, ChevronDown, Bell, Grid3x3, AlertCircle, Info, Code, Shield, Target } from 'lucide-react';
 import { useToast } from '../hooks/useToast';
 import { useChatStore } from '../store/useChatStore';
 import { useNavigate } from 'react-router';
 import { axiosInstance } from '../lib/axios';
 import { useSocket } from '../contexts/SocketContext';
+import { useThemeStore } from '../store/useThemeStore';
+import { isDarkTheme } from '../constants/themes';
 
 function DonateBackground() {
   const { chatBackground } = useChatStore();
@@ -87,6 +89,7 @@ const StatSkeleton = () => (
 export default function DonateView() {
   const navigate = useNavigate();
   const { socket } = useSocket();
+  const { currentTheme } = useThemeStore();
   const [activeTab, setActiveTab] = useState('donate');
   const [selectedTier, setSelectedTier] = useState(null);
   const [customAmount, setCustomAmount] = useState('');
@@ -99,7 +102,6 @@ export default function DonateView() {
   const [featureDescription, setFeatureDescription] = useState('');
   const [featureCategory, setFeatureCategory] = useState('feature');
   const [isAnonymousRequest, setIsAnonymousRequest] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
 
   // Stats state
   const [stats, setStats] = useState(null);
@@ -153,7 +155,7 @@ export default function DonateView() {
   }, []);
 
   // Fetch feature requests function
-  const fetchFeatureRequests = async () => {
+  const fetchFeatureRequests = useCallback(async () => {
     if (activeTab === 'request') {
       try {
         setRequestsLoading(true);
@@ -171,19 +173,19 @@ export default function DonateView() {
         setRequestsLoading(false);
       }
     }
-  };
+  }, [activeTab]);
 
   // Fetch feature requests when component mounts or tab changes
   useEffect(() => {
     fetchFeatureRequests();
-  }, [activeTab]);
+  }, [fetchFeatureRequests]);
 
   // Also fetch requests when component first mounts (in case user lands directly on request tab)
   useEffect(() => {
     if (featureRequests.length === 0 && !requestsLoading && !requestsError) {
       fetchFeatureRequests();
     }
-  }, []);
+  }, [featureRequests.length, requestsLoading, requestsError, fetchFeatureRequests]);
 
   // Scroll to top when tab changes
   useEffect(() => {
@@ -202,12 +204,12 @@ export default function DonateView() {
         prevRequests.map(request =>
           request._id === updatedRequest.id
             ? {
-                ...request,
-                upvotes: updatedRequest.upvotes,
-                downvotes: updatedRequest.downvotes,
-                voteScore: updatedRequest.voteScore,
-                userVote: updatedRequest.userVote
-              }
+              ...request,
+              upvotes: updatedRequest.upvotes,
+              downvotes: updatedRequest.downvotes,
+              voteScore: updatedRequest.voteScore,
+              userVote: updatedRequest.userVote
+            }
             : request
         )
       );
@@ -280,10 +282,7 @@ export default function DonateView() {
 
     try {
       // Get current user info from auth store if not anonymous
-      const userInfo = !isAnonymousRequest ? {
-        // The backend will get user info from the auth token
-        // We don't need to send it explicitly in the request body
-      } : null;
+
 
       const response = await axiosInstance.post('/api/feature-requests/submit', {
         title: featureTitle.trim(),
@@ -341,12 +340,12 @@ export default function DonateView() {
           prevRequests.map(request =>
             request._id === requestId
               ? {
-                  ...request,
-                  upvotes: response.data.featureRequest.upvotes,
-                  downvotes: response.data.featureRequest.downvotes,
-                  voteScore: response.data.featureRequest.voteScore,
-                  userVote: response.data.featureRequest.userVote
-                }
+                ...request,
+                upvotes: response.data.featureRequest.upvotes,
+                downvotes: response.data.featureRequest.downvotes,
+                voteScore: response.data.featureRequest.voteScore,
+                userVote: response.data.featureRequest.userVote
+              }
               : request
           )
         );
@@ -380,7 +379,7 @@ export default function DonateView() {
                 <p className="text-xs md:text-sm text-base-content/60">Help us build something amazing</p>
               </div>
             </div>
-            
+
             {/* Navigation Dropdown */}
             <div className="dropdown dropdown-end">
               <label tabIndex={0} className="btn btn-ghost btn-sm btn-circle">
@@ -669,7 +668,7 @@ export default function DonateView() {
         )}
 
         {activeTab === 'request' && (
-           <div className="max-w-5xl mx-auto space-y-6">
+          <div className="max-w-5xl mx-auto space-y-6">
             {/* Feature Request Form */}
             <div className="card bg-base-200 shadow-lg">
               <div className="card-body">
@@ -802,21 +801,19 @@ export default function DonateView() {
                           <div className="flex items-start justify-between mb-3">
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-2">
-                                <span className={`badge badge-sm ${
-                                  request.category === 'bug' ? 'badge-error' :
+                                <span className={`badge badge-sm ${request.category === 'bug' ? 'badge-error' :
                                   request.category === 'feature' ? 'badge-primary' :
-                                  request.category === 'improvement' ? 'badge-secondary' :
-                                  'badge-accent'
-                                }`}>
+                                    request.category === 'improvement' ? 'badge-secondary' :
+                                      'badge-accent'
+                                  }`}>
                                   {request.category}
                                 </span>
-                                <span className={`badge badge-sm ${
-                                  request.status === 'pending' ? 'badge-neutral' :
+                                <span className={`badge badge-sm ${request.status === 'pending' ? 'badge-neutral' :
                                   request.status === 'reviewing' ? 'badge-warning' :
-                                  request.status === 'approved' ? 'badge-success' :
-                                  request.status === 'implemented' ? 'badge-info' :
-                                  'badge-error'
-                                }`}>
+                                    request.status === 'approved' ? 'badge-success' :
+                                      request.status === 'implemented' ? 'badge-info' :
+                                        'badge-error'
+                                  }`}>
                                   {request.status}
                                 </span>
                               </div>
@@ -835,18 +832,16 @@ export default function DonateView() {
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <button
-                                className={`btn btn-ghost btn-sm gap-1 ${
-                                  request.userVote === 'up' ? 'btn-primary' : ''
-                                }`}
+                                className={`btn btn-ghost btn-sm gap-1 ${request.userVote === 'up' ? 'btn-primary' : ''
+                                  }`}
                                 onClick={() => handleVote(request._id, 'up')}
                               >
                                 <ThumbsUp className="w-4 h-4" />
                                 <span className="text-xs">{request.upvotes}</span>
                               </button>
                               <button
-                                className={`btn btn-ghost btn-sm gap-1 ${
-                                  request.userVote === 'down' ? 'btn-secondary' : ''
-                                }`}
+                                className={`btn btn-ghost btn-sm gap-1 ${request.userVote === 'down' ? 'btn-secondary' : ''
+                                  }`}
                                 onClick={() => handleVote(request._id, 'down')}
                               >
                                 <ThumbsUp className="w-4 h-4 rotate-180" />
@@ -874,167 +869,261 @@ export default function DonateView() {
         )}
 
         {activeTab === 'about' && (
-           <div className="max-w-5xl mx-auto space-y-6">
-             {/* App Overview */}
-             <div className="card bg-gradient-to-br from-primary to-secondary text-primary-content shadow-xl">
-               <div className="card-body text-center">
-                 <Code className="w-16 h-16 mx-auto mb-4" />
-                 <h2 className="card-title text-2xl justify-center">About This App</h2>
-                 <p className="text-primary-content/90 max-w-2xl mx-auto">
-                   A modern, feature-rich communication platform built with cutting-edge technologies to provide seamless messaging, group chats, and social connectivity.
-                 </p>
-               </div>
-             </div>
+          <div className="max-w-5xl mx-auto space-y-6">
+            {/* App Overview with Logo */}
+            <div className="card bg-gradient-to-br from-primary to-secondary text-primary-content shadow-xl overflow-hidden">
+              <div className="card-body text-center py-12">
+                {/* App Logo */}
+                <div className="mb-6 flex justify-center">
+                  <div className="w-32 h-32 rounded-3xl bg-base-100 p-4 shadow-2xl">
+                    <img
+                      src={isDarkTheme(currentTheme) ? '/assets/lightlogo.png' : '/assets/darklogo.png'}
+                      alt="de_monax Logo"
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                </div>
 
-             {/* Mission & Vision */}
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-               <div className="card bg-base-200 shadow-lg">
-                 <div className="card-body">
-                   <div className="flex items-center gap-3 mb-3">
-                     <Target className="w-8 h-8 text-primary" />
-                     <h3 className="card-title text-lg">Our Mission</h3>
-                   </div>
-                   <p className="text-sm text-base-content/70">
-                     To create the most intuitive and reliable communication platform that connects people seamlessly, while continuously innovating and adapting to user needs.
-                   </p>
-                 </div>
-               </div>
+                {/* App Name */}
+                <h1 className="text-4xl font-bold mb-2">de_monax</h1>
+                <p className="text-lg text-primary-content/80 mb-6">Where Conversations Come Alive</p>
 
-               <div className="card bg-base-200 shadow-lg">
-                 <div className="card-body">
-                   <div className="flex items-center gap-3 mb-3">
-                     <Star className="w-8 h-8 text-secondary" />
-                     <h3 className="card-title text-lg">Our Vision</h3>
-                   </div>
-                   <p className="text-sm text-base-content/70">
-                     To become the leading communication platform that sets the standard for user experience, privacy, and innovation in social connectivity.
-                   </p>
-                 </div>
-               </div>
-             </div>
+                <div className="divider divider-neutral opacity-30"></div>
 
-             {/* Features Overview */}
-             <div className="card bg-base-200 shadow-lg">
-               <div className="card-body">
-                 <h3 className="card-title text-xl mb-6 text-center">Key Features</h3>
-                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                   <div className="flex items-start gap-3 p-4 bg-base-300 rounded-lg">
-                     <MessageSquare className="w-6 h-6 text-primary mt-1" />
-                     <div>
-                       <h4 className="font-semibold text-sm">Real-time Messaging</h4>
-                       <p className="text-xs text-base-content/70">Instant message delivery with typing indicators</p>
-                     </div>
-                   </div>
-                   <div className="flex items-start gap-3 p-4 bg-base-300 rounded-lg">
-                     <Users className="w-6 h-6 text-secondary mt-1" />
-                     <div>
-                       <h4 className="font-semibold text-sm">Group Management</h4>
-                       <p className="text-xs text-base-content/70">Create and manage groups with ease</p>
-                     </div>
-                   </div>
-                   <div className="flex items-start gap-3 p-4 bg-base-300 rounded-lg">
-                     <Shield className="w-6 h-6 text-success mt-1" />
-                     <div>
-                       <h4 className="font-semibold text-sm">Privacy & Security</h4>
-                       <p className="text-xs text-base-content/70">End-to-end encryption and data protection</p>
-                     </div>
-                   </div>
-                   <div className="flex items-start gap-3 p-4 bg-base-300 rounded-lg">
-                     <Zap className="w-6 h-6 text-warning mt-1" />
-                     <div>
-                       <h4 className="font-semibold text-sm">Fast Performance</h4>
-                       <p className="text-xs text-base-content/70">Optimized for speed and reliability</p>
-                     </div>
-                   </div>
-                   <div className="flex items-start gap-3 p-4 bg-base-300 rounded-lg">
-                     <Heart className="w-6 h-6 text-error mt-1" />
-                     <div>
-                       <h4 className="font-semibold text-sm">Community Driven</h4>
-                       <p className="text-xs text-base-content/70">Built with user feedback and contributions</p>
-                     </div>
-                   </div>
-                   <div className="flex items-start gap-3 p-4 bg-base-300 rounded-lg">
-                     <Code className="w-6 h-6 text-info mt-1" />
-                     <div>
-                       <h4 className="font-semibold text-sm">Open Source</h4>
-                       <p className="text-xs text-base-content/70">Transparent development and community contributions</p>
-                     </div>
-                   </div>
-                 </div>
-               </div>
-             </div>
+                <p className="text-primary-content/90 max-w-2xl mx-auto leading-relaxed">
+                  A modern, feature-rich communication platform built with cutting-edge technologies to provide seamless messaging, group chats, and social connectivity. Experience the future of digital communication.
+                </p>
+
+                {/* Version Badge */}
+                <div className="mt-6 flex justify-center gap-2">
+                  <div className="badge badge-lg bg-base-100 text-base-content border-base-300">
+                    Version 1.0.0
+                  </div>
+                  <div className="badge badge-lg bg-base-100 text-base-content border-base-300">
+                    Beta
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Mission & Vision */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="card bg-base-200 shadow-lg">
+                <div className="card-body">
+                  <div className="flex items-center gap-3 mb-3">
+                    <Target className="w-8 h-8 text-primary" />
+                    <h3 className="card-title text-lg">Our Mission</h3>
+                  </div>
+                  <p className="text-sm text-base-content/70">
+                    To create the most intuitive and reliable communication platform that connects people seamlessly, while continuously innovating and adapting to user needs.
+                  </p>
+                </div>
+              </div>
+
+              <div className="card bg-base-200 shadow-lg">
+                <div className="card-body">
+                  <div className="flex items-center gap-3 mb-3">
+                    <Star className="w-8 h-8 text-secondary" />
+                    <h3 className="card-title text-lg">Our Vision</h3>
+                  </div>
+                  <p className="text-sm text-base-content/70">
+                    To become the leading communication platform that sets the standard for user experience, privacy, and innovation in social connectivity.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Features Overview */}
+            <div className="card bg-base-200 shadow-lg">
+              <div className="card-body">
+                <div className="text-center mb-8">
+                  <h3 className="text-2xl font-bold mb-2">Powerful Features</h3>
+                  <p className="text-sm text-base-content/60">Everything you need for seamless communication</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="flex items-start gap-3 p-5 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl border border-primary/20 hover:shadow-lg transition-all">
+                    <div className="w-12 h-12 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
+                      <MessageSquare className="w-6 h-6 text-primary" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold mb-1">Real-time Messaging</h4>
+                      <p className="text-xs text-base-content/70">Instant message delivery with typing indicators and read receipts</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-5 bg-gradient-to-br from-secondary/10 to-secondary/5 rounded-xl border border-secondary/20 hover:shadow-lg transition-all">
+                    <div className="w-12 h-12 rounded-lg bg-secondary/20 flex items-center justify-center flex-shrink-0">
+                      <Users className="w-6 h-6 text-secondary" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold mb-1">Group Management</h4>
+                      <p className="text-xs text-base-content/70">Create and manage groups with advanced permissions</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-5 bg-gradient-to-br from-success/10 to-success/5 rounded-xl border border-success/20 hover:shadow-lg transition-all">
+                    <div className="w-12 h-12 rounded-lg bg-success/20 flex items-center justify-center flex-shrink-0">
+                      <Shield className="w-6 h-6 text-success" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold mb-1">Privacy & Security</h4>
+                      <p className="text-xs text-base-content/70">Your data is protected with industry-standard encryption</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-5 bg-gradient-to-br from-warning/10 to-warning/5 rounded-xl border border-warning/20 hover:shadow-lg transition-all">
+                    <div className="w-12 h-12 rounded-lg bg-warning/20 flex items-center justify-center flex-shrink-0">
+                      <Zap className="w-6 h-6 text-warning" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold mb-1">Lightning Fast</h4>
+                      <p className="text-xs text-base-content/70">Optimized performance for instant responsiveness</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-5 bg-gradient-to-br from-error/10 to-error/5 rounded-xl border border-error/20 hover:shadow-lg transition-all">
+                    <div className="w-12 h-12 rounded-lg bg-error/20 flex items-center justify-center flex-shrink-0">
+                      <Heart className="w-6 h-6 text-error" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold mb-1">Community Driven</h4>
+                      <p className="text-xs text-base-content/70">Built with user feedback and contributions</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-5 bg-gradient-to-br from-info/10 to-info/5 rounded-xl border border-info/20 hover:shadow-lg transition-all">
+                    <div className="w-12 h-12 rounded-lg bg-info/20 flex items-center justify-center flex-shrink-0">
+                      <Code className="w-6 h-6 text-info" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold mb-1">Open Development</h4>
+                      <p className="text-xs text-base-content/70">Transparent development process and roadmap</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
 
 
-             {/* Contact & Support */}
-             <div className="card bg-gradient-to-r from-accent to-neutral text-accent-content shadow-lg">
-               <div className="card-body text-center">
-                 <h3 className="card-title text-xl justify-center mb-4">Get In Touch</h3>
-                 <p className="mb-6 text-accent-content/90">
-                   Have questions, suggestions, or need support? We'd love to hear from you!
-                 </p>
-                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                   <div className="flex items-center justify-center gap-2">
-                     <MessageSquare className="w-5 h-5" />
-                     <span className="text-sm">Request features and improvements</span>
-                   </div>
-                   <div className="flex items-center justify-center gap-2">
-                     <Heart className="w-5 h-5" />
-                     <span className="text-sm">Support our development</span>
-                   </div>
-                   <div className="flex items-center justify-center gap-2">
-                     <Users className="w-5 h-5" />
-                     <span className="text-sm">Join our community</span>
-                   </div>
-                 </div>
-               </div>
-             </div>
-           </div>
-         )}
+            {/* Tech Stack */}
+            <div className="card bg-base-200 shadow-lg">
+              <div className="card-body">
+                <div className="text-center mb-6">
+                  <Code className="w-12 h-12 mx-auto mb-3 text-primary" />
+                  <h3 className="text-xl font-bold mb-2">Built With Modern Technology</h3>
+                  <p className="text-sm text-base-content/60">Powered by cutting-edge tools and frameworks</p>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="text-center p-4 bg-base-300 rounded-lg">
+                    <div className="font-bold text-lg mb-1">React</div>
+                    <div className="text-xs text-base-content/60">Frontend</div>
+                  </div>
+                  <div className="text-center p-4 bg-base-300 rounded-lg">
+                    <div className="font-bold text-lg mb-1">Node.js</div>
+                    <div className="text-xs text-base-content/60">Backend</div>
+                  </div>
+                  <div className="text-center p-4 bg-base-300 rounded-lg">
+                    <div className="font-bold text-lg mb-1">Socket.IO</div>
+                    <div className="text-xs text-base-content/60">Real-time</div>
+                  </div>
+                  <div className="text-center p-4 bg-base-300 rounded-lg">
+                    <div className="font-bold text-lg mb-1">MongoDB</div>
+                    <div className="text-xs text-base-content/60">Database</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Contact & Support */}
+            <div className="card bg-base-200 shadow-lg">
+              <div className="card-body text-center py-10">
+                <h3 className="text-2xl font-bold mb-3">Get In Touch</h3>
+                <p className="mb-8 text-base-content/70 max-w-2xl mx-auto">
+                  Have questions, suggestions, or need support? We'd love to hear from you!
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl mx-auto">
+                  <div className="flex flex-col items-center gap-3 p-4 bg-base-300 rounded-lg">
+                    <MessageSquare className="w-8 h-8 text-primary" />
+                    <span className="font-semibold">Request Features</span>
+                    <span className="text-xs text-base-content/60">Share your ideas</span>
+                  </div>
+                  <div className="flex flex-col items-center gap-3 p-4 bg-base-300 rounded-lg">
+                    <Heart className="w-8 h-8 text-error" />
+                    <span className="font-semibold">Support Development</span>
+                    <span className="text-xs text-base-content/60">Help us grow</span>
+                  </div>
+                  <div className="flex flex-col items-center gap-3 p-4 bg-base-300 rounded-lg">
+                    <Users className="w-8 h-8 text-secondary" />
+                    <span className="font-semibold">Join Community</span>
+                    <span className="text-xs text-base-content/60">Connect with others</span>
+                  </div>
+                </div>
+
+                {/* Social Links */}
+                <div className="mt-8 flex justify-center gap-4">
+                  <a
+                    href="https://discord.gg/sTQMkVsj9f"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-circle btn-primary"
+                    title="Join our Discord"
+                  >
+                    <MessageSquare className="w-5 h-5" />
+                  </a>
+                  <a
+                    href="https://github.com/justelson"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-circle btn-ghost"
+                    title="GitHub"
+                  >
+                    <Code className="w-5 h-5" />
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {activeTab === 'community' && (
-           <div className="max-w-5xl mx-auto space-y-6">
-             {/* Community Stats */}
-             <div className="card bg-gradient-to-br from-primary to-secondary text-primary-content shadow-xl">
-               <div className="card-body text-center">
-                 <Users className="w-16 h-16 mx-auto mb-4" />
-                 <h2 className="card-title text-2xl justify-center">Join Our Growing Community</h2>
-                 <p className="text-primary-content/90">
-                   Connect with other users, share feedback, and help us build something amazing together
-                 </p>
-                 <div className="grid grid-cols-3 gap-4 mt-6">
-                   <div>
-                     <div className="text-3xl font-bold">{stats?.activeUsers?.toLocaleString() || '0'}</div>
-                     <div className="text-sm opacity-80">Active Users</div>
-                   </div>
-                   <div>
-                     <div className="text-3xl font-bold">{stats?.totalSupporters || '0'}</div>
-                     <div className="text-sm opacity-80">Supporters</div>
-                   </div>
-                   <div>
-                     <div className="text-3xl font-bold">{stats?.featuresBuilt || '12'}</div>
-                     <div className="text-sm opacity-80">Features Built</div>
-                   </div>
-                 </div>
-               </div>
-             </div>
+          <div className="max-w-5xl mx-auto space-y-6">
+            {/* Community Stats */}
+            <div className="card bg-gradient-to-br from-primary to-secondary text-primary-content shadow-xl">
+              <div className="card-body text-center">
+                <Users className="w-16 h-16 mx-auto mb-4" />
+                <h2 className="card-title text-2xl justify-center">Join Our Growing Community</h2>
+                <p className="text-primary-content/90">
+                  Connect with other users, share feedback, and help us build something amazing together
+                </p>
+                <div className="grid grid-cols-3 gap-4 mt-6">
+                  <div>
+                    <div className="text-3xl font-bold">{stats?.activeUsers?.toLocaleString() || '0'}</div>
+                    <div className="text-sm opacity-80">Active Users</div>
+                  </div>
+                  <div>
+                    <div className="text-3xl font-bold">{stats?.totalSupporters || '0'}</div>
+                    <div className="text-sm opacity-80">Supporters</div>
+                  </div>
+                  <div>
+                    <div className="text-3xl font-bold">{stats?.featuresBuilt || '12'}</div>
+                    <div className="text-sm opacity-80">Features Built</div>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-             {/* New App Notice for Community */}
-             <div className="alert alert-info shadow-lg">
-               <div className="flex items-start gap-3">
-                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="stroke-current shrink-0 w-6 h-6">
-                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                 </svg>
-                 <div className="flex-1">
-                   <h3 className="font-bold">Brand New Community! 🚀</h3>
-                   <div className="text-sm">
-                     {stats?.activeUsers > 0
-                       ? `Our community is growing with ${stats.activeUsers.toLocaleString()} active users! Be part of our journey from the beginning.`
-                       : "This app is just getting started! Be one of the first community members and help shape our growing platform."
-                     }
-                   </div>
-                 </div>
-               </div>
-             </div>
+            {/* New App Notice for Community */}
+            <div className="alert alert-info shadow-lg">
+              <div className="flex items-start gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="stroke-current shrink-0 w-6 h-6">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <div className="flex-1">
+                  <h3 className="font-bold">Brand New Community! 🚀</h3>
+                  <div className="text-sm">
+                    {stats?.activeUsers > 0
+                      ? `Our community is growing with ${stats.activeUsers.toLocaleString()} active users! Be part of our journey from the beginning.`
+                      : "This app is just getting started! Be one of the first community members and help shape our growing platform."
+                    }
+                  </div>
+                </div>
+              </div>
+            </div>
 
             {/* Community Links */}
             <div className="card bg-base-200 shadow-lg">

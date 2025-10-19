@@ -1,17 +1,49 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuthStore } from "../store/useAuthStore";
-import { MailIcon, LockIcon, EyeIcon, EyeOffIcon, ArrowRightIcon, UserIcon } from "lucide-react";
-import { Link, useNavigate } from "react-router";
+import { MailIcon, LockIcon, EyeIcon, EyeOffIcon } from "lucide-react";
+import { Link, useNavigate, useLocation } from "react-router";
 import GoogleSignIn from "../components/GoogleSignIn";
-import AppLogo from "../components/AppLogo";
-import QuickThemeToggle from "../components/QuickThemeToggle";
 import ThemeIcons from "../components/ThemeDots";
+import AppLogo from "../components/AppLogo";
+import { useThemeStore } from "../store/useThemeStore";
 
 function LoginPageNew() {
+  const location = useLocation();
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const { login, isLoggingIn } = useAuthStore();
   const navigate = useNavigate();
+
+  const currentTheme = useThemeStore((state) => state.currentTheme);
+
+  // Get theme-specific text color
+  const getTextColor = () => {
+    switch (currentTheme) {
+      case 'light':
+        return '#1a1a1a'; // Dark black for light theme
+      case 'synthwave':
+        return '#e779c1'; // Synthwave pink
+      case 'dracula':
+        return '#f8f8f2'; // Dracula white
+      default:
+        return undefined; // Use theme's default primary-content
+    }
+  };
+
+  // Get theme-specific text shadow
+  const getTextShadow = () => {
+    if (currentTheme === 'cyberpunk') {
+      return 'none'; // No shadow for cyberpunk
+    }
+    return '0 2px 10px rgba(0,0,0,0.3), 0 0 20px rgba(0,0,0,0.2)';
+  };
+
+  // Pre-fill email if coming from signup
+  useEffect(() => {
+    if (location.state?.email) {
+      setFormData(prev => ({ ...prev, email: location.state.email }));
+    }
+  }, [location.state]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -22,178 +54,117 @@ function LoginPageNew() {
   };
 
   return (
-    <div className="min-h-screen bg-base-300 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="w-full max-w-6xl grid lg:grid-cols-2 gap-8 items-center min-h-screen lg:min-h-0 py-8">
-        
-        {/* Left Side - Branding & Illustration */}
-        <div className="hidden lg:flex flex-col items-center justify-center p-12 space-y-8">
-          <div className="text-center space-y-6">
-            <div className="w-32 h-32 mx-auto">
-              <AppLogo className="w-32 h-32" />
-            </div>
-            <div className="space-y-2">
-              <h1 className="text-4xl font-bold text-primary">
-                Welcome Back
-              </h1>
-              <p className="text-lg text-base-content/70">
-                Connect with friends and share moments
-              </p>
-            </div>
+    <div className="w-full min-h-screen flex flex-col md:flex-row bg-base-100">
+      {/* LEFT PANEL - Welcome Section */}
+      <div className="hidden md:flex md:w-1/2 flex-col items-center relative overflow-hidden bg-gradient-to-br from-primary/90 to-secondary/90" style={{ minHeight: '100vh', paddingTop: '20vh' }}>
+        {/* Decorative Circles */}
+        <div className="absolute top-20 left-20 w-32 h-32 rounded-full bg-white/20 backdrop-blur-md shadow-lg"></div>
+        <div className="absolute top-1/3 left-1/2 transform -translate-x-1/2 w-48 h-48 rounded-full bg-white/15 backdrop-blur-md shadow-lg"></div>
+        <div className="absolute bottom-32 left-16 w-40 h-40 rounded-full bg-white/20 backdrop-blur-md shadow-lg"></div>
+        <div className="absolute bottom-1/4 right-20 w-28 h-28 rounded-full bg-white/25 backdrop-blur-md shadow-lg"></div>
+
+        {/* Content */}
+        <div className="text-center space-y-5 p-10 relative z-10" style={{ color: getTextColor(), textShadow: getTextShadow() }}>
+          <div className="mb-6">
+            <AppLogo className="w-24 h-24 mx-auto" />
           </div>
-          
-          {/* Feature highlights */}
-          <div className="grid grid-cols-1 gap-4 w-full max-w-md">
-            <div className="flex items-center gap-3 p-4 bg-base-200/50 rounded-xl border border-base-300/50">
-              <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center">
-                <MailIcon className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-sm text-base-content">Real-time Chat</h3>
-                <p className="text-xs text-base-content/60">Instant messaging with friends</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-4 bg-base-200/50 rounded-xl border border-base-300/50">
-              <div className="w-10 h-10 bg-secondary/20 rounded-full flex items-center justify-center">
-                <UserIcon className="w-5 h-5 text-secondary" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-sm text-base-content">Group Chats</h3>
-                <p className="text-xs text-base-content/60">Create and manage group conversations</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-4 bg-base-200/50 rounded-xl border border-base-300/50">
-              <div className="w-10 h-10 bg-accent/20 rounded-full flex items-center justify-center">
-                <LockIcon className="w-5 h-5 text-accent" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-sm text-base-content">Secure & Private</h3>
-                <p className="text-xs text-base-content/60">Your conversations are protected</p>
-              </div>
-            </div>
-          </div>
+          <h1 className="text-6xl font-bold tracking-tight">Welcome Back</h1>
+          <p className="text-lg font-light opacity-90">We're glad to see you again. Let's continue the conversation.</p>
         </div>
+      </div>
 
-        {/* Right Side - Login Form */}
-        <div className="w-full max-w-md mx-auto lg:mx-0">
-          <div className="bg-base-100 rounded-3xl shadow-2xl border border-base-300/50 p-8 space-y-6 max-h-[90vh] overflow-y-auto scrollbar-hide relative">
-            
-            {/* Theme Toggle - Top Right */}
-            <div className="absolute top-4 right-4">
-              <QuickThemeToggle />
-            </div>
-            
-            {/* Header */}
-            <div className="text-center space-y-2">
-              <div className="lg:hidden w-16 h-16 mx-auto mb-4">
-                <AppLogo className="w-16 h-16" />
-              </div>
-              <h2 className="text-3xl font-bold text-base-content">Sign In</h2>
-              <p className="text-base-content/60">Welcome back! Please sign in to continue</p>
-            </div>
-
-            {/* Login Form */}
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="form-control">
-                <label className="label">
-                  <span className="label-text font-medium">Email Address</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="email"
-                    className="input input-bordered w-full pl-12 focus:input-primary transition-all duration-200"
-                    placeholder="Enter your email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
-                    required
-                  />
-                  <MailIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-base-content/40" />
+      {/* RIGHT PANEL - Form Section - SCROLLABLE */}
+      <div className="w-full md:w-1/2 bg-base-100">
+        <div className="h-screen overflow-y-auto">
+          <div className="flex items-center justify-center p-8 min-h-screen">
+            <div className="w-full max-w-md py-6">
+              <div className="text-center mb-6">
+                <div className="flex justify-center mb-3">
+                  <svg className="w-14 h-14 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                  </svg>
                 </div>
+                <h2 className="text-2xl font-bold text-base-content mb-2">Sign In</h2>
+                <p className="text-sm text-base-content/60">Welcome back! Please sign in to continue</p>
               </div>
 
-              <div className="form-control">
-                <label className="label">
-                  <span className="label-text font-medium">Password</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    className="input input-bordered w-full pl-12 pr-12 focus:input-primary transition-all duration-200"
-                    placeholder="Enter your password"
-                    value={formData.password}
-                    onChange={(e) => setFormData({...formData, password: e.target.value})}
-                    required
-                  />
-                  <LockIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-base-content/40" />
-                  <button
-                    type="button"
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-base-content/40 hover:text-base-content transition-colors"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOffIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
-                  </button>
+              {/* Email / Password form - FIRST */}
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <div className="form-control w-full">
+                  <label className="label">
+                    <span className="label-text text-base-content/70">Email Address</span>
+                  </label>
+                  <label className="input input-bordered flex items-center gap-2 bg-base-200 w-full">
+                    <MailIcon className="w-4 h-4 opacity-70" />
+                    <input
+                      type="email"
+                      className="grow"
+                      placeholder="Enter your email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      required
+                    />
+                  </label>
                 </div>
-              </div>
 
-              <button 
-                type="submit" 
-                className={`btn btn-primary w-full gap-2 ${isLoggingIn ? 'loading' : ''}`}
-                disabled={isLoggingIn}
-              >
-                {isLoggingIn ? (
-                  <>
+                <div className="form-control w-full">
+                  <label className="label">
+                    <span className="label-text text-base-content/70">Password</span>
+                  </label>
+                  <label className="input input-bordered flex items-center gap-2 bg-base-200 w-full">
+                    <LockIcon className="w-4 h-4 opacity-70" />
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      className="grow"
+                      placeholder="Enter your password"
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="text-base-content/40 hover:text-base-content transition-colors"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOffIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+                    </button>
+                  </label>
+                </div>
+
+                <button
+                  className={`btn btn-primary w-full mt-6 ${isLoggingIn ? 'btn-disabled' : ''}`}
+                  type="submit"
+                  disabled={isLoggingIn}
+                >
+                  {isLoggingIn ? (
                     <span className="loading loading-spinner loading-sm"></span>
-                    Signing In...
-                  </>
-                ) : (
-                  <>
-                    Sign In
-                    <ArrowRightIcon className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-            </form>
+                  ) : (
+                    "Sign In"
+                  )}
+                </button>
+              </form>
 
-            <div className="divider text-base-content/50">or sign in with</div>
+              <div className="divider text-base-content/60 text-sm my-8">or</div>
 
-            {/* Google Sign In */}
-            <div className="space-y-4">
-              <div className="p-4 bg-base-200/30 rounded-2xl border border-base-300/30">
-                <div className="flex justify-center">
+              {/* Google Sign In - Centered */}
+              <div className="flex justify-center w-full">
+                <div className="w-full max-w-sm">
                   <GoogleSignIn onSuccess={() => navigate("/chat")} />
                 </div>
               </div>
-            </div>
 
-            {/* Footer Links */}
-            <div className="text-center space-y-4">
-              <div className="text-sm text-base-content/60">
-                Don't have an account?{" "}
-                <Link to="/signup" className="link link-primary font-medium">
-                  Create one here
-                </Link>
+              <div className="mt-8 text-center text-sm text-base-content/60">
+                Don't have an account? <Link to="/signup" className="text-primary hover:underline">Create account</Link>
               </div>
-              
-              <div className="flex justify-center gap-4 text-xs">
-                <Link to="/admin/login" className="link link-hover text-base-content/50">
-                  Admin Login
-                </Link>
-                <span className="text-base-content/30">•</span>
-                <a href="#" className="link link-hover text-base-content/50">
-                  Forgot Password?
-                </a>
+
+              <div className="mt-4 text-center">
+                <Link to="/admin/login" className="text-xs text-base-content/40 hover:text-base-content/60">Admin Portal</Link>
               </div>
-            </div>
 
-            {/* Theme Dots */}
-            <div className="pt-4 border-t border-base-300/30">
-              <ThemeIcons />
-            </div>
-
-            {/* Terms */}
-            <div className="text-xs text-center text-base-content/50 pt-3">
-              By signing in, you agree to our{" "}
-              <Link to="/terms" className="link link-hover">Terms of Service</Link> and{" "}
-              <Link to="/privacy" className="link link-hover">Privacy Policy</Link>
+              {/* Theme Picker - Below Footer */}
+              <div className="mt-8 pt-6 border-t border-base-300">
+                <ThemeIcons />
+              </div>
             </div>
           </div>
         </div>

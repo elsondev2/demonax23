@@ -25,42 +25,60 @@ const AppsBackground = () => {
 
 const RequestAppCard = ({ onClick }) => (
     <div
-        className="card bg-transparent border-2 border-dashed border-base-300 hover:border-primary/50 hover:bg-base-200/50 shadow-sm hover:shadow-lg transition-all cursor-pointer flex flex-col"
+        className="card bg-gradient-to-br from-primary/5 to-secondary/5 border-2 border-dashed border-primary/30 hover:border-primary hover:shadow-xl hover:shadow-primary/10 transition-all cursor-pointer flex flex-col group"
         onClick={onClick}
     >
         <div className="card-body p-5 flex-grow flex flex-col items-start text-left">
-            <div className="w-14 h-14 rounded-xl bg-base-300/70 flex items-center justify-center mb-3">
-                <Plus className="w-7 h-7 text-base-content/70" />
+            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <Plus className="w-8 h-8 text-primary" />
             </div>
-            <h3 className="card-title text-base font-bold mb-1 text-base-content/80">Request New App</h3>
-            <p className="text-sm text-base-content/60 flex-grow">Can't find what you're looking for? Let us know.</p>
+            <h3 className="card-title text-base font-bold mb-2 text-base-content">Request New App</h3>
+            <p className="text-sm text-base-content/60 flex-grow">Can't find what you're looking for? Let us know and we'll consider adding it!</p>
+        </div>
+        <div className="px-5 pb-5">
+            <button className="btn btn-outline btn-primary btn-sm w-full">
+                <Plus className="w-4 h-4" />
+                Submit Request
+            </button>
         </div>
     </div>
 );
 
 const AppDetailModal = ({ app, onClose }) => (
-    <IOSModal isOpen={!!app} onClose={onClose}>
+    <IOSModal isOpen={!!app} onClose={onClose} className="max-w-md">
         {app && (
-            <div className="p-6">
-                <div className="flex items-center gap-4 mb-6">
-                    <div className="w-16 h-16 rounded-lg bg-base-300 flex items-center justify-center">
-                        <app.icon className="w-8 h-8 text-base-content" />
+            <>
+                {/* Header */}
+                <div className="px-6 py-4 border-b border-base-300 bg-base-100 flex-shrink-0">
+                    <h3 className="font-bold text-xl">App Details</h3>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto p-6 bg-base-100">
+                    <div className="flex items-center gap-4 mb-6">
+                        <div className="w-16 h-16 rounded-lg bg-base-300 flex items-center justify-center">
+                            <app.icon className="w-8 h-8 text-base-content" />
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-xl">{app.name}</h3>
+                            <p className="text-sm text-base-content/60">{app.description}</p>
+                        </div>
                     </div>
-                    <div>
-                        <h3 className="font-bold text-xl">{app.name}</h3>
-                        <p className="text-sm text-base-content/60">{app.description}</p>
+                    <div className="alert alert-warning">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <span className="text-sm">This app integration is not yet available. Check back soon!</span>
                     </div>
                 </div>
-                <div className="alert alert-warning">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                    <span className="text-sm">This app integration is not yet available. Check back soon!</span>
+
+                {/* Actions */}
+                <div className="px-6 py-4 border-t border-base-300 bg-base-100 flex-shrink-0">
+                    <button className="btn btn-primary w-full" onClick={onClose}>
+                        Got it
+                    </button>
                 </div>
-                <button className="btn btn-primary w-full mt-6" onClick={onClose}>
-                    Got it
-                </button>
-            </div>
+            </>
         )}
     </IOSModal>
 );
@@ -77,37 +95,44 @@ const AddAppModal = ({ isOpen, onClose, onSubmit }) => {
     };
 
     return (
-        <IOSModal isOpen={isOpen} onClose={onClose}>
-            <div className="p-6">
-                <h3 className="font-bold text-xl mb-2">Request App Integration</h3>
-                <p className="text-base-content/70 mb-6 text-sm">
+        <IOSModal isOpen={isOpen} onClose={onClose} className="max-w-md">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-base-300 bg-base-100 flex-shrink-0">
+                <h3 className="font-bold text-xl">Request App Integration</h3>
+                <p className="text-base-content/70 text-sm mt-1">
                     Want to see your favorite app integrated? Let us know!
                 </p>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6 bg-base-100">
                 <div className="space-y-4">
                     <div className="form-control w-full">
-                        <label className="label"><span className="label-text font-semibold text-base-content/70">App Name</span></label>
+                        <label className="label"><span className="label-text font-semibold">App Name</span></label>
                         <input
                             type="text"
                             placeholder="e.g., Twitch, Netflix, Notion"
-                            className="input input-bordered w-full bg-base-300/50 border-base-content/10 focus:bg-base-300/70 focus:outline-none focus:border-base-content/20 placeholder:text-base-content/40"
+                            className="input input-bordered w-full focus:outline-none focus:ring-2 focus:ring-primary"
                             value={appName}
                             onChange={(e) => setAppName(e.target.value)}
                         />
                     </div>
                     <div className="form-control w-full">
-                        <label className="label"><span className="label-text font-semibold text-base-content/70">Why do you need this app?</span></label>
+                        <label className="label"><span className="label-text font-semibold">Why do you need this app?</span></label>
                         <textarea
-                            className="textarea textarea-bordered w-full bg-base-300/50 border-base-content/10 focus:bg-base-300/70 focus:outline-none focus:border-base-content/20 placeholder:text-base-content/40 h-32 resize-none"
+                            className="textarea textarea-bordered w-full focus:outline-none focus:ring-2 focus:ring-primary h-32 resize-none"
                             placeholder="Tell us how you'd use this integration..."
                             value={appReason}
                             onChange={(e) => setAppReason(e.target.value)}
                         ></textarea>
                     </div>
                 </div>
-                <div className="flex gap-3 mt-6">
-                    <button className="btn btn-ghost flex-1" onClick={onClose}>Cancel</button>
-                    <button className="btn btn-primary flex-1" onClick={handleSubmit}>Submit Request</button>
-                </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3 px-6 py-4 border-t border-base-300 bg-base-100 flex-shrink-0">
+                <button className="btn btn-ghost flex-1" onClick={onClose}>Cancel</button>
+                <button className="btn btn-primary flex-1" onClick={handleSubmit}>Submit Request</button>
             </div>
         </IOSModal>
     );
@@ -167,16 +192,16 @@ export default function AppsView() {
             <div className="relative z-10 flex-shrink-0 border-b border-base-300 bg-base-200">
                 <div className="p-4">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3 flex-1">
-                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                          <Grid3x3 className="w-6 h-6 text-primary" />
+                        <div className="flex items-center gap-3 flex-1">
+                            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                                <Grid3x3 className="w-6 h-6 text-primary" />
+                            </div>
+                            <div className="flex-1">
+                                <h1 className="text-xl md:text-2xl font-bold">App Integrations</h1>
+                                <p className="text-xs md:text-sm text-base-content/60">Connect your favorite apps</p>
+                            </div>
                         </div>
-                        <div className="flex-1">
-                          <h1 className="text-xl md:text-2xl font-bold">App Integrations</h1>
-                          <p className="text-xs md:text-sm text-base-content/60">Connect your favorite apps</p>
-                        </div>
-                      </div>
-                        
+
                         <div className="flex items-center gap-2">
                             <button
                                 className="btn btn-primary btn-sm max-sm:btn-circle"
@@ -185,7 +210,7 @@ export default function AppsView() {
                                 <Plus className="w-4 h-4" />
                                 <span className="hidden sm:inline ml-2">Request App</span>
                             </button>
-                            
+
                             {/* Navigation Dropdown */}
                             <div className="dropdown dropdown-end">
                                 <label tabIndex={0} className="btn btn-ghost btn-sm btn-circle">
@@ -218,37 +243,39 @@ export default function AppsView() {
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-4 relative">
-                <div className="max-w-6xl mx-auto space-y-6">
+            <div className="flex-1 overflow-y-auto p-4 md:p-6 relative">
+                <div className="max-w-7xl mx-auto space-y-6">
                     {/* Info Banner */}
-                    <div className="alert bg-base-200 border border-base-300">
-                        <Zap className="w-5 h-5 text-base-content/70" />
+                    <div className="alert bg-gradient-to-r from-primary/10 to-secondary/10 border border-primary/20">
+                        <Zap className="w-5 h-5 text-primary" />
                         <div>
                             <p className="font-semibold text-sm">App Integrations Coming Soon</p>
-                            <p className="text-xs text-base-content/70">These integrations are in development. Request new apps below!</p>
+                            <p className="text-xs text-base-content/70">Connect your favorite apps to enhance your experience. Request new integrations below!</p>
                         </div>
                     </div>
 
-                    {/* Apps Grid */}
-                    <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-20">
+                    {/* Apps Grid - Improved Layout */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-20">
                         {TEMPLATE_APPS.map((app) => (
                             <AppCard key={app.id} app={app} onClick={handleAppClick} />
                         ))}
 
-                        {/* Add More Apps Card */}
+                        {/* Request New App Card - Always visible */}
                         <RequestAppCard onClick={() => setShowAddApp(true)} />
                     </div>
                 </div>
 
-                {/* Floating Question Button - Now positioned relative to the content area */}
-                <div className="absolute bottom-4 right-4 z-50 md:bottom-6 md:right-6">
-                    <button
-                        className="btn btn-circle btn-primary btn-lg shadow-2xl hover:scale-110 transition-transform"
-                        onClick={() => setShowHowItWorks(true)}
-                        title="How it works?"
-                    >
-                        <HelpCircle className="w-6 h-6" />
-                    </button>
+                {/* Floating Question Button - Sticky within content area */}
+                <div className="sticky bottom-6 float-right clear-both z-50 pointer-events-none">
+                    <div className="flex justify-end pr-6">
+                        <button
+                            className="btn btn-circle btn-primary btn-lg shadow-2xl hover:scale-110 transition-transform animate-pulse pointer-events-auto"
+                            onClick={() => setShowHowItWorks(true)}
+                            title="How it works?"
+                        >
+                            <HelpCircle className="w-6 h-6" />
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -263,19 +290,23 @@ export default function AppsView() {
             />
 
             {/* How It Works Modal - iOS Style */}
-            <IOSModal isOpen={showHowItWorks} onClose={() => setShowHowItWorks(false)}>
-                <div className="p-6">
-                    <div className="flex items-center gap-3 mb-6">
+            <IOSModal isOpen={showHowItWorks} onClose={() => setShowHowItWorks(false)} className="max-w-md">
+                {/* Header */}
+                <div className="px-6 py-4 border-b border-base-300 bg-base-100 flex-shrink-0">
+                    <div className="flex items-center gap-3">
                         <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
                             <HelpCircle className="w-6 h-6 text-primary" />
                         </div>
                         <div>
-                            <h3 className="font-bold text-xl">How App Integrations Work</h3>
-                            <p className="text-sm text-base-content/60">Learn about our integration process</p>
+                            <h3 className="font-bold text-lg">How It Works</h3>
+                            <p className="text-sm text-base-content/60">Integration process</p>
                         </div>
                     </div>
+                </div>
 
-                    <div className="space-y-4 mb-6">
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto p-6 bg-base-100">
+                    <div className="space-y-4">
                         <div className="flex gap-3">
                             <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                                 <span className="text-primary font-bold text-sm">1</span>
@@ -304,7 +335,10 @@ export default function AppsView() {
                             </div>
                         </div>
                     </div>
+                </div>
 
+                {/* Actions */}
+                <div className="px-6 py-4 border-t border-base-300 bg-base-100 flex-shrink-0">
                     <button
                         className="btn btn-primary w-full"
                         onClick={() => setShowHowItWorks(false)}

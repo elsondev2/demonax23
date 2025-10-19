@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { useAuthStore } from "../store/useAuthStore";
-import { UserIcon, AtSignIcon, MailIcon, LockIcon, EyeIcon, EyeOffIcon, ArrowRightIcon, CameraIcon } from "lucide-react";
+import { AtSignIcon, MailIcon, LockIcon, EyeIcon, EyeOffIcon, UserIcon, ArrowRightIcon, ArrowLeftIcon } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 import GoogleSignIn from "../components/GoogleSignIn";
-import Avatar from "../components/Avatar";
-import AppLogo from "../components/AppLogo";
-import QuickThemeToggle from "../components/QuickThemeToggle";
+import ProfilePicUpload from "../components/ProfilePicUpload";
 import ThemeIcons from "../components/ThemeDots";
+import AppLogo from "../components/AppLogo";
+import { axiosInstance } from "../lib/axios";
+import toast from "react-hot-toast";
+import { useThemeStore } from "../store/useThemeStore";
 
 function SignUpPageNew() {
   const [formData, setFormData] = useState({
@@ -18,279 +20,258 @@ function SignUpPageNew() {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
-  const [currentStep, setCurrentStep] = useState(1);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1); // Step 1 or 2
   const { signup, isSigningUp } = useAuthStore();
   const navigate = useNavigate();
+  const currentTheme = useThemeStore((state) => state.currentTheme);
 
-  const handleImageSelect = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+  // Get theme-specific text color
+  const getTextColor = () => {
+    switch (currentTheme) {
+      case 'light':
+        return '#1a1a1a'; // Dark black for light theme
+      case 'synthwave':
+        return '#e779c1'; // Synthwave pink
+      case 'dracula':
+        return '#f8f8f2'; // Dracula white
+      default:
+        return undefined; // Use theme's default primary-content
+    }
+  };
 
+  // Get theme-specific text shadow
+  const getTextShadow = () => {
+    if (currentTheme === 'cyberpunk') {
+      return 'none'; // No shadow for cyberpunk
+    }
+    return '0 2px 10px rgba(0,0,0,0.3), 0 0 20px rgba(0,0,0,0.2)';
+  };
+
+  const handleImageSelect = (file) => {
     setFormData({ ...formData, profilePic: file });
-    const reader = new FileReader();
-    reader.onloadend = () => setPreviewUrl(reader.result);
-    reader.readAsDataURL(file);
+    try {
+      setPreviewUrl(URL.createObjectURL(file));
+    } catch (error) {
+      console.error('Error creating preview URL:', error);
+    }
+  };
+
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const isStep1Valid = () => {
+    return (
+      formData.fullName.trim().length >= 3 &&
+      validateEmail(formData.email) &&
+      formData.password.length >= 6
+    );
+  };
+
+  const handleContinue = async () => {
+    if (!isStep1Valid()) return;
+
+    try {
+      // Check if user already exists
+      const response = await axiosInstance.post('/api/auth/check-user', {
+        email: formData.email.trim()
+      });
+
+      if (response.data.exists) {
+        toast.error('An account with this email already exists. Redirecting to login...');
+        setTimeout(() => {
+          navigate('/login', {
+            state: { email: formData.email.trim() }
+          });
+        }, 1500);
+      } else {
+        setCurrentStep(2);
+      }
+    } catch (error) {
+      console.error('Error checking user existence:', error);
+      // If check fails, proceed to step 2 anyway
+      setCurrentStep(2);
+    }
+  };
+
+  const handleBack = () => {
+    setCurrentStep(1);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validate required fields
-    if (!formData.fullName.trim()) {
-      console.error('Full name is required');
-      return;
-    }
-    if (!formData.username.trim()) {
-      console.error('Username is required');
-      return;
-    }
-    if (!formData.email.trim()) {
-      console.error('Email is required');
-      return;
-    }
-    if (!formData.password.trim()) {
-      console.error('Password is required');
-      return;
-    }
     if (!agreedToTerms) {
       console.error('You must agree to the terms and conditions');
       return;
     }
 
-    console.log('Submitting signup data:', {
-      fullName: formData.fullName,
-      username: formData.username,
-      email: formData.email,
-      hasProfilePic: !!formData.profilePic
-    });
+    // Create FormData for file upload
+    const submitData = new FormData();
+    submitData.append('fullName', formData.fullName.trim());
+    submitData.append('username', formData.username.trim());
+    submitData.append('email', formData.email.trim());
+    submitData.append('password', formData.password);
 
-    // Try both FormData and JSON approaches
-    let result;
     if (formData.profilePic) {
-      // Use FormData for file upload
-      const submitData = new FormData();
-      submitData.append('fullName', formData.fullName.trim());
-      submitData.append('username', formData.username.trim());
-      submitData.append('email', formData.email.trim());
-      submitData.append('password', formData.password);
       submitData.append('profilePic', formData.profilePic);
-
-      console.log('Using FormData with file upload');
-      result = await signup(submitData);
-      console.log('Signup result:', result);
-    } else {
-      // Use JSON for no file upload
-      const submitData = {
-        fullName: formData.fullName.trim(),
-        username: formData.username.trim(),
-        email: formData.email.trim(),
-        password: formData.password
-      };
-
-      console.log('Using JSON without file upload');
-      result = await signup(submitData);
-      console.log('Signup result:', result);
     }
 
+    const result = await signup(submitData);
+
     if (result?.success) {
-      // Check if verification is required
       if (result.requiresVerification) {
         navigate('/verify-email', {
           state: { userData: result.userData },
           replace: true
         });
       } else {
-        // Already verified (e.g., Google OAuth)
         navigate("/chat");
       }
     }
   };
 
-  const nextStep = () => {
-    if (currentStep < 2) setCurrentStep(currentStep + 1);
-  };
-
-  const prevStep = () => {
-    if (currentStep > 1) setCurrentStep(currentStep - 1);
-  };
-
-  const isStep1Valid = formData.fullName && formData.email && formData.password;
-
   return (
-    <div className="min-h-screen bg-base-300 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="w-full max-w-6xl grid lg:grid-cols-2 gap-8 items-center min-h-screen lg:min-h-0 py-8">
+    <div className="w-full min-h-screen flex flex-col md:flex-row bg-base-100">
+      {/* LEFT PANEL - Welcome Section */}
+      <div className="hidden md:flex md:w-1/2 flex-col items-center relative overflow-hidden bg-gradient-to-br from-primary/90 to-secondary/90" style={{ minHeight: '100vh', paddingTop: '20vh' }}>
+        {/* Decorative Circles */}
+        <div className="absolute top-20 left-20 w-32 h-32 rounded-full bg-white/20 backdrop-blur-md shadow-lg"></div>
+        <div className="absolute top-1/3 left-1/2 transform -translate-x-1/2 w-48 h-48 rounded-full bg-white/15 backdrop-blur-md shadow-lg"></div>
+        <div className="absolute bottom-32 left-16 w-40 h-40 rounded-full bg-white/20 backdrop-blur-md shadow-lg"></div>
+        <div className="absolute bottom-1/4 right-20 w-28 h-28 rounded-full bg-white/25 backdrop-blur-md shadow-lg"></div>
 
-        {/* Left Side - Branding & Progress */}
-        <div className="hidden lg:flex flex-col items-center justify-center p-12 space-y-8">
-          <div className="text-center space-y-6">
-            <div className="w-32 h-32 mx-auto">
-              <AppLogo className="w-32 h-32" />
-            </div>
-            <div className="space-y-2">
-              <h1 className="text-4xl font-bold text-primary">
-                Join Our Community
-              </h1>
-              <p className="text-lg text-base-content/70">
-                Create your account and start connecting
-              </p>
-            </div>
+        {/* Content */}
+        <div className="text-center space-y-5 p-10 relative z-10" style={{ color: getTextColor(), textShadow: getTextShadow() }}>
+          <div className="mb-6">
+            <AppLogo className="w-24 h-24 mx-auto" />
           </div>
-
-          {/* Progress Steps */}
-          <div className="w-full max-w-md space-y-4">
-            <div className="flex items-center justify-center space-x-4 mb-6">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all ${currentStep >= 1 ? 'bg-primary text-primary-content' : 'bg-base-300 text-base-content/50'
-                }`}>
-                1
-              </div>
-              <div className={`h-1 w-16 transition-all ${currentStep >= 2 ? 'bg-primary' : 'bg-base-300'}`}></div>
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all ${currentStep >= 2 ? 'bg-primary text-primary-content' : 'bg-base-300 text-base-content/50'
-                }`}>
-                2
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <div className={`flex items-center gap-3 p-4 rounded-xl border transition-all ${currentStep === 1
-                ? 'bg-primary/10 border-primary/30'
-                : 'bg-base-200/50 border-base-300'
-                }`}>
-                <UserIcon className={`w-6 h-6 ${currentStep === 1 ? 'text-primary' : 'text-base-content/40'}`} />
-                <div className="text-left">
-                  <h3 className="font-semibold text-base-content">Basic Information</h3>
-                  <p className="text-sm text-base-content/60">Name, email, and password</p>
-                </div>
-              </div>
-
-              <div className={`flex items-center gap-3 p-4 rounded-xl border transition-all ${currentStep === 2
-                ? 'bg-primary/10 border-primary/30'
-                : 'bg-base-200/50 border-base-300'
-                }`}>
-                <CameraIcon className={`w-6 h-6 ${currentStep === 2 ? 'text-primary' : 'text-base-content/40'}`} />
-                <div className="text-left">
-                  <h3 className="font-semibold text-base-content">Profile Setup</h3>
-                  <p className="text-sm text-base-content/60">Username and profile picture</p>
-                </div>
-              </div>
-            </div>
-          </div>
+          <h1 className="text-6xl font-bold tracking-tight">Welcome</h1>
+          <p className="text-lg font-light opacity-90">Join our community and start connecting with friends.</p>
         </div>
+      </div>
 
-        {/* Right Side - Sign Up Form */}
-        <div className="w-full max-w-md mx-auto lg:mx-0">
-          <div className="bg-base-100 rounded-3xl shadow-2xl border border-base-300/50 p-8 space-y-6 max-h-[90vh] overflow-y-auto scrollbar-hide relative">
-
-            {/* Theme Toggle - Top Right */}
-            <div className="absolute top-4 right-4">
-              <QuickThemeToggle />
-            </div>
-
-            {/* Header */}
-            <div className="text-center space-y-2">
-              <div className="lg:hidden w-16 h-16 mx-auto mb-4">
-                <AppLogo className="w-16 h-16" />
+      {/* RIGHT PANEL - Form Section - SCROLLABLE */}
+      <div className="w-full md:w-1/2 bg-base-100">
+        <div className="h-screen overflow-y-auto">
+          <div className="flex items-center justify-center p-8 min-h-screen">
+            <div className="w-full max-w-md py-6">
+              <div className="text-center mb-6">
+                <div className="flex justify-center mb-3">
+                  <UserIcon className="w-14 h-14 text-primary" />
+                </div>
+                <h2 className="text-2xl font-bold text-base-content mb-2">Create Account</h2>
+                <p className="text-sm text-base-content/60">
+                  {currentStep === 1 ? "Let's get started with your basic info" : "Complete your profile setup"}
+                </p>
               </div>
-              <h2 className="text-3xl font-bold text-base-content">Create Account</h2>
-              <p className="text-base-content/60">
-                {currentStep === 1 ? "Let's get started with your basic info" : "Complete your profile setup"}
-              </p>
-            </div>
 
-            {/* Mobile Progress */}
-            <div className="lg:hidden flex items-center justify-center space-x-4 mb-6">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${currentStep >= 1 ? 'bg-primary text-primary-content' : 'bg-base-300 text-base-content/50'
-                }`}>
-                1
+              {/* Progress Indicator */}
+              <div className="flex items-center justify-center mb-6">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all ${currentStep >= 1 ? 'bg-primary text-primary-content' : 'bg-base-300 text-base-content/50'
+                  }`}>
+                  1
+                </div>
+                <div className={`h-1 w-16 mx-2 transition-all ${currentStep >= 2 ? 'bg-primary' : 'bg-base-300'
+                  }`}></div>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all ${currentStep >= 2 ? 'bg-primary text-primary-content' : 'bg-base-300 text-base-content/50'
+                  }`}>
+                  2
+                </div>
               </div>
-              <div className={`h-1 w-12 ${currentStep >= 2 ? 'bg-primary' : 'bg-base-300'}`}></div>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${currentStep >= 2 ? 'bg-primary text-primary-content' : 'bg-base-300 text-base-content/50'
-                }`}>
-                2
-              </div>
-            </div>
 
-            {currentStep === 1 && (
-              <>
-                {/* Step 1 Form */}
-                <div className="space-y-4">
-                  <div className="form-control">
+              {/* STEP 1: Basic Info */}
+              {currentStep === 1 && (
+                <div className="space-y-5">
+                  <div className="form-control w-full">
                     <label className="label">
-                      <span className="label-text font-medium">Full Name</span>
+                      <span className="label-text text-base-content/70">Full Name</span>
                     </label>
-                    <div className="relative">
+                    <label className="input input-bordered flex items-center gap-2 bg-base-200 w-full">
+                      <UserIcon className="w-4 h-4 opacity-70" />
                       <input
                         type="text"
-                        className="input input-bordered w-full pl-12 focus:input-primary transition-all duration-200"
                         placeholder="Enter your full name"
+                        className="grow"
                         value={formData.fullName}
                         onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                         required
                       />
-                      <UserIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-base-content/40" />
-                    </div>
+                    </label>
                   </div>
 
-                  <div className="form-control">
+                  <div className="form-control w-full">
                     <label className="label">
-                      <span className="label-text font-medium">Email Address</span>
+                      <span className="label-text text-base-content/70">Email Address</span>
                     </label>
-                    <div className="relative">
+                    <label className="input input-bordered flex items-center gap-2 bg-base-200 w-full">
+                      <MailIcon className="w-4 h-4 opacity-70" />
                       <input
                         type="email"
-                        className="input input-bordered w-full pl-12 focus:input-primary transition-all duration-200"
                         placeholder="Enter your email"
+                        className="grow"
                         value={formData.email}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                         required
                       />
-                      <MailIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-base-content/40" />
-                    </div>
+                    </label>
                   </div>
 
-                  <div className="form-control">
+                  <div className="form-control w-full">
                     <label className="label">
-                      <span className="label-text font-medium">Password</span>
+                      <span className="label-text text-base-content/70">Password</span>
                     </label>
-                    <div className="relative">
+                    <label className="input input-bordered flex items-center gap-2 bg-base-200 w-full">
+                      <LockIcon className="w-4 h-4 opacity-70" />
                       <input
                         type={showPassword ? "text" : "password"}
-                        className="input input-bordered w-full pl-12 pr-12 focus:input-primary transition-all duration-200"
                         placeholder="Create a strong password"
+                        className="grow"
                         value={formData.password}
                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                         required
                       />
-                      <LockIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-base-content/40" />
                       <button
                         type="button"
-                        className="absolute right-4 top-1/2 transform -translate-y-1/2 text-base-content/40 hover:text-base-content transition-colors"
+                        className="text-base-content/40 hover:text-base-content transition-colors"
                         onClick={() => setShowPassword(!showPassword)}
                       >
                         {showPassword ? <EyeOffIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
                       </button>
-                    </div>
+                    </label>
                   </div>
 
                   <button
-                    type="button"
-                    onClick={nextStep}
-                    className={`btn btn-primary w-full gap-2 ${!isStep1Valid ? 'btn-disabled' : ''}`}
-                    disabled={!isStep1Valid}
+                    className="btn btn-primary w-full mt-6"
+                    onClick={handleContinue}
+                    disabled={!isStep1Valid()}
                   >
                     Continue
-                    <ArrowRightIcon className="w-4 h-4" />
+                    <ArrowRightIcon className="w-4 h-4 ml-2" />
                   </button>
-                </div>
 
-                <div className="divider text-base-content/50">or sign up with</div>
+                  {!isStep1Valid() && (formData.fullName || formData.email || formData.password) && (
+                    <div className="text-xs text-error mt-2 space-y-1">
+                      {formData.fullName && formData.fullName.trim().length < 3 && (
+                        <p>• Name must be at least 3 characters</p>
+                      )}
+                      {formData.email && !validateEmail(formData.email) && (
+                        <p>• Please enter a valid email address</p>
+                      )}
+                      {formData.password && formData.password.length < 6 && (
+                        <p>• Password must be at least 6 characters</p>
+                      )}
+                    </div>
+                  )}
 
-                {/* Google Sign In */}
-                <div className="space-y-4">
-                  <div className="p-4 bg-base-200/30 rounded-2xl border border-base-300/30">
-                    <div className="flex justify-center">
+                  <div className="divider text-base-content/60 text-sm my-8">or sign up with</div>
+
+                  {/* Google Sign In - Centered */}
+                  <div className="flex justify-center w-full">
+                    <div className="w-full max-w-sm">
                       <GoogleSignIn text="signup_with" onSuccess={(info) => {
-                        // Pre-fill from Google token claims if available
                         try {
                           const claims = info?.claims || {};
                           setFormData(prev => ({
@@ -302,143 +283,123 @@ function SignUpPageNew() {
                             setPreviewUrl(claims.picture);
                           }
                         } catch { /* empty */ }
-                        // Navigate to chat after successful Google sign up
                         navigate("/chat");
                       }} />
                     </div>
                   </div>
                 </div>
-              </>
-            )}
+              )}
 
-            {currentStep === 2 && (
-              <>
-                {/* Step 2 Form */}
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  <div className="form-control">
+              {/* STEP 2: Profile Setup */}
+              {currentStep === 2 && (
+                <form onSubmit={handleSubmit} className="space-y-5">
+                  <div className="form-control w-full">
                     <label className="label">
-                      <span className="label-text font-medium">Username</span>
+                      <span className="label-text text-base-content/70">Username</span>
                     </label>
-                    <div className="relative">
+                    <label className="input input-bordered flex items-center gap-2 bg-base-200 w-full">
+                      <AtSignIcon className="w-4 h-4 opacity-70" />
                       <input
                         type="text"
-                        className="input input-bordered w-full pl-12 focus:input-primary transition-all duration-200"
+                        className="grow"
                         placeholder="Choose a unique username"
                         value={formData.username}
                         onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                         required
                       />
-                      <AtSignIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-base-content/40" />
-                    </div>
-                  </div>
-
-                  <div className="form-control">
-                    <label className="label">
-                      <span className="label-text font-medium">Profile Picture (Optional)</span>
                     </label>
-                    <div className="flex items-center gap-4">
-                      <Avatar
-                        src={previewUrl}
-                        name={formData.fullName}
-                        size="w-20 h-20"
-                        textSize="text-xl"
-                        className="ring-2 ring-base-300"
-                      />
-                      <div className="flex-1">
-                        <label className="btn btn-outline btn-sm gap-2 cursor-pointer">
-                          <CameraIcon className="w-4 h-4" />
-                          Choose Photo
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={handleImageSelect}
-                          />
-                        </label>
-                        <p className="text-xs text-base-content/60 mt-2">
-                          Upload a profile picture or we'll create one with your initials
-                        </p>
-                      </div>
+                  </div>
+
+                  {/* Profile Photo Upload */}
+                  <div className="form-control w-full">
+                    <label className="label">
+                      <span className="label-text text-base-content/70">Profile Picture (Optional)</span>
+                    </label>
+                    <div className="flex flex-col items-center gap-4 p-4 border-2 border-dashed border-base-300 rounded-lg">
+                      <ProfilePicUpload onImageSelect={handleImageSelect} selectedImage={previewUrl} />
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm"
+                        onClick={() => document.querySelector('input[type="file"]')?.click()}
+                      >
+                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        Choose Photo
+                      </button>
+                      <p className="text-xs text-base-content/60 text-center">
+                        Upload a profile picture or we'll create one with your initials
+                      </p>
                     </div>
                   </div>
 
-                  {/* Terms Agreement */}
-                  <div className="form-control">
-                    <label className="label cursor-pointer justify-start gap-3">
+                  {/* Terms Checkbox */}
+                  <div className="form-control w-full">
+                    <label className="flex items-center gap-3 cursor-pointer">
                       <input
                         type="checkbox"
-                        className="checkbox checkbox-primary"
+                        className="checkbox checkbox-primary checkbox-sm flex-shrink-0"
                         checked={agreedToTerms}
                         onChange={(e) => setAgreedToTerms(e.target.checked)}
+                        required
                       />
-                      <span className="label-text text-sm">
-                        I agree to the{" "}
-                        <Link to="/eula" className="link link-primary">EULA</Link>
-                        {", "}
-                        <Link to="/terms" className="link link-primary">Terms of Service</Link>
-                        {" "}and{" "}
-                        <Link to="/privacy" className="link link-primary">Privacy Policy</Link>
+                      <span className="label-text text-xs text-base-content/60">
+                        I agree to the <Link to="/eula" className="text-primary">EULA</Link>, <Link to="/terms" className="text-primary">Terms of Service</Link> and <Link to="/privacy" className="text-primary">Privacy Policy</Link>
                       </span>
                     </label>
                   </div>
 
-                  <div className="flex gap-3">
+                  {/* Verification Notice */}
+                  <div className="bg-info/10 border border-info/30 rounded-lg p-3 mt-4">
+                    <p className="text-xs text-base-content/70 text-center">
+                      📧 After creating your account, you'll receive a verification code via email to complete the setup.
+                    </p>
+                  </div>
+
+                  <div className="flex gap-3 mt-4">
                     <button
                       type="button"
-                      onClick={prevStep}
                       className="btn btn-outline flex-1"
+                      onClick={handleBack}
                     >
+                      <ArrowLeftIcon className="w-4 h-4 mr-2" />
                       Back
                     </button>
                     <button
                       type="submit"
-                      className={`btn btn-primary flex-1 gap-2 ${isSigningUp ? 'loading' : ''}`}
+                      className={`btn btn-primary flex-1 ${isSigningUp ? 'btn-disabled' : ''}`}
                       disabled={isSigningUp || !formData.username || !agreedToTerms}
                     >
                       {isSigningUp ? (
-                        <>
-                          <span className="loading loading-spinner loading-sm"></span>
-                          Creating...
-                        </>
+                        <span className="loading loading-spinner loading-sm"></span>
                       ) : (
                         <>
                           Create Account
-                          <ArrowRightIcon className="w-4 h-4" />
+                          <ArrowRightIcon className="w-4 h-4 ml-2" />
                         </>
                       )}
                     </button>
                   </div>
                 </form>
-              </>
-            )}
+              )}
 
-            {/* Footer Links */}
-            <div className="text-center space-y-4">
-              <div className="text-sm text-base-content/60">
-                Already have an account?{" "}
-                <Link to="/login" className="link link-primary font-medium">
-                  Sign in here
-                </Link>
+              <div className="mt-8 text-center text-sm text-base-content/60">
+                Already have an account? <Link to="/login" className="text-primary hover:underline">Sign in here</Link>
               </div>
 
-              <div className="flex justify-center gap-4 text-xs">
-                <Link to="/admin/login" className="link link-hover text-base-content/50">
-                  Admin Login
-                </Link>
+              <div className="mt-4 text-center">
+                <Link to="/admin/login" className="text-xs text-base-content/40 hover:text-base-content/60">Admin Login</Link>
               </div>
-            </div>
 
-            {/* Theme Dots */}
-            <div className="pt-4 border-t border-base-300/30">
-              <ThemeIcons />
-            </div>
+              {/* Theme Picker - Below Footer */}
+              <div className="mt-8 pt-6 border-t border-base-300">
+                <ThemeIcons />
+              </div>
 
-            {/* Terms */}
-            <div className="text-xs text-center text-base-content/50 pt-3">
-              By creating an account, you agree to our{" "}
-              <Link to="/eula" className="link link-hover">EULA</Link>,{" "}
-              <Link to="/terms" className="link link-hover">Terms of Service</Link> and{" "}
-              <Link to="/privacy" className="link link-hover">Privacy Policy</Link>
+              {/* Terms Footer */}
+              <div className="mt-6 text-xs text-center text-base-content/50">
+                By creating an account, you agree to our <Link to="/eula" className="link link-hover">EULA</Link>, <Link to="/terms" className="link link-hover">Terms of Service</Link> and <Link to="/privacy" className="link link-hover">Privacy Policy</Link>
+              </div>
             </div>
           </div>
         </div>
