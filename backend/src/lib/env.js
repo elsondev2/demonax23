@@ -31,6 +31,6 @@ export const ENV = {
   SMTP_PASS: process.env.SMTP_PASS,
   EMAIL_FROM: process.env.EMAIL_FROM,
   EMAIL_FROM_NAME: process.env.EMAIL_FROM_NAME || "de_monax",
-  // Resend
-  RESEND_API_KEY: process.env.RESEND_API_KEY,
+  // MailerSend
+  MAILERSEND_API_KEY: process.env.MAILERSEND_API_KEY,
 };

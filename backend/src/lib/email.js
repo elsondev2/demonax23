@@ -1,19 +1,14 @@
 import nodemailer from "nodemailer";
 import { ENV } from "./env.js";
+import { MailerSend, EmailParams, Sender, Recipient } from "mailersend";
 
-// Try to import Resend (optional dependency)
-let Resend = null;
-let resendClient = null;
-
-try {
-  const resendModule = await import("resend");
-  Resend = resendModule.Resend;
-  if (ENV.RESEND_API_KEY) {
-    resendClient = new Resend(ENV.RESEND_API_KEY);
-    console.log("✅ Resend email service initialized");
-  }
-} catch (error) {
-  console.log("ℹ️ Resend not available, will use SMTP fallback");
+// Initialize MailerSend
+let mailerSend = null;
+if (ENV.MAILERSEND_API_KEY) {
+  mailerSend = new MailerSend({
+    apiKey: ENV.MAILERSEND_API_KEY,
+  });
+  console.log("✅ MailerSend email service initialized");
 }
 
 // Create reusable transporter for SMTP fallback
@@ -49,32 +44,37 @@ function getTransporter() {
 }
 
 /**
- * Send email using Resend (preferred) or Nodemailer (fallback)
+ * Send email using MailerSend (preferred) or Nodemailer (fallback)
  */
 export async function sendEmail({ to, subject, html }) {
   console.log(`📧 Attempting to send email to: ${to}`);
   console.log(`📧 Subject: ${subject}`);
 
-  // Try Resend first (works better on Render and other platforms)
-  if (resendClient) {
+  // Try MailerSend first (works on Render)
+  if (mailerSend) {
     try {
-      console.log("📧 Using Resend email service...");
-      const { data, error } = await resendClient.emails.send({
-        from: `${ENV.EMAIL_FROM_NAME || 'de_monax'} <${ENV.EMAIL_FROM || 'onboarding@resend.dev'}>`,
-        to: [to],
-        subject,
-        html,
-      });
+      console.log("📧 Using MailerSend email service...");
 
-      if (error) {
-        console.error("❌ Resend error:", error);
-        throw new Error(error.message || "Resend failed");
-      }
+      const sentFrom = new Sender(
+        ENV.EMAIL_FROM || "info@test-ywj2lpn1dvqg7oqz.mlsender.net",
+        ENV.EMAIL_FROM_NAME || "de_monax"
+      );
 
-      console.log(`✅ Email sent successfully via Resend: ${data.id}`);
-      return { success: true, messageId: data.id, provider: 'resend' };
-    } catch (resendError) {
-      console.error("❌ Resend failed, trying SMTP fallback:", resendError.message);
+      const recipients = [new Recipient(to)];
+
+      const emailParams = new EmailParams()
+        .setFrom(sentFrom)
+        .setTo(recipients)
+        .setSubject(subject)
+        .setHtml(html);
+
+      const response = await mailerSend.email.send(emailParams);
+
+      console.log(`✅ Email sent successfully via MailerSend`);
+      return { success: true, messageId: response.body?.id || 'sent', provider: 'mailersend' };
+    } catch (mailerSendError) {
+      console.error("❌ MailerSend failed:", mailerSendError.message);
+      console.error("❌ Error details:", mailerSendError);
       // Fall through to SMTP
     }
   }

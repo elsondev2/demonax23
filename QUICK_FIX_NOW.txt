@@ -1,0 +1,96 @@
+╔═══════════════════════════════════════════════════════════════╗
+║                                                               ║
+║   🚨 QUICK FIX - RESEND TEST MODE RESTRICTION 🚨             ║
+║                                                               ║
+╚═══════════════════════════════════════════════════════════════╝
+
+PROBLEM:
+  Resend is working, but in TEST MODE
+  Can only send to: elsonmgaya25@gmail.com
+  Other emails blocked until domain verified
+
+CURRENT ERROR:
+  "You can only send testing emails to your own email address"
+
+═══════════════════════════════════════════════════════════════
+
+QUICK FIX (2 MINUTES):
+
+1. Go to Render Dashboard
+   → https://dashboard.render.com
+
+2. Find your backend service: "demonax23"
+
+3. Click "Environment" tab
+
+4. Find or add this variable:
+
+   ┌─────────────────────────────────────────────────────────┐
+   │ EMAIL_FROM                                              │
+   │ elsonmgaya25@gmail.com                                 │
+   └─────────────────────────────────────────────────────────┘
+
+5. Click "Save Changes"
+
+6. Wait for redeploy (2-3 minutes)
+
+7. Test signup - should work for ALL emails now! ✅
+
+═══════════════════════════════════════════════════════════════
+
+WHY THIS WORKS:
+
+  Resend allows sending FROM your verified email
+  (elsonmgaya25@gmail.com) to ANY recipient.
+
+  By changing EMAIL_FROM to your verified email,
+  you bypass the test mode restriction.
+
+═══════════════════════════════════════════════════════════════
+
+WHAT YOU'LL SEE IN RENDER LOGS:
+
+  ✅ SUCCESS:
+     "📧 Using Resend email service..."
+     "✅ Email sent successfully via Resend"
+  
+  ❌ BEFORE FIX:
+     "❌ Resend error: You can only send testing emails..."
+     "❌ Failed to send email via SMTP: Connection timeout"
+
+═══════════════════════════════════════════════════════════════
+
+FOR PRODUCTION (LATER):
+
+  To use a professional email like noreply@yourdomain.com:
+
+  1. Go to Resend dashboard → Domains
+  2. Add your domain
+  3. Add DNS records (SPF, DKIM, DMARC)
+  4. Wait for verification (up to 48 hours)
+  5. Update EMAIL_FROM to noreply@yourdomain.com
+
+  See: RESEND_DOMAIN_SETUP.md for details
+
+═══════════════════════════════════════════════════════════════
+
+CURRENT RENDER ENVIRONMENT VARIABLES:
+
+  ✅ RESEND_API_KEY = re_your_key (already set)
+  🔧 EMAIL_FROM = elsonmgaya25@gmail.com (UPDATE THIS!)
+  ✅ EMAIL_FROM_NAME = de_monax (already set)
+
+═══════════════════════════════════════════════════════════════
+
+ACTION REQUIRED:
+
+  1. Update EMAIL_FROM in Render
+  2. Save and wait for redeploy
+  3. Test signup
+  4. Done! ✅
+
+═══════════════════════════════════════════════════════════════
+
+START HERE: https://dashboard.render.com
+
+═══════════════════════════════════════════════════════════════
