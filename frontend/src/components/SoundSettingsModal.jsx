@@ -284,7 +284,7 @@ function SoundSettingsModal({ isOpen, onClose }) {
 
   return (
     <IOSModal isOpen={isOpen} onClose={onClose} className="max-w-lg mx-auto">
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col h-full max-h-[90vh]">
         {modalContent}
       </div>
     </IOSModal>

@@ -265,17 +265,15 @@ export default function AppsView() {
                     </div>
                 </div>
 
-                {/* Floating Question Button - Sticky within content area */}
-                <div className="sticky bottom-6 float-right clear-both z-50 pointer-events-none">
-                    <div className="flex justify-end pr-6">
-                        <button
-                            className="btn btn-circle btn-primary btn-lg shadow-2xl hover:scale-110 transition-transform animate-pulse pointer-events-auto"
-                            onClick={() => setShowHowItWorks(true)}
-                            title="How it works?"
-                        >
-                            <HelpCircle className="w-6 h-6" />
-                        </button>
-                    </div>
+                {/* Floating Question Button - Absolute positioned within content */}
+                <div className="absolute bottom-4 right-4 z-50">
+                    <button
+                        className="btn btn-circle btn-primary btn-lg shadow-2xl hover:scale-110 transition-transform animate-pulse"
+                        onClick={() => setShowHowItWorks(true)}
+                        title="How it works?"
+                    >
+                        <HelpCircle className="w-6 h-6" />
+                    </button>
                 </div>
             </div>
 
