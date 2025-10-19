@@ -29,5 +29,8 @@ export const ENV = {
   SMTP_PORT: process.env.SMTP_PORT || 587,
   SMTP_USER: process.env.SMTP_USER,
   SMTP_PASS: process.env.SMTP_PASS,
-  EMAIL_FROM_NAME: process.env.EMAIL_FROM_NAME || "Your App",
+  EMAIL_FROM: process.env.EMAIL_FROM,
+  EMAIL_FROM_NAME: process.env.EMAIL_FROM_NAME || "de_monax",
+  // Resend
+  RESEND_API_KEY: process.env.RESEND_API_KEY,
 };

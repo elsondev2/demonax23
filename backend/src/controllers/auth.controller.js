@@ -330,18 +330,12 @@ export const googleAuth = async (req, res) => {
     let user = await User.findOne({ email });
 
     if (user) {
-      // User exists - just log them in
-      // Update Google ID and profile pic if not set
+      // User exists - update Google ID and profile pic if not set
       if (!user.googleId) {
         user.googleId = googleId;
       }
       if (!user.profilePic && picture) {
         user.profilePic = picture;
-      }
-      // Ensure Google OAuth users are verified
-      if (!user.isVerified) {
-        user.isVerified = true;
-        user.verifiedAt = new Date();
       }
       await user.save();
     } else {
@@ -366,16 +360,50 @@ export const googleAuth = async (req, res) => {
         username: username,
         profilePic: picture || "",
         googleId: googleId,
-        isVerified: true, // Google OAuth users are pre-verified
-        verifiedAt: new Date(),
+        isVerified: false, // Google OAuth users also need to verify email
+        verifiedAt: null,
         // No password needed for Google OAuth users
         password: await bcrypt.hash(Math.random().toString(36), 10), // Random password as fallback
       });
 
       await user.save();
+
+      // Send verification email to Google OAuth users
+      try {
+        const { createAndSendOTP } = await import("../services/otp.service.js");
+        await createAndSendOTP(user._id.toString(), user.email, "email");
+        console.log("Verification email sent to Google OAuth user:", user.email);
+      } catch (err) {
+        console.log("Failed to send verification email to Google OAuth user:", err);
+      }
+
+      // Return user data without token - they need to verify email first
+      return res.status(201).json({
+        _id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        username: user.username,
+        profilePic: user.profilePic,
+        isVerified: user.isVerified,
+        requiresVerification: true, // Flag to frontend
+      });
     }
 
-    // Generate JWT token and set cookie
+    // For existing users, check if they need verification
+    if (!user.isVerified) {
+      // User exists but not verified - send them to verification
+      return res.status(200).json({
+        _id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        username: user.username,
+        profilePic: user.profilePic,
+        isVerified: user.isVerified,
+        requiresVerification: true,
+      });
+    }
+
+    // Generate JWT token and set cookie for verified users
     const token = generateToken(user._id, res);
 
     // Return user data

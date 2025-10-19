@@ -7,16 +7,28 @@ let transporter = null;
 function getTransporter() {
   if (transporter) return transporter;
 
+  // Validate required environment variables
+  if (!ENV.SMTP_USER || !ENV.SMTP_PASS) {
+    console.error("❌ SMTP credentials missing! Check SMTP_USER and SMTP_PASS in environment variables.");
+    throw new Error("Email configuration incomplete");
+  }
+
   // Configure based on your email service
   transporter = nodemailer.createTransport({
     host: ENV.SMTP_HOST || "smtp.gmail.com",
-    port: ENV.SMTP_PORT || 587,
+    port: parseInt(ENV.SMTP_PORT) || 587,
     secure: false, // true for 465, false for other ports
     auth: {
       user: ENV.SMTP_USER, // Your email
       pass: ENV.SMTP_PASS, // Your password or app password
     },
+    // Add timeout and connection options for production
+    connectionTimeout: 10000, // 10 seconds
+    greetingTimeout: 10000,
+    socketTimeout: 10000,
   });
+
+  console.log(`✅ Email transporter configured: ${ENV.SMTP_USER} via ${ENV.SMTP_HOST}:${ENV.SMTP_PORT}`);
 
   return transporter;
 }
@@ -28,6 +40,9 @@ export async function sendEmail({ to, subject, html }) {
   try {
     const transporter = getTransporter();
 
+    console.log(`📧 Attempting to send email to: ${to}`);
+    console.log(`📧 Subject: ${subject}`);
+
     const info = await transporter.sendMail({
       from: `"${ENV.EMAIL_FROM_NAME || 'Your App'}" <${ENV.SMTP_USER}>`,
       to,
@@ -35,11 +50,18 @@ export async function sendEmail({ to, subject, html }) {
       html,
     });
 
-    console.log(`✅ Email sent: ${info.messageId}`);
+    console.log(`✅ Email sent successfully: ${info.messageId}`);
+    console.log(`✅ Response: ${info.response}`);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error("❌ Failed to send email:", error);
-    throw new Error("Failed to send email");
+    console.error("❌ Failed to send email:", error.message);
+    console.error("❌ Error details:", {
+      code: error.code,
+      command: error.command,
+      response: error.response,
+      responseCode: error.responseCode,
+    });
+    throw new Error(`Failed to send email: ${error.message}`);
   }
 }
 
