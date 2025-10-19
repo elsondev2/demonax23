@@ -1,4 +1,4 @@
-import { testEmailConfig, sendEmail } from "./src/lib/email.js";
+import { sendEmail } from "./src/lib/email.js";
 import "dotenv/config";
 
 /**
@@ -9,36 +9,48 @@ import "dotenv/config";
 async function testEmail() {
   console.log("🧪 Testing email configuration...\n");
 
-  // Test 1: Verify SMTP configuration
-  console.log("Test 1: Verifying SMTP configuration...");
-  const isValid = await testEmailConfig();
-  
-  if (!isValid) {
-    console.error("❌ SMTP configuration is invalid. Check your credentials.");
+  // Check which email service is configured
+  if (process.env.RESEND_API_KEY) {
+    console.log("✅ Resend API key found");
+    console.log(`   Using: ${process.env.EMAIL_FROM || 'onboarding@resend.dev'}\n`);
+  } else if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+    console.log("✅ SMTP credentials found");
+    console.log(`   Using: ${process.env.SMTP_USER}\n`);
+  } else {
+    console.error("❌ No email configuration found!");
+    console.error("   Add RESEND_API_KEY or SMTP credentials to .env");
     process.exit(1);
   }
 
-  console.log("✅ SMTP configuration is valid!\n");
-
-  // Test 2: Send a test email
-  console.log("Test 2: Sending test email...");
-  const testRecipient = process.env.SMTP_USER; // Send to yourself
+  // Send a test email
+  console.log("📧 Sending test email...");
+  const testRecipient = process.env.SMTP_USER || process.env.EMAIL_FROM || "test@example.com";
   
   try {
-    await sendEmail({
+    const result = await sendEmail({
       to: testRecipient,
       subject: "Test Email - de_monax",
       html: `
-        <h1>Test Email</h1>
-        <p>If you're reading this, your email configuration is working correctly!</p>
-        <p>Sent at: ${new Date().toISOString()}</p>
+        <div style="font-family: Arial, sans-serif; padding: 20px;">
+          <h1 style="color: #10b981;">✅ Email Test Successful!</h1>
+          <p>If you're reading this, your email configuration is working correctly!</p>
+          <p><strong>Sent at:</strong> ${new Date().toISOString()}</p>
+          <p><strong>Provider:</strong> ${result.provider || 'unknown'}</p>
+          <p><strong>Message ID:</strong> ${result.messageId || 'N/A'}</p>
+        </div>
       `,
     });
     
-    console.log(`✅ Test email sent successfully to ${testRecipient}`);
+    console.log(`\n✅ Test email sent successfully to ${testRecipient}`);
+    console.log(`   Provider: ${result.provider}`);
+    console.log(`   Message ID: ${result.messageId}`);
     console.log("\n🎉 All tests passed! Email is configured correctly.");
   } catch (error) {
-    console.error("❌ Failed to send test email:", error.message);
+    console.error("\n❌ Failed to send test email:", error.message);
+    console.error("\nTroubleshooting:");
+    console.error("1. Check your environment variables");
+    console.error("2. If using Resend, verify API key is correct");
+    console.error("3. If using SMTP, check credentials and network access");
     process.exit(1);
   }
 }

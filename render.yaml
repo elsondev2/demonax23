@@ -10,22 +10,60 @@ services:
         source: /*
         destination: /index.html
 
-  # Backend API (if you want to deploy backend on Render too)
-  # - type: web
-  #   name: demonax23-backend
-  #   env: node
-  #   buildCommand: cd backend && npm install
-  #   startCommand: cd backend && npm start
-  #   envVars:
-  #     - key: NODE_ENV
-  #       value: production
-  #     - key: MONGODB_URI
-  #       sync: false
-  #     - key: JWT_SECRET
-  #       sync: false
-  #     - key: CLOUDINARY_CLOUD_NAME
-  #       sync: false
-  #     - key: CLOUDINARY_API_KEY
-  #       sync: false
-  #     - key: CLOUDINARY_API_SECRET
-  #       sync: false
+  # Backend API (deployed on Render)
+  - type: web
+    name: demonax23-backend
+    env: node
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5001
+      # Database
+      - key: MONGO_URI
+        sync: false
+      # JWT
+      - key: JWT_SECRET
+        sync: false
+      # Frontend URL
+      - key: CLIENT_URL
+        sync: false
+      # Cloudinary
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      # Google OAuth
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      # Supabase
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_BUCKET
+        sync: false
+      # SMTP Email (REQUIRED FOR EMAIL VERIFICATION)
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: EMAIL_FROM_NAME
+        sync: false
+      # Optional: Resend (alternative email service)
+      - key: RESEND_API_KEY
+        sync: false

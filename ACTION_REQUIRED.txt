@@ -1,0 +1,76 @@
+╔═══════════════════════════════════════════════════════════════╗
+║                                                               ║
+║   🚨 ACTION REQUIRED - EMAIL NOT WORKING ON RENDER 🚨        ║
+║                                                               ║
+╚═══════════════════════════════════════════════════════════════╝
+
+PROBLEM:
+  Render blocks SMTP port 587 → Your emails timeout ❌
+
+SOLUTION:
+  Use Resend (takes 5 minutes) ✅
+
+CODE CHANGES:
+  ✅ Already deployed and ready!
+  ✅ Email system updated to use Resend
+  ✅ SMTP fallback for local development
+
+═══════════════════════════════════════════════════════════════
+
+YOUR TODO LIST (5 MINUTES):
+
+  ☐ 1. Sign up at https://resend.com (2 min)
+  
+  ☐ 2. Get API key from Resend dashboard (1 min)
+       → Click "API Keys" → "Create API Key"
+       → Copy the key (starts with "re_")
+  
+  ☐ 3. Add to Render environment variables (2 min)
+       → Go to https://dashboard.render.com
+       → Find "demonax23" service
+       → Click "Environment"
+       → Add these 3 variables:
+       
+       RESEND_API_KEY = re_your_actual_key
+       EMAIL_FROM = onboarding@resend.dev
+       EMAIL_FROM_NAME = de_monax
+  
+  ☐ 4. Save and wait for redeploy (auto, 2-3 min)
+  
+  ☐ 5. Test signup flow (1 min)
+       → Sign up with email
+       → Check inbox for verification code
+       → Check Render logs for success
+
+═══════════════════════════════════════════════════════════════
+
+WHAT YOU'LL SEE IN RENDER LOGS:
+
+  ✅ SUCCESS:
+     "✅ Resend email service initialized"
+     "✅ Email sent successfully via Resend"
+  
+  ❌ ERROR (if API key missing):
+     "⚠️ Resend API key not found"
+     "❌ Failed to send email: Connection timeout"
+
+═══════════════════════════════════════════════════════════════
+
+RESEND FREE TIER:
+  ✅ 3,000 emails/month
+  ✅ 100 emails/day
+  ✅ No credit card required
+  ✅ Perfect for your app!
+
+═══════════════════════════════════════════════════════════════
+
+HELP FILES:
+  📄 QUICK_FIX_RESEND.txt - Visual guide
+  📄 RESEND_SETUP_RENDER.md - Detailed instructions
+  📄 EMAIL_FIX_SUMMARY.md - Complete explanation
+
+═══════════════════════════════════════════════════════════════
+
+START HERE: https://resend.com
+
+═══════════════════════════════════════════════════════════════
