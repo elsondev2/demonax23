@@ -1,9 +1,10 @@
 import React, { useState } from "react";
-import { XIcon, Volume2, VolumeX, Keyboard, Play, Phone } from "lucide-react";
+import { XIcon, Volume2, VolumeX, Keyboard, Play, Phone, Bell, BellOff } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
 import { useCallStore } from "../store/useCallStore";
 import { playSound } from "../lib/soundUtils";
 import IOSModal from "./IOSModal";
+import { useNotifications } from "../hooks/useNotifications";
 
 const KEYSTROKE_SOUNDS = [
   { id: "keystroke1", name: "Classic", description: "Traditional typewriter sound" },
@@ -33,6 +34,14 @@ function SoundSettingsModal({ isOpen, onClose }) {
   
   const [previewingSound, setPreviewingSound] = useState(null);
   const [previewingRingtone, setPreviewingRingtone] = useState(null);
+  const [isRequesting, setIsRequesting] = useState(false);
+  
+  // Notification settings
+  const {
+    isNotificationSupported,
+    notificationPermission,
+    requestPermission
+  } = useNotifications();
 
   const handlePreviewSound = async (soundId) => {
     setPreviewingSound(soundId);
@@ -85,6 +94,12 @@ function SoundSettingsModal({ isOpen, onClose }) {
     }
   };
 
+  const handleRequestPermission = async () => {
+    setIsRequesting(true);
+    await requestPermission();
+    setIsRequesting(false);
+  };
+
   const modalContent = (
     <>
       <div className="flex items-center justify-between p-4 border-b border-base-300">
@@ -98,6 +113,85 @@ function SoundSettingsModal({ isOpen, onClose }) {
       </div>
       
       <div className="p-4 overflow-y-auto flex-1 space-y-6">
+        {/* Browser Notifications Section */}
+        <div className="card bg-base-200/50 shadow-sm">
+          <div className="card-body p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <Bell className="w-5 h-5 text-primary" />
+              <div>
+                <h4 className="font-medium text-base-content">Browser Notifications</h4>
+                <p className="text-sm text-base-content/60">Get notified when you're away</p>
+              </div>
+            </div>
+
+            {!isNotificationSupported ? (
+              <div className="alert alert-warning">
+                <BellOff className="w-5 h-5" />
+                <div>
+                  <div className="font-semibold">Not Supported</div>
+                  <div className="text-sm">Your browser doesn't support notifications</div>
+                </div>
+              </div>
+            ) : notificationPermission === 'denied' ? (
+              <div className="alert alert-error">
+                <BellOff className="w-5 h-5" />
+                <div>
+                  <div className="font-semibold">Notifications Blocked</div>
+                  <div className="text-sm">Please enable them in your browser settings</div>
+                </div>
+              </div>
+            ) : notificationPermission === 'granted' ? (
+              <div className="alert alert-success">
+                <Bell className="w-5 h-5" />
+                <div>
+                  <div className="font-semibold">Notifications Enabled</div>
+                  <div className="text-sm">You'll receive alerts when not viewing the app</div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="text-sm text-base-content/70">
+                  Enable browser notifications to receive alerts about new messages even when you're not viewing the app.
+                </div>
+                <button
+                  onClick={handleRequestPermission}
+                  disabled={isRequesting}
+                  className="btn btn-primary w-full"
+                >
+                  {isRequesting ? (
+                    <>
+                      <span className="loading loading-spinner loading-sm"></span>
+                      Requesting...
+                    </>
+                  ) : (
+                    <>
+                      <Bell className="w-5 h-5" />
+                      Enable Notifications
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+
+            <div className="mt-3 pt-3 border-t border-base-300">
+              <div className="text-xs text-base-content/60 space-y-1">
+                <div className="flex items-start gap-2">
+                  <span className="text-primary">•</span>
+                  <span>Notifications appear when you switch tabs or minimize the browser</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-primary">•</span>
+                  <span>Click notifications to jump directly to the conversation</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-primary">•</span>
+                  <span>Badge count shows total unread messages</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Main Sound Toggle */}
         <div className="card bg-base-200/50 shadow-sm">
           <div className="card-body p-4">

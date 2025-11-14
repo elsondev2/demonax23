@@ -3,6 +3,7 @@ import { axiosInstance } from "../lib/axios";
 import toast from "react-hot-toast";
 import { useAuthStore } from "./useAuthStore";
 import { playSound } from "../lib/soundUtils";
+import { isUserActive } from "../utils/visibilityUtils";
 
 // Simple real-time message system without caching
 
@@ -84,6 +85,7 @@ export const useChatStore = create((set, get) => ({
   messageInputText: "",
   quotedMessage: null,
   lastRefreshTime: null, // Track last refresh time to prevent rapid refreshes
+  notificationCallback: null, // Callback for showing notifications (set by useNotifications hook)
   // Track how often each chat is opened to power the quick-access row
   visitCounts: (() => {
     try {
@@ -119,9 +121,15 @@ export const useChatStore = create((set, get) => ({
 
   playNotificationSound: () => {
     const { isSoundEnabled } = get();
-    if (isSoundEnabled) {
+    // Always play sound when user is not actively viewing the app
+    // Or when sound is enabled and user is viewing
+    if (!isUserActive() || isSoundEnabled) {
       playSound("/sounds/notification.mp3");
     }
+  },
+
+  setNotificationCallback: (callback) => {
+    set({ notificationCallback: callback });
   },
 
   testSound: (soundPath) => {
@@ -1166,9 +1174,18 @@ export const useChatStore = create((set, get) => ({
         set({ chats: updatedChats });
       }
 
-      // Play notification sound for incoming messages (not from selected user)
+      // Play notification sound and show notification for incoming messages
       if (isMessageSentToMe && senderId !== selectedUser?._id) {
         get().playNotificationSound();
+        
+        // Show browser notification if user is not actively viewing
+        const notificationCallback = get().notificationCallback;
+        if (notificationCallback && !isUserActive()) {
+          const sender = typeof newMessage.senderId === 'object' ? newMessage.senderId : null;
+          if (sender) {
+            notificationCallback(newMessage, sender, false, null);
+          }
+        }
       }
 
       // Immediately ack delivery when I receive a direct message
@@ -1272,9 +1289,19 @@ export const useChatStore = create((set, get) => ({
 
       set({ chats: updatedChats });
 
-      // Play notification sound for group messages not in current view (and not from me)
+      // Play notification sound and show notification for group messages not in current view (and not from me)
       if (groupId !== selectedGroup?._id && senderId !== authUser._id) {
         get().playNotificationSound();
+        
+        // Show browser notification if user is not actively viewing
+        const notificationCallback = get().notificationCallback;
+        if (notificationCallback && !isUserActive()) {
+          const sender = typeof newMessage.senderId === 'object' ? newMessage.senderId : null;
+          const group = chatsSnapshot.find(c => c.isGroup && c._id === groupId);
+          if (sender && group) {
+            notificationCallback(newMessage, sender, true, group.name);
+          }
+        }
       }
 
       // For group messages, show them in the chat if we're viewing that group
@@ -1340,9 +1367,19 @@ export const useChatStore = create((set, get) => ({
           }
         }
 
-        // Only play sound for messages from others in current group view
+        // Play sound and show notification for messages from others in current group view
         if (senderId !== authUser._id) {
           get().playNotificationSound();
+          
+          // Show browser notification if user is not actively viewing (even if in the conversation)
+          const notificationCallback = get().notificationCallback;
+          if (notificationCallback && !isUserActive()) {
+            const sender = typeof newMessage.senderId === 'object' ? newMessage.senderId : null;
+            const group = chatsSnapshot.find(c => c.isGroup && c._id === groupId);
+            if (sender && group) {
+              notificationCallback(newMessage, sender, true, group.name);
+            }
+          }
         }
       } else {
         console.log('ℹ️ Group message not relevant to current conversation', {

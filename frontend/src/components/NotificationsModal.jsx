@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from "react";
-import { XIcon, Bell, Loader2, MessageCircle, Megaphone, CheckCircle, Circle } from "lucide-react";
+import React, { useState } from "react";
+import { XIcon, Bell, Loader2, MessageCircle, Megaphone, CheckCircle, Circle, BellOff, Settings } from "lucide-react";
 import useFriendStore from "../store/useFriendStore";
 import { useChatStore } from "../store/useChatStore";
 import { axiosInstance } from "../lib/axios";
 import IOSModal from "./IOSModal";
 import Avatar from "./Avatar";
 import toast from "react-hot-toast";
+import { useNotifications } from "../hooks/useNotifications";
 
 const Row = ({ avatar, title, subtitle, right, badge }) => (
   <div className="flex items-center justify-between p-3 rounded-xl bg-base-200/40 hover:bg-base-200/60 transition mb-2">
@@ -38,6 +39,14 @@ function NotificationsModal({ isOpen, onClose }) {
   const [pending, setPending] = React.useState({});
   const [announcements, setAnnouncements] = useState([]);
   const [loadingAnnouncements, setLoadingAnnouncements] = useState(false);
+  const [isRequesting, setIsRequesting] = useState(false);
+  
+  // Notification settings
+  const {
+    isNotificationSupported,
+    notificationPermission,
+    requestPermission
+  } = useNotifications();
 
   // Filter announcements into read and unread
   const unreadAnnouncements = announcements.filter(announcement => !announcement.isRead);
@@ -48,7 +57,8 @@ function NotificationsModal({ isOpen, onClose }) {
       fetchRequests().catch(() => {});
       fetchAnnouncements();
     }
-  }, [isOpen, fetchRequests]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   const setLoading = (key, label) => setPending(prev => ({ ...prev, [key]: label }));
   const clearLoading = (key) => setPending(prev => { const n = { ...prev }; delete n[key]; return n; });
@@ -124,6 +134,12 @@ function NotificationsModal({ isOpen, onClose }) {
     onClose();
   };
 
+  const handleRequestPermission = async () => {
+    setIsRequesting(true);
+    await requestPermission();
+    setIsRequesting(false);
+  };
+
   const modalContent = (
     <>
       <div className="flex items-center justify-between p-4 border-b border-base-300">
@@ -139,6 +155,71 @@ function NotificationsModal({ isOpen, onClose }) {
         </button>
       </div>
       <div className="p-4 overflow-y-auto flex-1">
+        {/* Browser Notification Settings Section */}
+        <div className="mb-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Settings className="w-4 h-4 text-primary" />
+            <h4 className="text-sm font-semibold text-base-content">Browser Notifications</h4>
+          </div>
+          
+          <div className="card bg-base-200/50 shadow-sm">
+            <div className="card-body p-3">
+              {!isNotificationSupported ? (
+                <div className="flex items-start gap-2 text-sm text-warning">
+                  <BellOff className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <div className="font-medium">Not Supported</div>
+                    <div className="text-xs opacity-80">Your browser doesn't support notifications</div>
+                  </div>
+                </div>
+              ) : notificationPermission === 'denied' ? (
+                <div className="flex items-start gap-2 text-sm text-error">
+                  <BellOff className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <div className="font-medium">Notifications Blocked</div>
+                    <div className="text-xs opacity-80">Enable in browser settings to receive alerts</div>
+                  </div>
+                </div>
+              ) : notificationPermission === 'granted' ? (
+                <div className="flex items-start gap-2 text-sm text-success">
+                  <Bell className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <div className="font-medium">Notifications Enabled</div>
+                    <div className="text-xs opacity-80">You'll receive alerts when not viewing the app</div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2 text-sm">
+                    <Bell className="w-4 h-4 flex-shrink-0 mt-0.5 text-primary" />
+                    <div>
+                      <div className="font-medium">Enable Notifications</div>
+                      <div className="text-xs opacity-80">Get notified about new messages even when you're away</div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleRequestPermission}
+                    disabled={isRequesting}
+                    className="btn btn-primary btn-sm w-full"
+                  >
+                    {isRequesting ? (
+                      <>
+                        <span className="loading loading-spinner loading-xs"></span>
+                        Requesting...
+                      </>
+                    ) : (
+                      <>
+                        <Bell className="w-4 h-4" />
+                        Enable Notifications
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* Unread Messages Section */}
         {unreadChats.length > 0 && (
           <div className="mb-4">

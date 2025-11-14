@@ -2,6 +2,7 @@ import { useChatStore } from "../store/useChatStore";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useNavigate, useLocation, useParams } from "react-router";
+import { useNotifications } from "../hooks/useNotifications";
 
 import BorderAnimatedContainer from "../components/BorderAnimatedContainer";
 import SwipeableViews from "../components/SwipeableViews";
@@ -20,10 +21,14 @@ import { useCallStore } from "../store/useCallStore";
 
 
 function ChatPage() {
-  const { selectedUser, selectedGroup, getMyChatPartners, setSelectedUser, setSelectedGroup, chats } = useChatStore();
+  const { selectedUser, selectedGroup, getMyChatPartners, setSelectedUser, setSelectedGroup, chats, setNotificationCallback } = useChatStore();
   const { socket, connectSocket, authUser, isConnecting } = useAuthStore();
   const { showTour, completeTour, skipTour } = useWelcomeTour();
   const [manualTourOpen, setManualTourOpen] = useState(false);
+  
+  // Initialize notifications
+  const { notifyNewMessage, requestPermission, isNotificationGranted } = useNotifications();
+  
   // Call system cleanup is handled automatically
 
   const navigate = useNavigate();
@@ -81,6 +86,21 @@ function ChatPage() {
     if (isFeatureRoute) setLastRightView(2);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname, isMobile]);
+
+  // Set up notification callback in chat store
+  useEffect(() => {
+    setNotificationCallback(notifyNewMessage);
+    
+    // Request notification permission on first load if not already granted
+    if (!isNotificationGranted) {
+      // Wait a bit before requesting to avoid overwhelming the user
+      const timer = setTimeout(() => {
+        requestPermission();
+      }, 3000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [setNotificationCallback, notifyNewMessage, isNotificationGranted, requestPermission]);
 
   // Ensure socket connection
   useEffect(() => {
