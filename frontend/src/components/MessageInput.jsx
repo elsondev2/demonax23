@@ -10,7 +10,7 @@ import useFriendStore from "../store/useFriendStore";
 import { generateCaptionImage } from "../utils/captionImageGenerator";
 import MentionDropdown from "./mentions/MentionDropdown";
 
-const MessageInput = ({ onInputFocus }) => {
+const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
   const [text, setText] = useState("");
   const [image, setImage] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
@@ -23,6 +23,9 @@ const MessageInput = ({ onInputFocus }) => {
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [audioStream, setAudioStream] = useState(null);
   const [isSending, setIsSending] = useState(false);
+  const [typingTimeout, setTypingTimeout] = useState(null);
+  const [isTyping, setIsTyping] = useState(false);
+  const [localTypingUsers, setLocalTypingUsers] = useState([]); // eslint-disable-line no-unused-vars
   const { sendMessage, selectedUser, selectedGroup, messageInputText, setMessageInputText, quotedMessage, clearQuotedMessage, messages, playKeystrokeSound } = useChatStore();
   const [isEmojiOpen, setIsEmojiOpen] = useState(false);
   const [showCaptionImageModal, setShowCaptionImageModal] = useState(false);
@@ -77,14 +80,32 @@ const MessageInput = ({ onInputFocus }) => {
     return () => clearInterval(interval);
   }, [isRecording, recordStartTs]);
 
-  // Cleanup audio stream on unmount
+  // Cleanup audio stream and typing indicator on unmount
   useEffect(() => {
     return () => {
       if (audioStream) {
         audioStream.getTracks().forEach(track => track.stop());
       }
+      
+      // Clear typing timeout and emit stop typing on unmount
+      if (typingTimeout) {
+        clearTimeout(typingTimeout);
+      }
+      
+      const { socket } = useAuthStore.getState();
+      if (socket && socket.connected && isTyping) {
+        const conversationId = selectedUser?._id || selectedGroup?._id;
+        const isGroup = !!selectedGroup;
+        
+        if (conversationId) {
+          socket.emit('stopTyping', {
+            conversationId,
+            isGroup
+          });
+        }
+      }
     };
-  }, [audioStream]);
+  }, [audioStream, typingTimeout, isTyping, selectedUser, selectedGroup]);
 
   // Close emoji picker on mount and when switching chats
   useEffect(() => { setIsEmojiOpen(false); }, []);
@@ -149,7 +170,7 @@ const MessageInput = ({ onInputFocus }) => {
     return { top, left };
   };
 
-  // Handle text change with mention detection
+  // Handle text change with mention detection and typing indicator
   const handleTextChange = (newText) => {
     if (newText.length <= 2000) {
       setText(newText);
@@ -168,6 +189,47 @@ const MessageInput = ({ onInputFocus }) => {
         setShowMentionDropdown(false);
         setMentionQuery('');
         setMentionStartIndex(-1);
+      }
+
+      // NEW TYPING SYSTEM: Start typing indicator immediately
+      const { socket } = useAuthStore.getState();
+      if (socket && socket.connected) {
+        const conversationId = selectedUser?._id || selectedGroup?._id;
+        const isGroup = !!selectedGroup;
+        
+        if (conversationId) {
+          // Start typing if not already typing
+          if (!isTyping) {
+            socket.emit('typing', {
+              conversationId,
+              isGroup,
+              userName: authUser?.fullName
+            });
+            setIsTyping(true);
+            // Add yourself to local typing users for immediate feedback
+            const newLocalUsers = [authUser?.fullName || 'You'];
+            setLocalTypingUsers(newLocalUsers);
+            onLocalTypingChange?.(newLocalUsers);
+          }
+
+          // Clear previous inactivity timeout
+          if (typingTimeout) {
+            clearTimeout(typingTimeout);
+          }
+
+          // Set new 3-second inactivity timeout
+          const timeout = setTimeout(() => {
+            socket.emit('stopTyping', {
+              conversationId,
+              isGroup
+            });
+            setIsTyping(false);
+            setLocalTypingUsers([]);
+            onLocalTypingChange?.([]);
+          }, 3000);
+
+          setTypingTimeout(timeout);
+        }
       }
     }
   };
@@ -274,6 +336,28 @@ const MessageInput = ({ onInputFocus }) => {
 
     setIsSending(true);
 
+    // Stop typing when sending message
+    if (typingTimeout) {
+      clearTimeout(typingTimeout);
+      setTypingTimeout(null);
+    }
+
+    const { socket } = useAuthStore.getState();
+    if (socket && socket.connected && isTyping) {
+      const conversationId = selectedUser?._id || selectedGroup?._id;
+      const isGroup = !!selectedGroup;
+      
+      if (conversationId) {
+        socket.emit('stopTyping', {
+          conversationId,
+          isGroup
+        });
+        setIsTyping(false);
+        setLocalTypingUsers([]);
+        onLocalTypingChange?.([]);
+      }
+    }
+
     try {
       let imageData = null;
       if (image) {
@@ -290,6 +374,11 @@ const MessageInput = ({ onInputFocus }) => {
       setAudio(null);
       setMentions([]);
       clearQuotedMessage(); // Clear quote after sending
+      
+      // Keep input focused after sending so user can continue typing
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 0);
     } catch (error) {
       console.error("Failed to send message:", error);
     } finally {
@@ -590,6 +679,32 @@ const MessageInput = ({ onInputFocus }) => {
               }
             }}
             onFocus={() => onInputFocus?.()}
+            onBlur={() => {
+              // Stop typing when leaving input area
+              if (isTyping) {
+                const { socket } = useAuthStore.getState();
+                if (socket && socket.connected) {
+                  const conversationId = selectedUser?._id || selectedGroup?._id;
+                  const isGroup = !!selectedGroup;
+                  
+                  if (conversationId) {
+                    socket.emit('stopTyping', {
+                      conversationId,
+                      isGroup
+                    });
+                    setIsTyping(false);
+                    setLocalTypingUsers([]);
+                    onLocalTypingChange?.([]);
+                  }
+                }
+                
+                // Clear timeout
+                if (typingTimeout) {
+                  clearTimeout(typingTimeout);
+                  setTypingTimeout(null);
+                }
+              }
+            }}
             onPaste={handlePaste}
             placeholder={getPlaceholder()}
             className="input input-bordered w-full rounded-full"

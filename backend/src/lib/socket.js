@@ -182,6 +182,58 @@ io.on("connection", (socket) => {
     }
   });
 
+  // ===== TYPING INDICATOR EVENTS =====
+  
+  // Handle typing start
+  socket.on("typing", (data) => {
+    const { conversationId, isGroup, userName } = data;
+    
+    if (isGroup) {
+      // Broadcast to all group members except sender
+      socket.to(`group_${conversationId}`).emit("userTyping", {
+        conversationId,
+        userId: socket.userId,
+        userName: userName || socket.user.fullName,
+        isGroup: true
+      });
+    } else {
+      // Send to the other user in 1:1 chat
+      const targetSocketId = getReceiverSocketId(conversationId);
+      if (targetSocketId) {
+        io.to(targetSocketId).emit("userTyping", {
+          conversationId: socket.userId, // For 1:1, conversation ID is the sender's ID
+          userId: socket.userId,
+          userName: userName || socket.user.fullName,
+          isGroup: false
+        });
+      }
+    }
+  });
+
+  // Handle typing stop
+  socket.on("stopTyping", (data) => {
+    const { conversationId, isGroup } = data;
+    
+    if (isGroup) {
+      // Broadcast to all group members except sender
+      socket.to(`group_${conversationId}`).emit("userStoppedTyping", {
+        conversationId,
+        userId: socket.userId,
+        isGroup: true
+      });
+    } else {
+      // Send to the other user in 1:1 chat
+      const targetSocketId = getReceiverSocketId(conversationId);
+      if (targetSocketId) {
+        io.to(targetSocketId).emit("userStoppedTyping", {
+          conversationId: socket.userId, // For 1:1, conversation ID is the sender's ID
+          userId: socket.userId,
+          isGroup: false
+        });
+      }
+    }
+  });
+
   socket.on("disconnect", () => {
     console.log("A user disconnected", socket.user.fullName);
     delete userSocketMap[userId];

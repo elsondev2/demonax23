@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useChatStore } from "../store/useChatStore";
 import ChatHeader from "./ChatHeader";
@@ -12,6 +12,7 @@ import GroupDetailsModal from "./GroupDetailsModal";
 import ChatIntroHeader from "./ChatIntroHeader";
 import DateSeparator from "./DateSeparator";
 import UnreadSeparator from "./UnreadSeparator";
+import TypingIndicator from "./TypingIndicator";
 import useFriendStore from "../store/useFriendStore";
 import useMessageRenderingDiagnostics from "../hooks/useMessageRenderingDiagnostics";
 
@@ -30,6 +31,7 @@ function ChatContainer() {
     chatBackground,
     chats,
     detectAndRecoverMessageLoss,
+    typingUsers,
   } = useChatStore();
   const { authUser, checkAndReconnectSocket } = useAuthStore();
   const friendStore = useFriendStore();
@@ -48,9 +50,13 @@ function ChatContainer() {
   const [showNewMessageIndicator, setShowNewMessageIndicator] = useState(false);
   const [newMessageCount, setNewMessageCount] = useState(0);
   const [showBackToBottom, setShowBackToBottom] = useState(false);
+  
+  const [localTypingUsers, setLocalTypingUsers] = useState([]);
 
   // Message rendering diagnostics
   const { forceCheck } = useMessageRenderingDiagnostics(messagesContainerRef);
+
+  // No forced re-renders - let natural state changes handle updates
 
   // Check socket connection periodically (reduced frequency)
   useEffect(() => {
@@ -349,6 +355,28 @@ function ChatContainer() {
   const items = prepareRenderItems();
   const firstMessageDate = messages[0]?.createdAt;
 
+  // Get current typing users - simplified
+  const currentTypingUsers = useMemo(() => {
+    // Combine local and remote typing users
+    const { typingUsers: remoteTypingState, currentConversationId } = useChatStore.getState();
+    const remoteUsers = [];
+    
+    if (currentConversationId && remoteTypingState[currentConversationId]) {
+      const conversationTyping = remoteTypingState[currentConversationId];
+      const now = Date.now();
+      
+      Object.values(conversationTyping).forEach((data) => {
+        if ((now - data.timestamp) < 8000) { // 8 second buffer
+          remoteUsers.push(data.name);
+        }
+      });
+    }
+    
+    // Combine and deduplicate
+    const combined = [...localTypingUsers, ...remoteUsers];
+    return [...new Set(combined)];
+  }, [localTypingUsers, typingUsers]);
+
   return (
     <div className="bg-base-100 text-base-content flex-1 flex flex-col h-full relative">
       {/* Background under entire chat column */}
@@ -430,6 +458,10 @@ function ChatContainer() {
                 />
               )
             ))}
+            
+            {/* Typing Indicator */}
+            <TypingIndicator typingUsers={currentTypingUsers} />
+            
             {/* 👇 scroll target with extra padding for mobile input */}
             <div ref={messageEndRef} className="pb-4 md:pb-2" />
           </div>
@@ -496,17 +528,23 @@ function ChatContainer() {
         </div>
       )}
 
-      <MessageInput onInputFocus={() => {
-        if (!hasInteractedWithInput) {
-          setHasInteractedWithInput(true);
-          // Mark all messages as read when user focuses on input
-          if (selectedUser) {
-            markConversationRead(selectedUser._id);
-          } else if (selectedGroup) {
-            markGroupRead(selectedGroup._id);
+      <MessageInput 
+        onInputFocus={() => {
+          if (!hasInteractedWithInput) {
+            setHasInteractedWithInput(true);
+            // Mark all messages as read when user focuses on input
+            if (selectedUser) {
+              markConversationRead(selectedUser._id);
+            } else if (selectedGroup) {
+              markGroupRead(selectedGroup._id);
+            }
           }
-        }
-      }} />
+        }}
+        onLocalTypingChange={(localUsers) => {
+          // Update typing indicator with local typing users
+          setLocalTypingUsers(localUsers);
+        }}
+      />
 
       {/* Edit Message Modal */}
       {editingMessage && (

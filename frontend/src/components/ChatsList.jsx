@@ -94,7 +94,7 @@ const CommunityGroupItem = memo(({ group, onClick, formatTime, formatLastMessage
 });
 
 function ChatsList() {
-  const { getMyChatPartners, getAllContacts, allContacts, chats, setSelectedUser, setSelectedGroup, recordVisit, visitCounts } = useChatStore();
+  const { getMyChatPartners, getAllContacts, allContacts, chats, setSelectedUser, setSelectedGroup, recordVisit, visitCounts, typingUsers } = useChatStore();
   const { getGroupById, getGroups, groups, getCommunityGroups, communityGroups, isCommunityGroupsLoading, joinCommunityGroup } = useGroupStore();
   const { fetchRequests, requests, sendRequest: sendFriendRequest, acceptRequest, rejectRequest, cancelRequest } = useFriendStore();
   const { onlineUsers, authUser } = useAuthStore();
@@ -107,6 +107,21 @@ function ChatsList() {
   const [isCreateGroupModalOpen, setIsCreateGroupModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const scrollContainerRef = useRef(null);
+  const [, forceUpdate] = useState({});
+
+  // Force re-render when typing state changes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Check if any typing indicators need updating
+      const hasActiveTyping = Object.values(typingUsers).some(chatTyping =>
+        Object.values(chatTyping).some(data => (Date.now() - data.timestamp) < 3000)
+      );
+      if (hasActiveTyping) {
+        forceUpdate({});
+      }
+    }, 500);
+    return () => clearInterval(interval);
+  }, [typingUsers]);
 
   useEffect(() => {
     getMyChatPartners();
@@ -329,6 +344,19 @@ function ChatsList() {
 
   // Function to format last message preview
   const formatLastMessagePreview = (chat) => {
+    // Check if someone is typing in this chat
+    const { typingUsers } = useChatStore.getState();
+    const chatTyping = typingUsers[chat._id] || {};
+    const typingUserNames = Object.values(chatTyping)
+      .filter(data => (Date.now() - data.timestamp) < 3000)
+      .map(data => data.name);
+
+    if (typingUserNames.length > 0) {
+      return typingUserNames.length === 1
+        ? `${typingUserNames[0]} is typing...`
+        : `${typingUserNames.length} people are typing...`;
+    }
+
     // Check if lastMessage exists and is not empty
     if (!chat.lastMessage || chat.lastMessage.trim() === '') {
       // If there's a lastMessageTime, it means there was a message (likely attachment/audio)
@@ -550,9 +578,31 @@ function ChatsList() {
                     <h4 className="text-base-content font-medium truncate text-sm md:text-base">
                       {chat.isGroup ? chat.name : (chat.fullName || 'Deleted User')}
                     </h4>
-                    <p className="text-base-content/60 text-xs truncate">
-                      {formatLastMessagePreview(chat)}
-                    </p>
+                    <div className="text-xs truncate">
+                      {(() => {
+                        const { typingUsers } = useChatStore.getState();
+                        const chatTyping = typingUsers[chat._id] || {};
+                        const typingUserNames = Object.values(chatTyping)
+                          .filter(data => (Date.now() - data.timestamp) < 3000)
+                          .map(data => data.name);
+
+                        if (typingUserNames.length > 0) {
+                          return (
+                            <span className="text-primary italic">
+                              {typingUserNames.length === 1
+                                ? `${typingUserNames[0]} is typing...`
+                                : `${typingUserNames.length} people are typing...`}
+                            </span>
+                          );
+                        }
+
+                        return (
+                          <span className="text-base-content/60">
+                            {formatLastMessagePreview(chat)}
+                          </span>
+                        );
+                      })()}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 text-base-content/60 text-xs">
                     <span>{formatTime(chat.lastMessageTime)}</span>
