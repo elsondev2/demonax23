@@ -9,6 +9,7 @@ import { useAuthStore } from "../store/useAuthStore";
 import useFriendStore from "../store/useFriendStore";
 import { generateCaptionImage } from "../utils/captionImageGenerator";
 import MentionDropdown from "./mentions/MentionDropdown";
+import { hapticSuccess } from "../utils/haptic";
 import { 
   getVoiceRecordingConstraints, 
   getBestAudioMimeType, 
@@ -17,7 +18,7 @@ import {
   supportsAdvancedAudioProcessing 
 } from "../utils/audioProcessor";
 
-const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
+const MessageInput = ({ onInputFocus, onLocalTypingChange, onHeightChange }) => {
   const [text, setText] = useState("");
   const [image, setImage] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
@@ -49,6 +50,10 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
   const [mentions, setMentions] = useState([]); // Track mentions in message
   const inputRef = useRef(null);
 
+  // Keyboard handling state
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+
   // Check message limit for non-friends - memoized to prevent recalculation on every render
   const limitInfo = useMemo(() => {
     if (!selectedUser || selectedGroup) return { isLimited: false, messagesSent: 0, remaining: 3 };
@@ -73,6 +78,41 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
   // Use IDs to prevent unnecessary re-renders
   const selectedUserId = selectedUser?._id;
   const selectedGroupId = selectedGroup?._id;
+
+  // Detect keyboard height using visualViewport API
+  useEffect(() => {
+    if (!window.visualViewport) return;
+
+    const handleResize = () => {
+      const viewport = window.visualViewport;
+      const windowHeight = window.innerHeight;
+      const viewportHeight = viewport.height;
+      const heightDiff = windowHeight - viewportHeight;
+
+      // Keyboard is open if height difference > 150px
+      if (heightDiff > 150) {
+        setKeyboardHeight(heightDiff);
+        setIsKeyboardOpen(true);
+        // Notify parent component of height change
+        onHeightChange?.(heightDiff + 80); // 80px for input height
+      } else {
+        setKeyboardHeight(0);
+        setIsKeyboardOpen(false);
+        onHeightChange?.(80); // Just input height
+      }
+    };
+
+    // Initial check
+    handleResize();
+
+    window.visualViewport.addEventListener('resize', handleResize);
+    window.visualViewport.addEventListener('scroll', handleResize);
+
+    return () => {
+      window.visualViewport.removeEventListener('resize', handleResize);
+      window.visualViewport.removeEventListener('scroll', handleResize);
+    };
+  }, [onHeightChange]);
 
   // Update recording duration
   useEffect(() => {
@@ -343,6 +383,9 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
 
     setIsSending(true);
 
+    // Haptic feedback on send
+    hapticSuccess();
+
     // Stop typing when sending message
     if (typingTimeout) {
       clearTimeout(typingTimeout);
@@ -407,7 +450,14 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
   };
 
   return (
-    <div className="message-input-container px-4 md:px-6 py-3 pb-safe bg-base-100 border-t border-base-300" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+    <div 
+      className="message-input-container px-4 md:px-6 py-3 bg-base-100 border-t border-base-300"
+      style={{
+        transform: isKeyboardOpen ? `translateY(-${keyboardHeight}px)` : 'translateY(0)',
+        transition: 'transform 0.2s ease-out',
+        paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'
+      }}
+    >
       {/* IMAGE PREVIEW */}
       {previewImage && (
         <div className="relative mb-2 w-fit">

@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from "react";
+import { useSwipeable } from "react-swipeable";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { AlertCircle, RotateCcw, Edit, Trash2, Quote, FileText, MoreVertical, Phone, Video, Download, Maximize2 } from "lucide-react";
 import useLongPress from "../hooks/useLongPress";
+import { hapticMedium, hapticLight } from "../utils/haptic";
 import Avatar from "./Avatar";
 import AudioPlayer from "./AudioPlayer";
 import ImagePreviewModal from "./ImagePreviewModal";
@@ -18,6 +20,8 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
   const [imageLoading, setImageLoading] = useState(!!message.image);
   const [attachmentLoadingStates, setAttachmentLoadingStates] = useState({});
   const [imageMenuOpen, setImageMenuOpen] = useState(null); // Track which image menu is open
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const [isSwipeActive, setIsSwipeActive] = useState(false);
   const [previewImage, setPreviewImage] = useState(null); // For full preview modal
   const messageRef = useRef(null);
   const dropdownRef = useRef(null);
@@ -156,6 +160,7 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
 
   const handleLongPress = () => {
     // Show context menu for all messages on mobile
+    hapticMedium();
     setShowContextMenu(true);
   };
 
@@ -163,7 +168,34 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
     // Regular click handler - can be extended if needed
   };
 
-  const longPressEvents = useLongPress(handleLongPress, handleClick, 500);
+  const longPressEvents = useLongPress(handleLongPress, handleClick, 300); // Reduced from 500ms to 300ms
+
+  // Swipe-to-reply handlers
+  const swipeHandlers = useSwipeable({
+    onSwiping: (eventData) => {
+      // Only allow swipe-right
+      if (eventData.dir === 'Right' && eventData.deltaX > 0) {
+        const offset = Math.min(eventData.deltaX, 80);
+        setSwipeOffset(offset);
+        setIsSwipeActive(true);
+      }
+    },
+    onSwiped: (eventData) => {
+      if (eventData.dir === 'Right' && eventData.deltaX > 50) {
+        // Trigger reply
+        onQuote(message);
+        
+        // Haptic feedback
+        hapticLight();
+      }
+      
+      // Reset
+      setSwipeOffset(0);
+      setIsSwipeActive(false);
+    },
+    trackMouse: false,
+    trackTouch: true,
+  });
 
   // Close context menu when clicking outside
   useEffect(() => {
@@ -185,7 +217,7 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
 
   return (
     <div
-      className={`px-2 md:px-4 py-1 ${showAvatar ? 'mt-2' : 'mt-0.5'} group relative message-item`}
+      className={`px-2 md:px-4 py-1 ${showAvatar ? 'mt-2' : 'mt-0.5'} relative message-item`}
       data-message-id={message._id}
       role="listitem"
     >
@@ -207,17 +239,38 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
           <div className="w-8 flex-shrink-0 mb-1"></div>
         )}
 
-        {/* Message bubble */}
-        <div
-          ref={messageRef}
-          className={`max-w-[70%] ${message.audio?.url ? 'min-w-[300px]' : 'min-w-[100px]'} rounded-lg px-3 py-2 pr-9 relative group ${isOwnMessage
-            ? 'bg-primary text-primary-content ml-auto'
-            : isUnread && !isOwnMessage
-              ? 'bg-accent/30 text-base-content border-l-4 border-accent shadow-md'
-              : 'bg-base-200 text-base-content'
-            }`}
-          {...longPressEvents}
+        {/* Message bubble with swipe-to-reply */}
+        <div 
+          className="relative group"
+          style={{
+            transform: `translateX(${swipeOffset}px)`,
+            transition: isSwipeActive ? 'none' : 'transform 0.2s ease-out'
+          }}
         >
+          {/* Reply icon that appears during swipe */}
+          {swipeOffset > 20 && (
+            <div 
+              className="absolute left-2 top-1/2 -translate-y-1/2 text-primary z-10"
+              style={{ 
+                opacity: Math.min(swipeOffset / 50, 1),
+                pointerEvents: 'none'
+              }}
+            >
+              <Quote className="w-6 h-6" />
+            </div>
+          )}
+          
+          <div
+            ref={messageRef}
+            {...swipeHandlers}
+            className={`max-w-[150%] ${message.audio?.url ? 'min-w-[300px]' : 'min-w-[100px]'} rounded-lg px-3 py-2 pr-9 relative ${isOwnMessage
+              ? 'bg-primary text-primary-content ml-auto'
+              : isUnread && !isOwnMessage
+                ? 'bg-accent/30 text-base-content border-l-4 border-accent shadow-md'
+                : 'bg-base-200 text-base-content'
+              }`}
+            {...longPressEvents}
+          >
           {/* Three-dot menu button - Always visible */}
           <div className="absolute top-1 right-1" ref={dropdownRef}>
             <button
@@ -679,12 +732,9 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
             )}
           </div>
         </div>
-
-        {/* Avatar for sent messages is not shown */}
-      </div>
-
-      {/* Floating action buttons on hover - positioned above message */}
-      <div className={`absolute -top-8 ${isOwnMessage ? 'right-4' : 'left-12'} hidden md:flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-base-100 border border-base-300 rounded-lg shadow-lg p-1 z-20`}>
+          
+          {/* Floating action buttons on hover - positioned above message bubble */}
+          <div className={`absolute -top-8 ${isOwnMessage ? 'right-0' : 'left-0'} hidden md:flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-base-100 border border-base-300 rounded-lg shadow-lg p-1 z-20`}>
         <button
           onClick={(e) => { e.stopPropagation(); onQuote?.(message); }}
           className="btn btn-xs btn-ghost hover:bg-base-300/50 text-base-content/60 hover:text-base-content"
@@ -710,6 +760,10 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
             <Trash2 className="w-4 h-4" />
           </button>
         )}
+          </div>
+        </div>
+
+        {/* Avatar for sent messages is not shown */}
       </div>
 
       {/* Context menu for mobile long press */}

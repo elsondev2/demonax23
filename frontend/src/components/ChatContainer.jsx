@@ -46,8 +46,10 @@ function ChatContainer() {
   const previousMessageCountRef = useRef(0);
   const todayFirstMessageRef = useRef(null);
   const hasScrolledToTodayRef = useRef(false);
+  const scrollPositionBeforePaginationRef = useRef(null);
   const [editingMessage, setEditingMessage] = useState(null);
   const [deletingMessageId, setDeletingMessageId] = useState(null);
+  const [inputHeight, setInputHeight] = useState(80); // Track input height for keyboard
   // Removed cache-related state - using real-time approach
   const [selectedProfileUser, setSelectedProfileUser] = useState(null);
   const [isUserProfileModalOpen, setIsUserProfileModalOpen] = useState(false);
@@ -127,8 +129,8 @@ function ChatContainer() {
   }, [selectedUserId, selectedGroupId, getMessagesByUserId, getGroupMessages]);
 
   // Enhanced loading states for better UX
-
-  const showMessages = !isMessagesLoading && messages.length > 0;
+  // Show messages if we have any, even while loading more
+  const showMessages = messages.length > 0;
 
   // Debounced message loss detection - only run when truly needed
   useEffect(() => {
@@ -159,33 +161,66 @@ function ChatContainer() {
   useEffect(() => {
     if (!messagesContainerRef.current) return;
 
+    const container = messagesContainerRef.current;
+
+    // Initial load: scroll to bottom
     if (previousMessageCountRef.current === 0 && messages.length > 0) {
-      // initial load: jump to bottom instantly
       requestAnimationFrame(() => {
         messageEndRef.current?.scrollIntoView({ behavior: "instant", block: "end" });
       });
-    } else if (messages.length > previousMessageCountRef.current && previousMessageCountRef.current > 0) {
-      // new message received: smart auto-scroll logic
-      const lastMessage = messages[messages.length - 1];
-      const lastSender = lastMessage?.senderId?._id || lastMessage?.senderId;
+      previousMessageCountRef.current = messages.length;
+      return;
+    }
 
-      // Auto-scroll if:
-      // 1. Message is from current user (they're actively chatting)
-      // 2. User is already near the bottom (within 100px)
-      // 3. Message is recent (within last 30 seconds)
-      const shouldAutoScroll =
-        (lastSender && authUser && lastSender.toString() === authUser._id.toString()) ||
-        isNearBottom() ||
-        isRecentMessage(lastMessage);
-
-      if (shouldAutoScroll) {
-        setTimeout(() => {
-          messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
-        }, 100);
+    // Messages count increased
+    if (messages.length > previousMessageCountRef.current && previousMessageCountRef.current > 0) {
+      // Check if this is pagination (we stored scroll position before loading)
+      if (scrollPositionBeforePaginationRef.current && 
+          scrollPositionBeforePaginationRef.current.messageCount === previousMessageCountRef.current) {
+        // This is pagination - maintain scroll position relative to the content we were viewing
+        console.log('📜 Pagination detected - maintaining scroll position');
+        
+        // Use double requestAnimationFrame to ensure DOM is fully rendered
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const newScrollHeight = container.scrollHeight;
+            const oldScrollHeight = scrollPositionBeforePaginationRef.current.scrollHeight;
+            const scrollHeightDiff = newScrollHeight - oldScrollHeight;
+            
+            // Maintain position by adjusting scroll by the height of new content added at top
+            const newScrollTop = scrollPositionBeforePaginationRef.current.scrollTop + scrollHeightDiff;
+            container.scrollTop = newScrollTop;
+            
+            console.log('📜 Scroll adjusted:', {
+              oldScrollHeight,
+              newScrollHeight,
+              scrollHeightDiff,
+              oldScrollTop: scrollPositionBeforePaginationRef.current.scrollTop,
+              newScrollTop
+            });
+            
+            // Clear the stored position
+            scrollPositionBeforePaginationRef.current = null;
+          });
+        });
       } else {
-        // Show new message indicator if user is scrolled up
-        setNewMessageCount(prev => prev + 1);
-        setShowNewMessageIndicator(true);
+        // This is a new message at the bottom - apply smart auto-scroll
+        const lastMessage = messages[messages.length - 1];
+        const lastSender = lastMessage?.senderId?._id || lastMessage?.senderId;
+
+        const shouldAutoScroll =
+          (lastSender && authUser && lastSender.toString() === authUser._id.toString()) ||
+          isNearBottom() ||
+          isRecentMessage(lastMessage);
+
+        if (shouldAutoScroll) {
+          setTimeout(() => {
+            messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
+          }, 100);
+        } else {
+          setNewMessageCount(prev => prev + 1);
+          setShowNewMessageIndicator(true);
+        }
       }
     }
 
@@ -260,6 +295,13 @@ function ChatContainer() {
 
     // Load more messages when scrolled near the top
     if (scrollTop < 100 && hasMoreMessages && !isMessagesLoading) {
+      // Store current scroll position and the message we're viewing
+      scrollPositionBeforePaginationRef.current = {
+        scrollTop: container.scrollTop,
+        scrollHeight: container.scrollHeight,
+        messageCount: messages.length
+      };
+      console.log('📜 Storing scroll position before pagination:', scrollPositionBeforePaginationRef.current);
       loadMoreMessages();
     }
 
@@ -448,6 +490,16 @@ function ChatContainer() {
 
         {showMessages ? (
           <div className="flex-1 overflow-y-auto overflow-x-hidden">
+            {/* Loading more messages indicator at top */}
+            {isMessagesLoading && messages.length > 0 && (
+              <div className="flex justify-center py-3">
+                <div className="flex items-center gap-2 bg-base-200 px-4 py-2 rounded-full shadow-sm">
+                  <span className="loading loading-spinner loading-sm"></span>
+                  <span className="text-sm text-base-content/70">Loading older messages...</span>
+                </div>
+              </div>
+            )}
+            
             {items.map((it, idx) => (
               it.type === 'date' ? (
                 <DateSeparator key={`date-${idx}`} date={it.date} />
@@ -475,8 +527,14 @@ function ChatContainer() {
             {/* Typing Indicator */}
             <TypingIndicator typingUsers={currentTypingUsers} />
             
-            {/* 👇 scroll target with extra padding for mobile input and browser UI */}
-            <div ref={messageEndRef} className="pb-32 md:pb-2" />
+            {/* 👇 scroll target with dynamic padding for mobile keyboard */}
+            <div 
+              ref={messageEndRef} 
+              className="md:pb-2"
+              style={{
+                paddingBottom: window.innerWidth < 768 ? `${inputHeight + 40}px` : '0.5rem'
+              }}
+            />
           </div>
         ) : (
           isMessagesLoading ? (
@@ -557,6 +615,7 @@ function ChatContainer() {
           // Update typing indicator with local typing users
           setLocalTypingUsers(localUsers);
         }}
+        onHeightChange={(height) => setInputHeight(height)}
       />
 
       {/* Edit Message Modal */}

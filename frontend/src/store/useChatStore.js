@@ -757,7 +757,7 @@ export const useChatStore = create((set, get) => ({
       } else {
         // Additional pages - prepend older messages to the beginning
         const existingMessages = get().messages;
-        const combined = [[...newMessages].reverse(), ...existingMessages];
+        const combined = [...[...newMessages].reverse(), ...existingMessages];
         const deduplicated = deduplicateMessages(combined);
         set({
           messages: deduplicated,
@@ -892,7 +892,7 @@ export const useChatStore = create((set, get) => ({
       } else {
         // Additional pages - prepend older messages to the beginning
         const existingMessages = get().messages;
-        const combined = [[...newMessages].reverse(), ...existingMessages];
+        const combined = [...[...newMessages].reverse(), ...existingMessages];
         const deduplicated = deduplicateMessages(combined);
         set({
           messages: deduplicated,

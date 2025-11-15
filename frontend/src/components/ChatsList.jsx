@@ -7,6 +7,7 @@ import CreateGroupModal from "./CreateGroupModal";
 import useGroupStore from "../store/useGroupStore";
 import useFriendStore from "../store/useFriendStore";
 import { Search as SearchIcon } from "lucide-react";
+import { hapticLight } from "../utils/haptic";
 import Avatar from "./Avatar";
 
 // Helper component for group items - OUTSIDE main component to prevent recreation
@@ -106,6 +107,7 @@ function ChatsList() {
   const [lastTapTime, setLastTapTime] = useState(0);
   const [isCreateGroupModalOpen, setIsCreateGroupModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [, setIsRefreshing] = useState(false);
   const scrollContainerRef = useRef(null);
   const [, forceUpdate] = useState({});
 
@@ -230,9 +232,25 @@ function ChatsList() {
 
 
 
-  const handleRefresh = () => {
-    getMyChatPartners();
-    setLastRefreshed(Date.now());
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    
+    // Haptic feedback
+    hapticLight();
+
+    try {
+      await getMyChatPartners();
+      if (activeTab === 'groups' || activeTab === 'communities') {
+        await getGroups();
+        await getCommunityGroups();
+      }
+      if (activeTab === 'contacts') {
+        await getAllContacts();
+      }
+      setLastRefreshed(Date.now());
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   // Double-tap to refresh functionality
@@ -264,6 +282,9 @@ function ChatsList() {
 
   const handleChatSelect = async (chat) => {
     console.log('ChatsList: Selecting chat:', { chatId: chat._id, isGroup: chat.isGroup });
+
+    // Haptic feedback on selection
+    hapticLight();
 
     try {
       // Check if this chat is already open
@@ -504,7 +525,13 @@ function ChatsList() {
       </div>
 
       {/* SCROLLABLE CONTENT */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden thin-scrollbar pb-20 md:pb-4">
+      <div 
+        ref={scrollContainerRef} 
+        className="flex-1 overflow-y-auto overflow-x-hidden thin-scrollbar pb-20 md:pb-4"
+        onTouchEnd={handleDoubleTap}
+        onDoubleClick={handleDoubleClick}
+        style={{ touchAction: 'manipulation' }}
+      >
         {/* QUICK ACCESS ROW - Scrolls naturally */}
         <div className="flex items-center gap-4 mb-3 px-1 py-1">
           {/* Plus button navigates to Contacts */}

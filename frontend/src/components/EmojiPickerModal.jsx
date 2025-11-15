@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { Smile, Search, Clock, Bird, Utensils, Gamepad2, Car, Package, Sparkles, Flag } from 'lucide-react'
+import { hapticSelection } from '../utils/haptic'
 import { EMOJI_DATA } from './emojiData'
 
 const EmojiPickerModal = ({ isOpen, onClose, onSelectEmoji, triggerRef, keepMounted = true }) => {
@@ -115,6 +116,9 @@ const EmojiPickerModal = ({ isOpen, onClose, onSelectEmoji, triggerRef, keepMoun
 
   // Handle emoji selection
   const handleEmojiClick = useCallback((emoji) => {
+    // Haptic feedback on emoji selection
+    hapticSelection();
+    
     onSelectEmoji(emoji.emoji)
 
     // Update recent emojis
