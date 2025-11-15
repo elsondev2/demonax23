@@ -504,7 +504,7 @@ function ChatsList() {
       </div>
 
       {/* SCROLLABLE CONTENT */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden thin-scrollbar">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden thin-scrollbar pb-20 md:pb-4">
         {/* QUICK ACCESS ROW - Scrolls naturally */}
         <div className="flex items-center gap-4 mb-3 px-1 py-1">
           {/* Plus button navigates to Contacts */}

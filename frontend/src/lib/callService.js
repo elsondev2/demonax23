@@ -1,4 +1,5 @@
 // CallService - WebRTC utility class for handling peer connections and media streams
+import { getVoiceCallConstraints } from '../utils/audioProcessor';
 
 export class CallService {
   constructor() {
@@ -7,14 +8,34 @@ export class CallService {
     this.peerConnection = null;
     this.isInitialized = false;
 
-    // WebRTC configuration
+    // WebRTC configuration with TURN servers for production
     this.rtcConfiguration = {
       iceServers: [
+        // STUN servers for NAT traversal
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
-        // Add TURN servers for production
-        // { urls: 'turn:your-turn-server.com:3478', username: '...', credential: '...' }
-      ]
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' },
+        
+        // Free TURN servers for better connectivity behind firewalls
+        {
+          urls: 'turn:openrelay.metered.ca:80',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        },
+        {
+          urls: 'turn:openrelay.metered.ca:443',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        },
+        {
+          urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        }
+      ],
+      iceCandidatePoolSize: 10
     };
   }
 
@@ -26,9 +47,10 @@ export class CallService {
         return;
       }
 
-      // Get local media stream
+      // Get local media stream with optimized audio settings
+      const audioConstraints = getVoiceCallConstraints();
       const constraints = {
-        audio: true,
+        ...audioConstraints,
         video: callType === 'video'
       };
 

@@ -1244,7 +1244,7 @@ function CommentsModal({ post, onClose, onCommentAdded }) {
       </div>
 
       {/* Comment Input - Fixed at bottom */}
-      <div className="px-6 py-4 border-t border-base-300 flex items-center gap-3 bg-base-100 flex-shrink-0">
+      <div className="px-6 py-4 pb-safe border-t border-base-300 flex items-center gap-3 bg-base-100 flex-shrink-0" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
         <Avatar
           src={authUser?.profilePic}
           name={authUser?.fullName}

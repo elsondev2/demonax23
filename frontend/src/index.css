@@ -834,3 +834,10 @@ hin scrollbar styles - nearly invisible */
 .animate-shimmer {
   animation: shimmer 3s infinite;
 }
+
+/* Mobile Safe Area Support - Prevents content from being hidden by browser UI */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .pb-safe {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom)) !important;
+  }
+}

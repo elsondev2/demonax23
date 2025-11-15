@@ -6,6 +6,8 @@ import { playSound } from "../lib/soundUtils";
 const useFriendStore = create((set, get) => ({
   statusByUser: {}, // { userId: { status, requestId } }
   requests: { incomingPending: [], outgoingPending: [], rejected: [], friends: [] },
+  statusCache: {}, // Cache with timestamps to prevent excessive API calls
+  statusCacheTimeout: 30000, // 30 seconds cache
 
   fetchRequests: async () => {
     try {
@@ -20,12 +22,43 @@ const useFriendStore = create((set, get) => ({
   },
 
   getStatus: async (userId) => {
+    const state = get();
+    const now = Date.now();
+    
+    // Check cache first
+    const cached = state.statusCache[userId];
+    if (cached && (now - cached.timestamp) < state.statusCacheTimeout) {
+      // Return cached result without API call
+      return cached.data;
+    }
+    
     try {
       const res = await axiosInstance.get(`/api/friends/status/${userId}`);
-      set({ statusByUser: { ...get().statusByUser, [userId]: res.data } });
-      return res.data;
+      const data = res.data;
+      
+      // Update both statusByUser and cache
+      set({ 
+        statusByUser: { ...state.statusByUser, [userId]: data },
+        statusCache: { 
+          ...state.statusCache, 
+          [userId]: { data, timestamp: now } 
+        }
+      });
+      
+      return data;
     } catch (e) {
-      return { status: "none" };
+      const fallbackData = { status: "none" };
+      
+      // Cache the fallback to prevent repeated failed requests
+      set({ 
+        statusByUser: { ...state.statusByUser, [userId]: fallbackData },
+        statusCache: { 
+          ...state.statusCache, 
+          [userId]: { data: fallbackData, timestamp: now } 
+        }
+      });
+      
+      return fallbackData;
     }
   },
 

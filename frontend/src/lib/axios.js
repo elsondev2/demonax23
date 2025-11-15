@@ -1,4 +1,5 @@
 import axios from "axios";
+import { trackApiCall } from "../utils/performanceMonitor";
 
 // Use environment variable for API URL or fallback to localhost
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
@@ -13,6 +14,11 @@ export const axiosInstance = axios.create({
 // Add a request interceptor to add Authorization header and handle errors
 axiosInstance.interceptors.request.use(
   (config) => {
+    // Track API call for performance monitoring
+    if (import.meta.env.DEV) {
+      trackApiCall(`${config.method?.toUpperCase()} ${config.url}`);
+    }
+    
     // Get token from localStorage and add to Authorization header
     const token = localStorage.getItem('jwt-token');
     if (token) {

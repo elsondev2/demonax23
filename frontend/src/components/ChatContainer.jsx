@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useChatStore } from "../store/useChatStore";
+import { trackRender } from "../utils/performanceMonitor";
 import ChatHeader from "./ChatHeader";
 import NoChatHistoryPlaceholder from "./NoChatHistoryPlaceholder";
 import MessageInput from "./MessageInput";
@@ -17,6 +18,11 @@ import useFriendStore from "../store/useFriendStore";
 import useMessageRenderingDiagnostics from "../hooks/useMessageRenderingDiagnostics";
 
 function ChatContainer() {
+  // Track renders for performance monitoring
+  if (import.meta.env.DEV) {
+    trackRender('ChatContainer');
+  }
+  
   const {
     selectedUser,
     selectedGroup,
@@ -124,7 +130,7 @@ function ChatContainer() {
 
   const showMessages = !isMessagesLoading && messages.length > 0;
 
-  // Auto-detect message loss after messages are loaded
+  // Debounced message loss detection - only run when truly needed
   useEffect(() => {
     if (!isMessagesLoading && (selectedUserId || selectedGroupId)) {
       console.log('🔍 Setting up message loss detection for:', {
@@ -134,20 +140,27 @@ function ChatContainer() {
         timestamp: new Date().toISOString()
       });
 
-      // Small delay to ensure state is settled
+      // Debounce the detection to prevent excessive runs
       const timer = setTimeout(() => {
         console.log('🔍 Running message loss detection and diagnostics');
         detectAndRecoverMessageLoss();
         // Also run rendering diagnostics
         forceCheck();
-      }, 1000);
+      }, 2000); // Increased delay to 2 seconds
 
       return () => {
         console.log('🔍 Cleaning up message loss detection timer');
         clearTimeout(timer);
       };
     }
-  }, [isMessagesLoading, selectedUserId, selectedGroupId, detectAndRecoverMessageLoss, forceCheck, messages.length]);
+  }, [
+    isMessagesLoading, 
+    selectedUserId, 
+    selectedGroupId, 
+    detectAndRecoverMessageLoss, 
+    forceCheck
+    // Removed messages.length to prevent constant re-runs
+  ]);
 
 
   useEffect(() => {
@@ -347,9 +360,16 @@ function ChatContainer() {
     return items;
   };
 
-  // fetch friend status when a new user chat opens
+  // Fetch friend status when a new user chat opens (with debouncing)
   useEffect(() => {
-    if (selectedUser) friendStore.getStatus(selectedUser._id);
+    if (selectedUser) {
+      // Debounce friend status requests to prevent excessive API calls
+      const timer = setTimeout(() => {
+        friendStore.getStatus(selectedUser._id);
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
   }, [friendStore, selectedUser]);
 
   const items = prepareRenderItems();
@@ -462,8 +482,8 @@ function ChatContainer() {
             {/* Typing Indicator */}
             <TypingIndicator typingUsers={currentTypingUsers} />
             
-            {/* 👇 scroll target with extra padding for mobile input */}
-            <div ref={messageEndRef} className="pb-4 md:pb-2" />
+            {/* 👇 scroll target with extra padding for mobile input and browser UI */}
+            <div ref={messageEndRef} className="pb-24 md:pb-2" />
           </div>
         ) : (
           isMessagesLoading ? (

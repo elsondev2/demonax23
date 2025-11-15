@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 
-const IOSModal = ({ isOpen, onClose, children, className = "" }) => {
+const IOSModal = ({ isOpen, onClose, children, className = "", disableBackdropClose = false }) => {
   const [isAnimating, setIsAnimating] = useState(false);
   const [shouldRender, setShouldRender] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -66,7 +66,7 @@ const IOSModal = ({ isOpen, onClose, children, className = "" }) => {
   };
 
   const handleBackdropClick = (e) => {
-    if (e.target === e.currentTarget) {
+    if (e.target === e.currentTarget && !disableBackdropClose) {
       handleAnimatedClose();
     }
   };
@@ -110,8 +110,8 @@ const IOSModal = ({ isOpen, onClose, children, className = "" }) => {
     const deltaY = currentY.current - startY.current;
     const threshold = 120; // Minimum swipe distance to close (increased for better UX)
 
-    if (deltaY > threshold) {
-      // Close the modal
+    if (deltaY > threshold && !disableBackdropClose) {
+      // Close the modal (only if backdrop close is not disabled)
       onClose();
     } else {
       // Snap back to original position

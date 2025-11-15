@@ -9,6 +9,13 @@ import { useAuthStore } from "../store/useAuthStore";
 import useFriendStore from "../store/useFriendStore";
 import { generateCaptionImage } from "../utils/captionImageGenerator";
 import MentionDropdown from "./mentions/MentionDropdown";
+import { 
+  getVoiceRecordingConstraints, 
+  getBestAudioMimeType, 
+  processAudioBlob, 
+  getMicrophoneErrorMessage,
+  supportsAdvancedAudioProcessing 
+} from "../utils/audioProcessor";
 
 const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
   const [text, setText] = useState("");
@@ -400,7 +407,7 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
   };
 
   return (
-    <div className="px-4 md:px-6 py-4">
+    <div className="px-4 md:px-6 py-4 pb-safe" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
       {/* IMAGE PREVIEW */}
       {previewImage && (
         <div className="relative mb-2 w-fit">
@@ -589,24 +596,18 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
               recorder?.stop();
               setIsRecording(false);
             } else {
-              // Start recording with reduced noise suppression
+              // Start recording with optimized settings for poor microphones
               try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                  audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true,
-                    sampleRate: 48000,
-                    // Reduce noise suppression intensity
-                    advanced: [{ noiseSuppression: { ideal: 0.3 } }]
-                  }
-                });
+                const constraints = getVoiceRecordingConstraints();
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
 
                 setAudioStream(stream);
 
+                // Create MediaRecorder with optimized settings for voice messages
+                const { mimeType, audioBitsPerSecond } = getBestAudioMimeType();
                 const mr = new MediaRecorder(stream, {
-                  mimeType: 'audio/webm',
-                  audioBitsPerSecond: 128000
+                  mimeType,
+                  audioBitsPerSecond
                 });
 
                 const chunks = [];
@@ -614,8 +615,19 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
                 mr.onstop = async () => {
                   setIsProcessingAudio(true);
                   try {
-                    const blob = new Blob(chunks, { type: 'audio/webm' });
+                    let blob = new Blob(chunks, { type: mimeType });
                     const durationSec = Math.round((Date.now() - recordStartTs) / 1000);
+                    
+                    // Apply additional audio processing if supported
+                    if (supportsAdvancedAudioProcessing() && durationSec > 1) {
+                      try {
+                        blob = await processAudioBlob(blob);
+                        console.log('✅ Audio processing applied for better quality');
+                      } catch (processingError) {
+                        console.warn('Audio processing failed, using original:', processingError);
+                      }
+                    }
+                    
                     const reader = new FileReader();
                     reader.readAsDataURL(blob);
                     await new Promise((r) => (reader.onloadend = r));
@@ -625,6 +637,7 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
                     setAudio(res.data);
                   } catch (error) {
                     console.error('Failed to process audio:', error);
+                    alert('Failed to process audio recording. Please try again.');
                   } finally {
                     setIsProcessingAudio(false);
                     // Stop all tracks to release microphone
@@ -639,7 +652,57 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
                 setIsRecording(true);
               } catch (error) {
                 console.error('Failed to start recording:', error);
-                alert('Failed to access microphone. Please check permissions.');
+                const userMessage = getMicrophoneErrorMessage(error);
+                alert(userMessage);
+                
+                // Try with basic constraints if advanced ones fail
+                if (error.name === 'OverconstrainedError') {
+                  try {
+                    const basicStream = await navigator.mediaDevices.getUserMedia({
+                      audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                      }
+                    });
+                    
+                    setAudioStream(basicStream);
+                    const { mimeType, audioBitsPerSecond } = getBestAudioMimeType();
+                    const mr = new MediaRecorder(basicStream, { mimeType, audioBitsPerSecond });
+                    
+                    const chunks = [];
+                    mr.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+                    mr.onstop = async () => {
+                      setIsProcessingAudio(true);
+                      try {
+                        const blob = new Blob(chunks, { type: mimeType });
+                        const durationSec = Math.round((Date.now() - recordStartTs) / 1000);
+                        const reader = new FileReader();
+                        reader.readAsDataURL(blob);
+                        await new Promise((r) => (reader.onloadend = r));
+                        const base64 = reader.result?.toString();
+
+                        const res = await axiosInstance.post('/api/messages/upload-audio', { base64, durationSec });
+                        setAudio(res.data);
+                      } catch (error) {
+                        console.error('Failed to process audio:', error);
+                        alert('Failed to process audio recording. Please try again.');
+                      } finally {
+                        setIsProcessingAudio(false);
+                        basicStream.getTracks().forEach(track => track.stop());
+                        setAudioStream(null);
+                      }
+                    };
+
+                    mr.start();
+                    setRecorder(mr);
+                    setRecordStartTs(Date.now());
+                    setIsRecording(true);
+                    console.log('✅ Recording started with basic constraints');
+                  } catch (basicError) {
+                    console.error('Failed with basic constraints too:', basicError);
+                  }
+                }
               }
             }
           }}

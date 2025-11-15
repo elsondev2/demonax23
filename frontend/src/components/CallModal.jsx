@@ -1,8 +1,9 @@
-import { PhoneIcon, PhoneOffIcon, XIcon, Video } from 'lucide-react';
+import { PhoneIcon, PhoneOffIcon, XIcon, Video, Volume2 } from 'lucide-react';
 import { useCallStore } from '../store/useCallStore';
 import Avatar from './Avatar';
 import IOSModal from './IOSModal';
 import { useEffect, useRef, useState } from 'react';
+import { testAudioPlayback } from '../utils/callAudioDebug';
 
 const CallModal = () => {
   const callStatus = useCallStore(state => state.callStatus);
@@ -12,6 +13,7 @@ const CallModal = () => {
   const calleeInfo = useCallStore(state => state.calleeInfo);
   const showCallModal = useCallStore(state => state.showCallModal);
   const showIncomingCall = useCallStore(state => state.showIncomingCall);
+  const lastUpdate = useCallStore(state => state.lastUpdate); // Subscribe to lastUpdate for re-renders
   const acceptCall = useCallStore(state => state.acceptCall);
   const rejectCall = useCallStore(state => state.rejectCall);
   const endCall = useCallStore(state => state.endCall);
@@ -23,51 +25,92 @@ const CallModal = () => {
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
   
-  // Setup audio visualization for local stream
+  // Setup audio visualization for local stream with proper error handling
   useEffect(() => {
     if (localStream && callStatus === 'connected') {
-      try {
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const analyser = audioContext.createAnalyser();
-        const source = audioContext.createMediaStreamSource(localStream);
-        
-        analyser.fftSize = 256;
-        source.connect(analyser);
-        
-        audioContextRef.current = audioContext;
-        analyserRef.current = analyser;
-        
-        // Monitor audio levels
-        const dataArray = new Uint8Array(analyser.frequencyBinCount);
-        
-        const checkLevel = () => {
-          if (!analyserRef.current) return;
+      let animationId = null;
+      
+      const setupAudioVisualization = async () => {
+        try {
+          const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          const analyser = audioContext.createAnalyser();
+          const source = audioContext.createMediaStreamSource(localStream);
           
-          analyserRef.current.getByteFrequencyData(dataArray);
-          const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
-          const normalizedLevel = Math.min(100, (average / 255) * 100);
+          analyser.fftSize = 256;
+          source.connect(analyser);
           
-          setAudioLevel(normalizedLevel);
-          requestAnimationFrame(checkLevel);
-        };
-        
-        checkLevel();
-      } catch (error) {
-        console.error('Failed to setup audio visualization:', error);
-      }
+          audioContextRef.current = audioContext;
+          analyserRef.current = analyser;
+          
+          // Monitor audio levels
+          const dataArray = new Uint8Array(analyser.frequencyBinCount);
+          
+          const checkLevel = () => {
+            if (!analyserRef.current) return;
+            
+            try {
+              analyserRef.current.getByteFrequencyData(dataArray);
+              const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+              const normalizedLevel = Math.min(100, (average / 255) * 100);
+              
+              setAudioLevel(normalizedLevel);
+              animationId = requestAnimationFrame(checkLevel);
+            } catch (error) {
+              console.warn('Audio level check failed:', error);
+              // Stop the animation loop on error
+              if (animationId) {
+                cancelAnimationFrame(animationId);
+              }
+            }
+          };
+          
+          checkLevel();
+        } catch (error) {
+          console.error('Failed to setup audio visualization:', error);
+          setAudioLevel(0); // Reset to 0 on error
+        }
+      };
+      
+      setupAudioVisualization().catch(error => {
+        console.error('Audio visualization setup promise rejected:', error);
+        setAudioLevel(0);
+      });
+      
+      return () => {
+        if (animationId) {
+          cancelAnimationFrame(animationId);
+        }
+        if (audioContextRef.current) {
+          audioContextRef.current.close().catch(error => {
+            console.warn('Failed to close audio context:', error);
+          });
+        }
+      };
     }
-    
-    return () => {
-      if (audioContextRef.current) {
-        audioContextRef.current.close();
-      }
-    };
   }, [localStream, callStatus]);
 
-  // Always render if there's any call activity or incoming call
-  const shouldRender = showIncomingCall || showCallModal || callStatus !== 'idle';
+  // Enhanced render logic with debugging - more permissive for incoming calls
+  const shouldRender = (
+    showIncomingCall || 
+    showCallModal || 
+    (callStatus !== 'idle' && callStatus !== 'ended')
+  );
+
+  // Debug logging for modal rendering
+  useEffect(() => {
+    console.log('📞 MODAL RENDER - State changed:', {
+      callStatus,
+      callDirection,
+      showIncomingCall,
+      showCallModal,
+      shouldRender,
+      callerInfo: callerInfo?.fullName,
+      lastUpdate
+    });
+  }, [callStatus, callDirection, showIncomingCall, showCallModal, shouldRender, callerInfo, lastUpdate]);
 
   if (!shouldRender) {
+    console.log('📞 MODAL RENDER - Not rendering modal, shouldRender:', shouldRender);
     return null;
   }
 
@@ -75,6 +118,7 @@ const CallModal = () => {
   const isOutgoing = callDirection === 'outgoing';
   const isRinging = callStatus === 'ringing' || callStatus === 'calling';
   const isConnected = callStatus === 'connected';
+  const isConnecting = callStatus === 'connecting';
 
   // Get display information
   const getDisplayInfo = () => {
@@ -102,9 +146,16 @@ const CallModal = () => {
 
   // Priority rendering for incoming calls
   if (showIncomingCall || (callStatus === 'ringing' && callDirection === 'incoming')) {
+    console.log('📞 MODAL - Rendering incoming call modal:', {
+      showIncomingCall,
+      callStatus,
+      callDirection,
+      callerInfo
+    });
+    
     return (
-      <IOSModal isOpen={true} onClose={rejectCall} className="max-w-sm">
-        <div className="flex flex-col h-full bg-base-100">
+      <IOSModal isOpen={true} onClose={rejectCall} className="max-w-sm" disableBackdropClose={true}>
+        <div className="flex flex-col h-full bg-base-100" data-call-modal="incoming">
           {/* Header */}
           <div className="pt-12 pb-8 px-6 text-center bg-gradient-to-b from-primary/5 to-transparent">
             <div className="mb-3 text-sm font-medium text-base-content/60 tracking-wide">
@@ -136,7 +187,7 @@ const CallModal = () => {
 
             {/* Status */}
             <p className="text-base-content/60 text-base">
-              Incoming call...
+              {isConnecting ? 'Connecting...' : 'Incoming call...'}
             </p>
           </div>
 
@@ -145,8 +196,16 @@ const CallModal = () => {
             {/* Decline button */}
             <div className="flex flex-col items-center gap-2">
               <button
-                onClick={rejectCall}
+                onClick={() => {
+                  try {
+                    console.log('📞 REJECT BUTTON CLICKED - Immediate UI feedback');
+                    rejectCall();
+                  } catch (error) {
+                    console.error('Failed to reject call:', error);
+                  }
+                }}
                 className="btn btn-circle btn-error btn-lg hover:scale-105 active:scale-95 transition-transform"
+                disabled={isConnecting} // Disable during connection to prevent double-clicks
               >
                 <XIcon className="w-7 h-7" strokeWidth={2.5} />
               </button>
@@ -156,10 +215,22 @@ const CallModal = () => {
             {/* Accept button */}
             <div className="flex flex-col items-center gap-2">
               <button
-                onClick={acceptCall}
+                onClick={() => {
+                  try {
+                    console.log('📞 ACCEPT BUTTON CLICKED - Immediate UI feedback');
+                    acceptCall();
+                  } catch (error) {
+                    console.error('Failed to accept call:', error);
+                  }
+                }}
                 className="btn btn-circle btn-success btn-lg hover:scale-105 active:scale-95 transition-transform animate-pulse"
+                disabled={isConnecting} // Disable during connection to prevent double-clicks
               >
-                <PhoneIcon className="w-7 h-7" strokeWidth={2.5} />
+                {isConnecting ? (
+                  <span className="loading loading-spinner loading-sm"></span>
+                ) : (
+                  <PhoneIcon className="w-7 h-7" strokeWidth={2.5} />
+                )}
               </button>
               <span className="text-xs text-base-content/60 font-medium">Accept</span>
             </div>
@@ -170,9 +241,15 @@ const CallModal = () => {
   }
 
   // Render for other call states (outgoing/active)
+  console.log('📞 MODAL - Rendering outgoing/active call modal:', {
+    showCallModal,
+    callStatus,
+    callDirection
+  });
+  
   return (
-    <IOSModal isOpen={true} onClose={endCall} className="max-w-sm">
-      <div className="flex flex-col h-full bg-base-100">
+    <IOSModal isOpen={true} onClose={endCall} className="max-w-sm" disableBackdropClose={true}>
+      <div className="flex flex-col h-full bg-base-100" data-call-modal="outgoing">
         {/* Header */}
         <div className="pt-12 pb-8 px-6 text-center bg-gradient-to-b from-primary/5 to-transparent">
           {/* Call type badge */}
@@ -257,6 +334,15 @@ const CallModal = () => {
                 </div>
               )}
             </>
+          ) : isConnecting ? (
+            <>
+              <p className="text-base-content/60 text-base mb-1">
+                Connecting...
+              </p>
+              <div className="flex justify-center mt-2">
+                <span className="loading loading-dots loading-sm"></span>
+              </div>
+            </>
           ) : (
             <p className="text-base-content/60 text-base mb-1">
               {displayInfo.subtitle}
@@ -283,7 +369,13 @@ const CallModal = () => {
           {/* End call button */}
           <div className="flex flex-col items-center gap-2">
             <button
-              onClick={endCall}
+              onClick={() => {
+                try {
+                  endCall();
+                } catch (error) {
+                  console.error('Failed to end call:', error);
+                }
+              }}
               className="btn btn-circle btn-error btn-lg hover:scale-105 active:scale-95 transition-transform"
             >
               <PhoneOffIcon className="w-7 h-7" strokeWidth={2.5} />
@@ -296,10 +388,20 @@ const CallModal = () => {
 
         {/* Connection tip for calling state */}
         {isRinging && (
-          <div className="px-6 pb-4 text-center">
+          <div className="px-6 pb-4 text-center space-y-2">
             <p className="text-xs text-base-content/50">
               Make sure your microphone is not muted
             </p>
+            {import.meta.env.DEV && (
+              <button
+                onClick={testAudioPlayback}
+                className="btn btn-xs btn-outline"
+                title="Test Audio"
+              >
+                <Volume2 className="w-3 h-3 mr-1" />
+                Test Audio
+              </button>
+            )}
           </div>
         )}
       </div>

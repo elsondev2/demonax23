@@ -78,17 +78,44 @@ io.on("connection", (socket) => {
 
   // Handle call request
   socket.on("call-request", (data) => {
+    console.log('📞 BACKEND - call-request received:', {
+      from: socket.userId,
+      to: data.to,
+      callType: data.callType,
+      callerInfo: data.callerInfo?.fullName,
+      timestamp: new Date().toISOString()
+    });
+    
     const { to, callType, offer, callerInfo } = data;
     const targetSocketId = getReceiverSocketId(to);
 
+    console.log('📞 BACKEND - Target user lookup:', {
+      targetUserId: to,
+      targetSocketId: targetSocketId,
+      isOnline: !!targetSocketId
+    });
+
     if (targetSocketId) {
-      io.to(targetSocketId).emit("call-request", {
+      const callData = {
         from: socket.userId,
         callType,
         offer,
         callerInfo
+      };
+      
+      console.log('📞 BACKEND - Forwarding call-request to target:', {
+        targetSocketId,
+        callData: {
+          from: callData.from,
+          callType: callData.callType,
+          callerName: callData.callerInfo?.fullName
+        }
       });
+      
+      io.to(targetSocketId).emit("call-request", callData);
+      console.log('📞 BACKEND - call-request forwarded successfully');
     } else {
+      console.log('📞 BACKEND - User not available, sending error');
       socket.emit("call-error", { message: "User is not available" });
     }
   });

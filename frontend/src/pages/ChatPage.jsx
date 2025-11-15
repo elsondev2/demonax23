@@ -1,6 +1,15 @@
 import { useChatStore } from "../store/useChatStore";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useAuthStore } from "../store/useAuthStore";
+import { trackRender } from "../utils/performanceMonitor";
+
+// Load testing utilities in development
+if (import.meta.env.DEV) {
+  import("../utils/performanceTest");
+  import("../utils/callExperienceTest");
+  import("../utils/incomingCallTest");
+  import("../utils/quickCallTest");
+}
 import { useNavigate, useLocation, useParams } from "react-router";
 import { useNotifications } from "../hooks/useNotifications";
 
@@ -21,6 +30,11 @@ import { useCallStore } from "../store/useCallStore";
 
 
 function ChatPage() {
+  // Track renders for performance monitoring
+  if (import.meta.env.DEV) {
+    trackRender('ChatPage');
+  }
+  
   const { selectedUser, selectedGroup, getMyChatPartners, setSelectedUser, setSelectedGroup, chats, setNotificationCallback } = useChatStore();
   const { socket, connectSocket, authUser, isConnecting } = useAuthStore();
   const { showTour, completeTour, skipTour } = useWelcomeTour();
@@ -287,12 +301,18 @@ function ChatPage() {
     };
   }, []);
 
-  // Debug logging for mobile scroll issue
+  // Debug logging for mobile scroll issue (throttled to prevent spam)
   useEffect(() => {
-    console.log('🔍 ChatPage.jsx Debug - Render with classes:', 'w-full h-screen');
-    console.log('🔍 ChatPage.jsx Debug - Current mobile state:', isMobile);
-    console.log('🔍 ChatPage.jsx Debug - Current view index:', currentViewIndex);
-  });
+    const throttledLog = () => {
+      console.log('🔍 ChatPage.jsx Debug - Render with classes:', 'w-full h-screen');
+      console.log('🔍 ChatPage.jsx Debug - Current mobile state:', isMobile);
+      console.log('🔍 ChatPage.jsx Debug - Current view index:', currentViewIndex);
+    };
+    
+    // Only log once per second to reduce console spam
+    const timer = setTimeout(throttledLog, 1000);
+    return () => clearTimeout(timer);
+  }, [isMobile, currentViewIndex]); // Only re-run when these specific values change
 
   // Show loading while checking authorization for URL-based chat access
   if ((userId || groupId) && !isAuthorizationChecked) {
