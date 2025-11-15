@@ -37,7 +37,7 @@ function ChatContainer() {
     chatBackground,
     chats,
     detectAndRecoverMessageLoss,
-    typingUsers,
+    typingUsers: _typingUsers,
   } = useChatStore();
   const { authUser, checkAndReconnectSocket } = useAuthStore();
   const friendStore = useFriendStore();
@@ -153,14 +153,7 @@ function ChatContainer() {
         clearTimeout(timer);
       };
     }
-  }, [
-    isMessagesLoading, 
-    selectedUserId, 
-    selectedGroupId, 
-    detectAndRecoverMessageLoss, 
-    forceCheck
-    // Removed messages.length to prevent constant re-runs
-  ]);
+  }, [isMessagesLoading, selectedUserId, selectedGroupId, detectAndRecoverMessageLoss, forceCheck, messages.length]);
 
 
   useEffect(() => {
@@ -483,7 +476,7 @@ function ChatContainer() {
             <TypingIndicator typingUsers={currentTypingUsers} />
             
             {/* 👇 scroll target with extra padding for mobile input and browser UI */}
-            <div ref={messageEndRef} className="pb-24 md:pb-2" />
+            <div ref={messageEndRef} className="pb-32 md:pb-2" />
           </div>
         ) : (
           isMessagesLoading ? (

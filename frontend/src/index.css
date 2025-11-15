@@ -855,21 +855,23 @@ hin scrollbar styles - nearly invisible */
     overflow: hidden;
   }
 
-  /* Fix message input positioning on mobile */
+  /* Fix message input positioning on mobile - raised position */
   .message-input-container {
-    position: sticky;
-    bottom: 0;
+    position: fixed;
+    bottom: 20px;
     left: 0;
     right: 0;
     z-index: 10;
     background: hsl(var(--b1));
     border-top: 1px solid hsl(var(--bc) / 0.1);
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
   }
 
   /* Prevent iOS Safari from hiding input behind bottom bar */
   @supports (-webkit-touch-callout: none) {
     .message-input-container {
-      padding-bottom: max(1rem, env(safe-area-inset-bottom, 1rem));
+      bottom: max(20px, env(safe-area-inset-bottom, 20px));
+      padding-bottom: 0.75rem;
     }
   }
 }

@@ -29,10 +29,12 @@ The chat interface wasn't properly handling mobile viewport constraints, especia
 ### 4. CSS Styles (`frontend/src/index.css`)
 - Added mobile-specific viewport fixes
 - Created `.message-input-container` class with:
-  - `position: sticky` to keep input at bottom
+  - `position: fixed` with `bottom: 20px` to raise input above mobile UI
   - `z-index: 10` to ensure it stays above content
-  - Proper safe-area-inset handling for iOS
+  - `box-shadow` for visual elevation
+  - Proper safe-area-inset handling for iOS (bottom: max(20px, env(safe-area-inset-bottom)))
 - Added `.chat-container-mobile` utility class for future use
+- Increased bottom padding on messages container to `pb-32` on mobile
 
 ## Testing Checklist
 - [ ] Message input visible on mobile (iOS Safari)
