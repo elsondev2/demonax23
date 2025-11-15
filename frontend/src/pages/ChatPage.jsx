@@ -304,7 +304,7 @@ function ChatPage() {
   // Debug logging for mobile scroll issue (throttled to prevent spam)
   useEffect(() => {
     const throttledLog = () => {
-      console.log('🔍 ChatPage.jsx Debug - Render with classes:', 'w-full h-screen');
+      console.log('🔍 ChatPage.jsx Debug - Render with classes:', 'w-full h-[100dvh] md:h-screen');
       console.log('🔍 ChatPage.jsx Debug - Current mobile state:', isMobile);
       console.log('🔍 ChatPage.jsx Debug - Current view index:', currentViewIndex);
     };
@@ -317,7 +317,7 @@ function ChatPage() {
   // Show loading while checking authorization for URL-based chat access
   if ((userId || groupId) && !isAuthorizationChecked) {
     return (
-      <div className="w-full h-screen flex items-center justify-center bg-base-100">
+      <div className="w-full h-[100dvh] flex items-center justify-center bg-base-100">
         <div className="flex flex-col items-center gap-4">
           <span className="loading loading-spinner loading-lg text-primary"></span>
           <p className="text-base-content/70">Verifying access...</p>
@@ -327,7 +327,7 @@ function ChatPage() {
   }
 
   return (
-    <div className="w-full h-screen md:h-screen">
+    <div className="w-full h-[100dvh] md:h-screen">
       <BorderAnimatedContainer>
         {isMobile ? (
           <SwipeableViews

@@ -29,9 +29,10 @@ function AppContent() {
 
   // Don't apply overflow-hidden to landing page
   // Fix mobile scrolling: remove overflow-hidden on mobile, keep on desktop
+  // Use dvh for mobile to account for browser UI
   const containerClass = isLandingPage
     ? ""
-    : "w-screen min-h-screen md:h-screen md:overflow-hidden bg-base-100 text-base-content";
+    : "w-screen h-[100dvh] md:h-screen md:overflow-hidden bg-base-100 text-base-content";
 
   // Debug logging for mobile scroll issue
   useEffect(() => {
