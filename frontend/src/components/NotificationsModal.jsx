@@ -142,7 +142,7 @@ function NotificationsModal({ isOpen, onClose }) {
 
   const modalContent = (
     <>
-      <div className="flex items-center justify-between p-4 border-b border-base-300">
+      <div className="flex items-center justify-between p-4 border-b border-base-300 flex-shrink-0">
         <div className="flex items-center gap-2">
           <Bell className="w-5 h-5 text-primary" />
           <h3 className="text-lg font-semibold text-base-content">Notifications</h3>
@@ -154,7 +154,7 @@ function NotificationsModal({ isOpen, onClose }) {
           <XIcon className="h-5 w-5" />
         </button>
       </div>
-      <div className="p-4 overflow-y-auto flex-1">
+      <div className="p-4 overflow-y-auto flex-1 min-h-0" style={{ WebkitOverflowScrolling: 'touch' }}>
         {/* Browser Notification Settings Section */}
         <div className="mb-4">
           <div className="flex items-center gap-2 mb-2">
@@ -374,7 +374,7 @@ function NotificationsModal({ isOpen, onClose }) {
 
   return (
     <IOSModal isOpen={isOpen} onClose={onClose} className="max-w-md mx-auto">
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col h-full min-h-0">
         {modalContent}
       </div>
     </IOSModal>

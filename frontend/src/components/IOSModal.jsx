@@ -141,12 +141,12 @@ const IOSModal = ({ isOpen, onClose, children, className = "", disableBackdropCl
             : 'scale-95 opacity-0 translate-y-2'
             } ${className}`}
           style={{
-            maxHeight: 'calc(100vh - 4rem)',
-            minHeight: '200px',
+            maxHeight: 'calc(100vh - 2rem)',
+            minHeight: '300px',
             display: 'flex',
             flexDirection: 'column',
             transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
-            borderRadius: '0', // Sharp corners for desktop
+            borderRadius: '12px',
             willChange: 'transform, opacity'
           }}
         >
@@ -173,9 +173,9 @@ const IOSModal = ({ isOpen, onClose, children, className = "", disableBackdropCl
         className={`w-full bg-base-100 rounded-t-3xl shadow-2xl overflow-hidden ${isDragging ? '' : 'transition-all duration-200'
           } ${className}`}
         style={{
-          height: '95vh',
-          minHeight: '600px',
-          maxHeight: '95vh',
+          height: '92vh',
+          minHeight: '500px',
+          maxHeight: '92vh',
           display: 'flex',
           flexDirection: 'column',
           transform: isDragging

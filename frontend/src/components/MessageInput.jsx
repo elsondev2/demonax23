@@ -407,7 +407,7 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
   };
 
   return (
-    <div className="px-4 md:px-6 py-4 pb-safe" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+    <div className="message-input-container px-4 md:px-6 py-3 pb-safe bg-base-100 border-t border-base-300" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
       {/* IMAGE PREVIEW */}
       {previewImage && (
         <div className="relative mb-2 w-fit">

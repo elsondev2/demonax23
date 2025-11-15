@@ -82,8 +82,9 @@ function CreateGroupModal({ isOpen, onClose }) {
 
   return (
     <IOSModal isOpen={isOpen} onClose={onClose} className="max-w-2xl">
-      {/* Enhanced Header with gradient */}
-      <div className="flex-shrink-0 relative bg-gradient-to-br from-primary/10 via-secondary/5 to-accent/10 px-6 py-4 border-b border-base-300">
+      <div className="flex flex-col h-full min-h-0">
+        {/* Enhanced Header with gradient */}
+        <div className="flex-shrink-0 relative bg-gradient-to-br from-primary/10 via-secondary/5 to-accent/10 px-6 py-4 border-b border-base-300">
         <button onClick={onClose} className="absolute top-4 right-4 btn btn-sm btn-ghost btn-circle hover:bg-base-100/20" aria-label="Close">
           <XIcon className="h-5 w-5" />
         </button>
@@ -99,8 +100,8 @@ function CreateGroupModal({ isOpen, onClose }) {
         </div>
       </div>
 
-      {/* Scrollable content area */}
-      <div className="flex-1 overflow-y-auto bg-base-100">
+        {/* Scrollable content area */}
+        <div className="flex-1 overflow-y-auto bg-base-100 min-h-0" style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
         <div className="p-6">
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Group Picture Upload */}
@@ -220,7 +221,7 @@ function CreateGroupModal({ isOpen, onClose }) {
                 </div>
               )}
 
-              <div className="max-h-48 overflow-y-auto border border-base-300 rounded-lg">
+              <div className="max-h-48 overflow-y-auto border border-base-300 rounded-lg" style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
                 {isUsersLoading ? (
                   <div className="text-center py-8">
                     <span className="loading loading-spinner loading-md text-primary"></span>
@@ -300,8 +301,8 @@ function CreateGroupModal({ isOpen, onClose }) {
         </div>
       </div>
 
-      {/* Enhanced Action Buttons - Fixed at bottom */}
-      <div className="flex-shrink-0 px-6 py-4 bg-base-100 border-t border-base-300">
+        {/* Enhanced Action Buttons - Fixed at bottom */}
+        <div className="flex-shrink-0 px-6 py-4 bg-base-100 border-t border-base-300 pb-safe" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
         <div className="flex gap-3">
           <button
             type="button"
@@ -344,6 +345,7 @@ function CreateGroupModal({ isOpen, onClose }) {
             </span>
           </div>
         </div>
+      </div>
       </div>
     </IOSModal>
   );

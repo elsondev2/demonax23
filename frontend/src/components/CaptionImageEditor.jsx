@@ -145,11 +145,11 @@ export default function CaptionImageEditor({ initialText = '', onGenerate, onCan
 
     return (
         <>
-            <div className="flex flex-col md:flex-row h-full max-h-[75vh] md:max-h-[70vh]">
+            <div className="flex flex-col md:flex-row h-full min-h-0 max-h-full overflow-hidden">
                 {/* Left Side - Preview */}
-                <div className="flex-shrink-0 bg-base-200 p-3 md:p-4 flex flex-col md:flex-1 md:justify-center">
-                    <div className="flex items-center justify-center">
-                        <div className="w-full max-w-[240px] md:max-w-[320px] aspect-square bg-base-300 rounded-xl overflow-hidden shadow-lg relative">
+                <div className="flex-shrink-0 bg-base-200 p-3 md:p-6 flex items-start justify-center md:flex-1 overflow-hidden pt-12 md:pt-16">
+                    <div className="flex flex-col items-center justify-center">
+                        <div className="w-[280px] md:w-[360px] aspect-square bg-base-300 overflow-hidden shadow-xl relative">
                             {isGeneratingPreview && (
                                 <div className="absolute inset-0 bg-base-300/50 backdrop-blur-sm flex items-center justify-center z-10">
                                     <span className="loading loading-spinner loading-md text-primary"></span>
@@ -170,20 +170,20 @@ export default function CaptionImageEditor({ initialText = '', onGenerate, onCan
                                 </div>
                             )}
                         </div>
-                    </div>
 
-                    {/* Quick Stats */}
-                    <div className="mt-2 flex items-center justify-center gap-2 text-xs text-base-content/60">
-                        <span>{text.length}/200</span>
-                        <span>•</span>
-                        <span className="hidden sm:inline">1080x1080px</span>
+                        {/* Quick Stats */}
+                        <div className="mt-3 flex items-center justify-center gap-2 text-xs text-base-content/60">
+                            <span>{text.length}/200</span>
+                            <span>•</span>
+                            <span className="hidden sm:inline">1080x1080px</span>
+                        </div>
                     </div>
                 </div>
 
                 {/* Right Side - Controls */}
-                <div className="w-full md:w-72 bg-base-100 flex flex-col min-h-0" style={{ contain: 'layout style paint' }}>
+                <div className="w-full md:w-80 lg:w-96 bg-base-100 border-t md:border-t-0 md:border-l border-base-300" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%', overflow: 'hidden' }}>
                     {/* Tab Switcher */}
-                    <div className="flex border-b border-base-300">
+                    <div className="flex border-b border-base-300 bg-base-100" style={{ flexShrink: 0 }}>
                         <button
                             className={`flex-1 py-3 px-4 font-medium transition-colors ${activeSection === 'text'
                                 ? 'text-primary border-b-2 border-primary'
@@ -212,11 +212,13 @@ export default function CaptionImageEditor({ initialText = '', onGenerate, onCan
 
                     {/* Content Area */}
                     <div 
-                        className="flex-1 overflow-y-auto overscroll-contain p-3 space-y-3" 
+                        className="p-3 space-y-3" 
                         style={{ 
+                            flex: 1,
+                            overflowY: 'scroll',
+                            overflowX: 'hidden',
                             WebkitOverflowScrolling: 'touch',
-                            scrollBehavior: 'smooth',
-                            willChange: 'scroll-position'
+                            minHeight: 0
                         }}
                     >
                         {activeSection === 'text' ? (
@@ -444,10 +446,11 @@ export default function CaptionImageEditor({ initialText = '', onGenerate, onCan
                                             <span className="label-text-alt text-base-content/60">Optional</span>
                                         </label>
                                         <div 
-                                            className="space-y-3 max-h-64 overflow-y-auto" 
+                                            className="space-y-3 max-h-48 overflow-y-auto" 
                                             style={{ 
                                                 WebkitOverflowScrolling: 'touch',
-                                                scrollBehavior: 'smooth'
+                                                scrollBehavior: 'smooth',
+                                                overscrollBehavior: 'contain'
                                             }}
                                         >
                                             {text.split('\n').map((line, index) => {
@@ -678,7 +681,7 @@ export default function CaptionImageEditor({ initialText = '', onGenerate, onCan
                     </div>
 
                     {/* Actions */}
-                    <div className="flex-shrink-0 p-3 md:p-4 border-t border-base-300 flex gap-2 md:gap-3 bg-base-100">
+                    <div className="p-3 md:p-4 border-t border-base-300 flex gap-2 md:gap-3 bg-base-100 pb-safe" style={{ flexShrink: 0, paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
                         <button className="btn btn-sm md:btn-md btn-ghost flex-1" onClick={onCancel}>
                             Cancel
                         </button>

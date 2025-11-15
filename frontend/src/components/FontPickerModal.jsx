@@ -19,10 +19,18 @@ export default function FontPickerModal({ isOpen, onClose, onSelect, currentFont
     };
 
     return (
-        <IOSModal isOpen={isOpen} onClose={onClose} title="Choose Font">
-            <div className="flex flex-col h-full">
+        <IOSModal isOpen={isOpen} onClose={onClose} className="max-w-2xl">
+            <div className="flex flex-col h-full min-h-0">
+                {/* Header */}
+                <div className="flex items-center justify-between p-4 border-b border-base-300 flex-shrink-0">
+                    <h3 className="text-lg font-semibold">Choose Font</h3>
+                    <button onClick={onClose} className="btn btn-ghost btn-sm btn-circle">
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+
                 {/* Search Bar */}
-                <div className="p-4 border-b border-base-300">
+                <div className="p-4 border-b border-base-300 flex-shrink-0">
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/40" />
                         <input
@@ -36,7 +44,7 @@ export default function FontPickerModal({ isOpen, onClose, onSelect, currentFont
                 </div>
 
                 {/* Category Tabs */}
-                <div className="flex gap-2 p-3 overflow-x-auto border-b border-base-300">
+                <div className="flex gap-2 p-3 overflow-x-auto border-b border-base-300 flex-shrink-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                     {FONT_CATEGORIES.map(category => (
                         <button
                             key={category.id}
@@ -51,7 +59,7 @@ export default function FontPickerModal({ isOpen, onClose, onSelect, currentFont
                 </div>
 
                 {/* Font List */}
-                <div className="flex-1 overflow-y-auto p-4">
+                <div className="flex-1 overflow-y-auto p-4 min-h-0" style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
                     <div className="space-y-2">
                         {filteredFonts.map(font => (
                             <button

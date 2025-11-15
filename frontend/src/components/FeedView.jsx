@@ -10,7 +10,7 @@ export default function FeedView() {
   const { selectedUser, selectedGroup } = useChatStore();
 
   return (
-    <div className="flex-1 flex flex-col h-full">
+    <div className="flex-1 flex flex-col h-full max-h-screen md:max-h-full overflow-hidden">
       {(selectedUser || selectedGroup) ? (
         <ChatContainer />
       ) : (

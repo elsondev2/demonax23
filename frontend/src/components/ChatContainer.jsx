@@ -395,10 +395,10 @@ function ChatContainer() {
     // Combine and deduplicate
     const combined = [...localTypingUsers, ...remoteUsers];
     return [...new Set(combined)];
-  }, [localTypingUsers, typingUsers]);
+  }, [localTypingUsers]);
 
   return (
-    <div className="bg-base-100 text-base-content flex-1 flex flex-col h-full relative">
+    <div className="bg-base-100 text-base-content flex-1 flex flex-col h-full max-h-screen md:max-h-full relative overflow-hidden">
       {/* Background under entire chat column */}
       <div
         className="absolute inset-0 bg-cover bg-center bg-no-repeat pointer-events-none"
@@ -411,7 +411,7 @@ function ChatContainer() {
       <ChatHeader onGroupInfoClick={handleGroupClick} onUserInfoClick={() => { if (selectedUser) { setSelectedProfileUser(selectedUser); setIsUserProfileModalOpen(true); } }} />
       {/* Chat messages container - Discord style */}
       <div
-        className="flex-1 overflow-y-auto relative"
+        className="flex-1 overflow-y-auto relative min-h-0"
         ref={messagesContainerRef}
         onClick={handleClickOutside}
         onScroll={handleScroll}
