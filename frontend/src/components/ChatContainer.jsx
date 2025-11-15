@@ -433,7 +433,7 @@ function ChatContainer() {
   }, [localTypingUsers]);
 
   return (
-    <div className="bg-base-100 text-base-content flex-1 flex flex-col h-full max-h-screen md:max-h-full relative overflow-hidden">
+    <div className="bg-base-100 text-base-content flex-1 flex flex-col h-full md:max-h-full relative overflow-hidden">
       {/* Background under entire chat column */}
       <div
         className="absolute inset-0 bg-cover bg-center bg-no-repeat pointer-events-none"

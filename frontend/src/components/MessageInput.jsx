@@ -451,10 +451,8 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange, onHeightChange }) => 
 
   return (
     <div 
-      className="message-input-container px-4 md:px-6 py-3 bg-base-100 border-t border-base-300"
+      className="message-input-container px-4 md:px-6 py-3 bg-base-100 border-t border-base-300 sticky bottom-0 z-20"
       style={{
-        transform: isKeyboardOpen ? `translateY(-${keyboardHeight}px)` : 'translateY(0)',
-        transition: 'transform 0.2s ease-out',
         paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'
       }}
     >
