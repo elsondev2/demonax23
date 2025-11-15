@@ -551,19 +551,19 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
             )}
             {/* Attachments */}
             {Array.isArray(message.attachments) && message.attachments.length > 0 && (
-              <div className="mt-2 space-y-2">
+              <div className="mt-1 md:mt-2 space-y-1 md:space-y-2">
                 {message.attachments.map((a, idx) => (
                   a.contentType?.startsWith('image/') ? (
                     <div key={idx} className="relative group/attachment">
                       {/* Skeleton loader */}
                       {attachmentLoadingStates[idx] !== false && (
-                        <div className="skeleton w-full max-w-sm h-64 rounded-lg"></div>
+                        <div className="skeleton w-full max-w-[200px] md:max-w-sm h-40 md:h-64 rounded-lg"></div>
                       )}
                       
                       <img
                         src={a.url}
                         alt={a.filename || 'image'}
-                        className={`rounded-lg max-w-sm max-h-80 w-full object-contain cursor-pointer hover:opacity-90 transition-opacity ${
+                        className={`rounded-lg max-w-[200px] md:max-w-sm max-h-48 md:max-h-80 w-full object-contain cursor-pointer hover:opacity-90 transition-opacity ${
                           attachmentLoadingStates[idx] === false ? 'block' : 'hidden'
                         }`}
                         loading="eager"
@@ -637,18 +637,18 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
                       )}
                     </div>
                   ) : a.contentType === 'application/pdf' ? (
-                    <div key={idx} className={`rounded-lg p-3 flex items-center justify-between max-w-sm border-2 ${
+                    <div key={idx} className={`rounded-lg p-2 md:p-3 flex items-center justify-between max-w-[200px] md:max-w-sm border ${
                       isOwnMessage 
                         ? 'bg-primary-content/20 border-primary-content/40' 
                         : 'bg-base-200/50 border-base-300/50'
                     }`}>
-                      <div className="flex items-center gap-2 text-sm min-w-0 flex-1">
-                        <FileText className={`w-5 h-5 flex-shrink-0 ${isOwnMessage ? 'text-primary-content' : 'text-base-content/60'}`} />
+                      <div className="flex items-center gap-1.5 md:gap-2 text-xs md:text-sm min-w-0 flex-1">
+                        <FileText className={`w-4 h-4 md:w-5 md:h-5 flex-shrink-0 ${isOwnMessage ? 'text-primary-content' : 'text-base-content/60'}`} />
                         <span className={`truncate font-medium ${isOwnMessage ? 'text-primary-content' : 'text-base-content/80'}`}>{a.filename || 'PDF'}</span>
                       </div>
-                      <div className="flex gap-1 ml-2 flex-shrink-0">
+                      <div className="flex gap-0.5 md:gap-1 ml-1 md:ml-2 flex-shrink-0">
                         <button
-                          className={`btn btn-xs ${isOwnMessage ? 'bg-primary-content/30 hover:bg-primary-content/40 text-primary-content border-primary-content/40' : 'btn-ghost'}`}
+                          className={`btn btn-xs ${isOwnMessage ? 'bg-primary-content/30 hover:bg-primary-content/40 text-primary-content border-primary-content/40' : 'btn-ghost'} hidden md:inline-flex`}
                           onClick={() => setDocPreview({ url: a.url, filename: a.filename || 'Document' })}
                         >
                           View
@@ -664,23 +664,23 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
                       </div>
                     </div>
                   ) : (
-                    <div key={idx} className={`rounded-lg p-3 flex items-center justify-between max-w-sm border-2 ${
+                    <div key={idx} className={`rounded-lg p-2 md:p-3 flex items-center justify-between max-w-[200px] md:max-w-sm border ${
                       isOwnMessage 
                         ? 'bg-primary-content/20 border-primary-content/40' 
                         : 'bg-base-200/50 border-base-300/50'
                     }`}>
-                      <div className="flex items-center gap-2 text-sm min-w-0 flex-1">
-                        <FileText className={`w-5 h-5 flex-shrink-0 ${isOwnMessage ? 'text-primary-content' : 'text-base-content/60'}`} />
+                      <div className="flex items-center gap-1.5 md:gap-2 text-xs md:text-sm min-w-0 flex-1">
+                        <FileText className={`w-4 h-4 md:w-5 md:h-5 flex-shrink-0 ${isOwnMessage ? 'text-primary-content' : 'text-base-content/60'}`} />
                         <span className={`truncate font-medium ${isOwnMessage ? 'text-primary-content' : 'text-base-content/80'}`}>{a.filename || a.contentType || 'File'}</span>
                       </div>
                       <a
                         href={a.url}
                         download={a.filename || 'file'}
-                        className={`btn btn-xs ${isOwnMessage ? 'bg-primary-content/30 hover:bg-primary-content/40 text-primary-content border-primary-content/40' : 'btn-ghost'} ml-2 flex-shrink-0`}
+                        className={`btn btn-xs ${isOwnMessage ? 'bg-primary-content/30 hover:bg-primary-content/40 text-primary-content border-primary-content/40' : 'btn-ghost'} ml-1 md:ml-2 flex-shrink-0`}
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <Download className="w-3 h-3 mr-1" />
-                        Download
+                        <Download className="w-3 h-3 md:mr-1" />
+                        <span className="hidden md:inline">Download</span>
                       </a>
                     </div>
                   )

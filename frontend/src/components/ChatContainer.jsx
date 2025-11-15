@@ -49,7 +49,6 @@ function ChatContainer() {
   const scrollPositionBeforePaginationRef = useRef(null);
   const [editingMessage, setEditingMessage] = useState(null);
   const [deletingMessageId, setDeletingMessageId] = useState(null);
-  const [inputHeight, setInputHeight] = useState(80); // Track input height for keyboard
   // Removed cache-related state - using real-time approach
   const [selectedProfileUser, setSelectedProfileUser] = useState(null);
   const [isUserProfileModalOpen, setIsUserProfileModalOpen] = useState(false);
@@ -527,13 +526,10 @@ function ChatContainer() {
             {/* Typing Indicator */}
             <TypingIndicator typingUsers={currentTypingUsers} />
             
-            {/* 👇 scroll target with dynamic padding for mobile keyboard */}
+            {/* 👇 scroll target with minimal padding for typing indicator */}
             <div 
               ref={messageEndRef} 
-              className="md:pb-2"
-              style={{
-                paddingBottom: window.innerWidth < 768 ? `${inputHeight + 40}px` : '0.5rem'
-              }}
+              className="pb-2"
             />
           </div>
         ) : (
@@ -615,7 +611,6 @@ function ChatContainer() {
           // Update typing indicator with local typing users
           setLocalTypingUsers(localUsers);
         }}
-        onHeightChange={(height) => setInputHeight(height)}
       />
 
       {/* Edit Message Modal */}
