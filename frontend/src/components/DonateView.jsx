@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Heart, Coffee, DollarSign, Send, Star, TrendingUp, Zap, Gift, CheckCircle, Users, MessageSquare, ThumbsUp, ChevronDown, Bell, Grid3x3, AlertCircle, Info, Code, Shield, Target } from 'lucide-react';
+import { Heart, Coffee, DollarSign, Send, Star, TrendingUp, Zap, Gift, CheckCircle, Users, MessageSquare, ThumbsUp, ChevronDown, Bell, Grid3x3, AlertCircle, Info, Code, Shield, Target, Clock, X } from 'lucide-react';
 import { useToast } from '../hooks/useToast';
 import { useChatStore } from '../store/useChatStore';
 import { useNavigate } from 'react-router';
@@ -24,31 +24,31 @@ function DonateBackground() {
 
 const DONATION_TIERS = [
   {
-    id: 'coffee',
-    name: 'Buy a Coffee',
-    amount: 5,
+    id: 'basic',
+    name: 'Basic Support',
+    amount: 6000,
     icon: Coffee,
     color: 'bg-amber-500',
-    description: 'Support with a small coffee',
-    perks: ['Our gratitude', 'Supporter badge']
+    description: 'Support with basic tier',
+    perks: ['Our gratitude', 'Supporter badge', 'Basic features']
   },
   {
-    id: 'lunch',
-    name: 'Buy Lunch',
-    amount: 15,
+    id: 'pro',
+    name: 'Pro Support',
+    amount: 20000,
     icon: Gift,
     color: 'bg-blue-500',
     description: 'Help fuel development',
-    perks: ['All Coffee perks', 'Priority support', 'Early feature access']
+    perks: ['All Basic perks', 'Priority support', 'Early feature access', 'Pro badge']
   },
   {
     id: 'premium',
     name: 'Premium Support',
-    amount: 50,
+    amount: 35000,
     icon: Star,
     color: 'bg-purple-500',
     description: 'Become a premium supporter',
-    perks: ['All Lunch perks', 'Custom feature request', 'Direct developer contact', 'Lifetime supporter badge']
+    perks: ['All Pro perks', 'Custom feature request', 'Direct developer contact', 'VIP badge']
   }
 ];
 
@@ -91,10 +91,6 @@ export default function DonateView() {
   const { socket } = useSocket();
   const { currentTheme } = useThemeStore();
   const [activeTab, setActiveTab] = useState('donate');
-  const [selectedTier, setSelectedTier] = useState(null);
-  const [customAmount, setCustomAmount] = useState('');
-  const [message, setMessage] = useState('');
-  const [isAnonymous, setIsAnonymous] = useState(false);
   const { toast, showToast } = useToast();
 
   // Feature request states
@@ -102,6 +98,7 @@ export default function DonateView() {
   const [featureDescription, setFeatureDescription] = useState('');
   const [featureCategory, setFeatureCategory] = useState('feature');
   const [isAnonymousRequest, setIsAnonymousRequest] = useState(false);
+  const [showKibubuModal, setShowKibubuModal] = useState(false);
 
   // Stats state
   const [stats, setStats] = useState(null);
@@ -134,10 +131,22 @@ export default function DonateView() {
         }
 
         // Use real data from both endpoints
+        // Feature count based on actual app features:
+        // 1. Real-time messaging, 2. Group chats, 3. Friend system, 4. User profiles
+        // 5. Status updates/posts, 6. File sharing, 7. Voice/Video calls, 8. Notifications
+        // 9. Themes, 10. Chat backgrounds, 11. User mentions, 12. Message reactions
+        // 13. Admin panel, 14. Payment system, 15. Notice board, 16. App integrations
+        // 17. KIBUBU (feature requests), 18. Community page, 19. Search functionality
+        // 20. Message editing/deletion, 21. Group management, 22. User banning
+        // 23. Premium tiers, 24. Supporter system, 25. Real-time presence
+        // 26. Typing indicators, 27. Read receipts, 28. Message forwarding
+        // 29. Profile customization, 30. Privacy settings
+        const featuresBuilt = 30;
+
         const stats = {
           totalSupporters: donationStats?.stats?.totalSupporters || 0,
           monthlyDonations: donationStats?.stats?.monthlyDonations || 0,
-          featuresBuilt: 12, // This could be calculated from git commits or manually updated
+          featuresBuilt: featuresBuilt,
           activeUsers: publicStats?.activeUsers || 0,
           recentDonations: donationStats?.recentDonations || []
         };
@@ -152,6 +161,13 @@ export default function DonateView() {
     };
 
     fetchStats();
+    
+    // Set up polling for real-time updates every 30 seconds
+    const interval = setInterval(() => {
+      fetchStats();
+    }, 30000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   // Fetch feature requests function
@@ -247,23 +263,6 @@ export default function DonateView() {
     };
   }, [socket, showToast]);
 
-  const handleClearSelection = () => {
-    setSelectedTier(null);
-    setCustomAmount('');
-    setMessage('');
-    setIsAnonymous(false);
-  };
-
-  const handleDonate = () => {
-    const amount = selectedTier?.amount || parseFloat(customAmount);
-    if (!amount || amount <= 0) {
-      showToast('Please select a tier or enter a valid amount.', 'error');
-      return;
-    }
-    // TODO: Integrate payment gateway (Stripe/PayPal)
-    showToast(`Thank you for your support! Payment integration is coming soon.`, 'success');
-  };
-
   const handleFeatureRequest = async () => {
     if (!featureTitle.trim() || !featureDescription.trim()) {
       showToast('Please fill in both title and description.', 'error');
@@ -281,30 +280,28 @@ export default function DonateView() {
     }
 
     try {
-      // Get current user info from auth store if not anonymous
-
-
       const response = await axiosInstance.post('/api/feature-requests/submit', {
         title: featureTitle.trim(),
         description: featureDescription.trim(),
         category: featureCategory,
         isAnonymous: isAnonymousRequest,
-        contactEmail: null // Optional - users can add this later if needed
+        contactEmail: null
       });
 
       if (response.data.success) {
-        showToast(`Feature request submitted successfully! 🎉 ${isAnonymousRequest ? '(Anonymous)' : '(Public)'}`, 'success');
+        showToast(`Idea submitted successfully! 🎉 ${isAnonymousRequest ? '(Anonymous)' : '(Public)'}`, 'success');
         setFeatureTitle('');
         setFeatureDescription('');
         setFeatureCategory('feature');
-        setIsAnonymousRequest(false); // Reset to default
+        setIsAnonymousRequest(false);
+        setShowKibubuModal(false);
 
-        // Refresh the trending requests to show the new submission
+        // Refresh the trending requests
         if (activeTab === 'request') {
           fetchFeatureRequests();
         }
 
-        // Refresh stats to show updated counts
+        // Refresh stats
         const statsResponse = await axiosInstance.get('/api/donations/public-stats');
         if (statsResponse.data.success) {
           setStats(prev => ({
@@ -313,14 +310,14 @@ export default function DonateView() {
           }));
         }
       } else {
-        showToast(response.data.message || 'Failed to submit feature request.', 'error');
+        showToast(response.data.message || 'Failed to submit idea.', 'error');
       }
     } catch (error) {
-      console.error('Error submitting feature request:', error);
+      console.error('Error submitting idea:', error);
       if (error.response?.status === 429) {
-        showToast('Too many requests. Please wait before submitting another feature request.', 'error');
+        showToast('Too many requests. Please wait before submitting another idea.', 'error');
       } else {
-        showToast('Failed to submit feature request. Please try again.', 'error');
+        showToast('Failed to submit idea. Please try again.', 'error');
       }
     }
   };
@@ -415,14 +412,14 @@ export default function DonateView() {
               onClick={() => setActiveTab('donate')}
             >
               <Heart className="w-4 h-4 mr-2" />
-              <span className="hidden sm:inline">Donate</span>
+              <span className="hidden sm:inline">Supporters</span>
             </a>
             <a
               className={`tab flex-1 ${activeTab === 'request' ? 'tab-active' : ''}`}
               onClick={() => setActiveTab('request')}
             >
               <Zap className="w-4 h-4 mr-2" />
-              <span className="hidden sm:inline">Request Feature</span>
+              <span className="hidden sm:inline">KIBUBU</span>
             </a>
             <a
               className={`tab flex-1 ${activeTab === 'community' ? 'tab-active' : ''}`}
@@ -446,25 +443,20 @@ export default function DonateView() {
       <div className="flex-1 overflow-y-auto p-4 donate-content-area">
         {activeTab === 'donate' && (
           <div className="max-w-5xl mx-auto space-y-6">
-            {/* New App Notice */}
-            <div className="alert alert-info shadow-lg">
-              <div className="flex items-start gap-3">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="stroke-current shrink-0 w-6 h-6">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                <div className="flex-1">
-                  <h3 className="font-bold">Support Our Growing Community! 🚀</h3>
-                  <div className="text-sm">
-                    {stats?.totalSupporters > 0
-                      ? `Join ${stats.totalSupporters} supporters who are helping us build something amazing! Every contribution makes a difference.`
-                      : "This app is just getting started. Be one of our first supporters and help us grow! Your support directly fuels new features and improvements."
-                    }
-                  </div>
-                </div>
+            {/* Hero Section */}
+            <div className="card bg-gradient-to-br from-primary to-secondary text-primary-content shadow-xl">
+              <div className="card-body text-center py-12">
+                <Heart className="w-16 h-16 mx-auto mb-4" />
+                <h2 className="text-3xl font-bold mb-2">Our Amazing Supporters</h2>
+                <p className="text-primary-content/90 max-w-2xl mx-auto">
+                  {stats?.totalSupporters > 0
+                    ? `${stats.totalSupporters} incredible people are helping us build something amazing! Every contribution makes a difference.`
+                    : "Be among the first to support this project and help us grow!"}
+                </p>
               </div>
             </div>
 
-            {/* Impact Stats - Example Data */}
+            {/* Impact Stats */}
             {statsLoading ? (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <StatSkeleton />
@@ -486,7 +478,7 @@ export default function DonateView() {
                 </div>
                 <div className="stat bg-base-200 rounded-lg p-4 shadow">
                   <div className="stat-title text-xs">This Month</div>
-                  <div className="stat-value text-2xl text-secondary">${stats.monthlyDonations.toLocaleString()}</div>
+                  <div className="stat-value text-2xl text-secondary">{stats.monthlyDonations.toLocaleString()} TSh</div>
                   <div className="stat-desc text-xs">Fueling development</div>
                 </div>
                 <div className="stat bg-base-200 rounded-lg p-4 shadow">
@@ -502,164 +494,61 @@ export default function DonateView() {
               </div>
             )}
 
-            {/* Donation Tiers */}
-            <div>
-              <h2 className="text-lg font-semibold mb-4">Choose Your Support Level</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {DONATION_TIERS.map((tier) => {
-                  const Icon = tier.icon;
-                  const isSelected = selectedTier?.id === tier.id;
-                  return (
-                    <div
-                      key={tier.id}
-                      className={`card bg-base-200 shadow-lg cursor-pointer transition-all hover:shadow-xl ${isSelected ? 'ring-2 ring-primary' : ''
-                        }`}
-                      onClick={() => {
-                        setSelectedTier(tier);
-                        setCustomAmount("");
-                      }}
-                    >
-                      <div className="card-body p-4">
-                        <div className={`w-12 h-12 rounded-lg ${tier.color} flex items-center justify-center mb-3`}>
-                          <Icon className="w-6 h-6 text-white" />
-                        </div>
-                        <h3 className="card-title text-base">{tier.name}</h3>
-                        <div className="text-2xl font-bold text-primary">${tier.amount}</div>
-                        <p className="text-sm text-base-content/70 mb-3">{tier.description}</p>
-                        <div className="space-y-1">
-                          {tier.perks.map((perk, idx) => (
-                            <div key={idx} className="flex items-center gap-2 text-xs">
-                              <CheckCircle className="w-3 h-3 text-success" />
-                              <span>{perk}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Custom Amount */}
-            <div className="card bg-base-200 shadow-lg">
-              <div className="card-body">
-                <div className="flex justify-between items-center">
-                  <h3 className="card-title text-base">Custom Amount</h3>
-                  <button className="btn btn-ghost btn-sm" onClick={handleClearSelection}>Clear</button>
-                </div>
-
-                {/* Amount Input - Full Width */}
-                <div className="form-control w-full">
-                  <label className="label">
-                    <span className="label-text font-semibold text-base-content/70">Enter your own amount</span>
-                  </label>
-                  <div className="join w-full">
-                    <span className="join-item btn btn-disabled bg-base-300/50 border-base-content/10">
-                      <DollarSign className="w-4 h-4" />
-                    </span>
-                    <input
-                      type="number"
-                      placeholder="25.00"
-                      className="input input-bordered join-item flex-1 bg-base-300/50 border-base-content/10 focus:bg-base-300/70 focus:outline-none focus:border-base-content/20 placeholder:text-base-content/40"
-                      value={customAmount}
-                      onChange={(e) => {
-                        setCustomAmount(e.target.value);
-                        setSelectedTier(null);
-                      }}
-                      min="1"
-                      step="0.01"
-                    />
-                  </div>
-                </div>
-
-                {/* Message - Full Width */}
-                <div className="form-control w-full mt-4">
-                  <label className="label">
-                    <span className="label-text font-semibold text-base-content/70">Leave a message (optional)</span>
-                  </label>
-                  <textarea
-                    className="textarea textarea-bordered w-full bg-base-300/50 border-base-content/10 focus:bg-base-300/70 focus:outline-none focus:border-base-content/20 placeholder:text-base-content/40 h-32 resize-none"
-                    placeholder="Thank you for building this amazing app!"
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                  ></textarea>
-                </div>
-
-                {/* Anonymous Option */}
-                <div className="form-control mt-4">
-                  <label className="label cursor-pointer justify-start gap-3">
-                    <input
-                      type="checkbox"
-                      className="checkbox checkbox-primary"
-                      checked={isAnonymous}
-                      onChange={(e) => setIsAnonymous(e.target.checked)}
-                    />
-                    <span className="label-text">Donate anonymously</span>
-                  </label>
-                </div>
-
-                {/* Donate Button */}
-                <button
-                  className="btn btn-primary btn-lg w-full mt-6"
-                  onClick={handleDonate}
-                >
-                  <Heart className="w-5 h-5 mr-2" />
-                  Support Now - ${selectedTier?.amount || customAmount || '0'}
-                </button>
-
-                {/* Payment Methods Info */}
-                <div className="alert alert-info mt-4">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="stroke-current shrink-0 w-6 h-6">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                  </svg>
-                  <div className="text-sm">
-                    <p className="font-semibold">Secure Payment</p>
-                    <p>Payment integration coming soon. We'll support Stripe, PayPal, and more.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Recent Supporters */}
+            {/* Supporters List */}
             <div className="card bg-base-200 shadow-lg">
               <div className="card-body">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="card-title text-base">Recent Supporters</h3>
+                  <h3 className="card-title text-lg">
+                    <Gift className="w-6 h-6 text-secondary" />
+                    Our Supporters
+                  </h3>
                   {stats?.recentDonations?.length > 0 && (
-                    <span className="badge badge-ghost badge-sm">Live Data</span>
+                    <span className="badge badge-secondary badge-sm">
+                      {stats.recentDonations.length} supporter{stats.recentDonations.length !== 1 ? 's' : ''}
+                    </span>
                   )}
                 </div>
 
                 {stats?.recentDonations?.length > 0 ? (
-                  <div className="space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {stats.recentDonations.map((supporter) => (
-                      <div key={supporter.id} className="flex items-start gap-3 p-3 bg-base-300 rounded-lg">
-                        <div className="avatar placeholder">
-                          <div className="bg-primary text-primary-content rounded-full w-10">
-                            {supporter.avatar ? (
-                              <img src={supporter.avatar} alt={supporter.name} className="rounded-full" />
-                            ) : (
-                              <span className="text-xs">{supporter.name[0]}</span>
-                            )}
+                      <div key={supporter.id} className="card bg-base-300 shadow hover:shadow-lg transition-shadow">
+                        <div className="card-body p-4">
+                          <div className="flex items-start gap-3">
+                            <div className="avatar placeholder">
+                              <div className="bg-primary text-primary-content rounded-full w-12">
+                                {supporter.avatar ? (
+                                  <img src={supporter.avatar} alt={supporter.name} className="rounded-full" />
+                                ) : (
+                                  <span className="text-lg">{supporter.name[0]}</span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="font-bold text-base">{supporter.name}</span>
+                                <div className="badge badge-primary badge-lg font-bold">
+                                  {supporter.amount.toLocaleString()} TSh
+                                </div>
+                              </div>
+                              {supporter.message && (
+                                <p className="text-sm text-base-content/80 mb-2 italic">"{supporter.message}"</p>
+                              )}
+                              <div className="flex items-center gap-2 text-xs text-base-content/60">
+                                <Clock className="w-3 h-3" />
+                                <span>{supporter.time}</span>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <span className="font-semibold text-sm">{supporter.name}</span>
-                            <span className="text-primary font-bold text-sm">${supporter.amount}</span>
-                          </div>
-                          {supporter.message && (
-                            <p className="text-xs text-base-content/70 mt-1">{supporter.message}</p>
-                          )}
-                          <span className="text-xs text-base-content/50">{supporter.time}</span>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-8 text-base-content/60">
-                    <p className="text-sm">No supporters yet. Be the first to support this project!</p>
+                  <div className="text-center py-12 text-base-content/60">
+                    <Gift className="w-16 h-16 mx-auto mb-4 opacity-30" />
+                    <p className="text-lg font-semibold mb-2">No supporters yet</p>
+                    <p className="text-sm">Be the first to support this project and help us grow!</p>
                   </div>
                 )}
               </div>
@@ -669,105 +558,173 @@ export default function DonateView() {
 
         {activeTab === 'request' && (
           <div className="max-w-5xl mx-auto space-y-6">
-            {/* Feature Request Form */}
-            <div className="card bg-base-200 shadow-lg">
-              <div className="card-body">
-                <h3 className="card-title">Submit Feature Request</h3>
-                <p className="text-sm text-base-content/70">
-                  Have an idea? Share it with us and help shape the future of this app!
+            {/* KIBUBU Hero */}
+            <div className="card bg-gradient-to-br from-accent to-info text-accent-content shadow-xl">
+              <div className="card-body text-center py-12">
+                <Zap className="w-16 h-16 mx-auto mb-4" />
+                <h2 className="text-4xl font-bold mb-2">KIBUBU</h2>
+                <p className="text-lg text-accent-content/90 mb-2">Your Ideas, Our Future</p>
+                <p className="text-accent-content/80 max-w-2xl mx-auto mb-6">
+                  Share your brilliant ideas and help shape the future of de_monax! Every suggestion matters.
                 </p>
-
-                {/* Category Selection */}
-                <div className="form-control mt-4">
-                  <label className="label">
-                    <span className="label-text">Category</span>
-                  </label>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                    {FEATURE_CATEGORIES.map((cat) => {
-                      const Icon = cat.icon;
-                      return (
-                        <button
-                          key={cat.id}
-                          className={`btn btn-sm ${featureCategory === cat.id ? 'btn-primary' : 'btn-outline'}`}
-                          onClick={() => setFeatureCategory(cat.id)}
-                        >
-                          <Icon className="w-4 h-4 mr-1" />
-                          {cat.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Title - Full Width */}
-                <div className="form-control w-full mt-4">
-                  <label className="label">
-                    <span className="label-text font-semibold text-base-content/70">Feature Title</span>
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g., Dark mode for chat interface"
-                    className="input input-bordered w-full bg-base-300/50 border-base-content/10 focus:bg-base-300/70 focus:outline-none focus:border-base-content/20 placeholder:text-base-content/40"
-                    value={featureTitle}
-                    onChange={(e) => setFeatureTitle(e.target.value)}
-                  />
-                </div>
-
-                {/* Description - Full Width */}
-                <div className="form-control w-full mt-4">
-                  <label className="label">
-                    <span className="label-text font-semibold text-base-content/70">Detailed Description</span>
-                  </label>
-                  <textarea
-                    className="textarea textarea-bordered w-full bg-base-300/50 border-base-content/10 focus:bg-base-300/70 focus:outline-none focus:border-base-content/20 placeholder:text-base-content/40 h-40 resize-none"
-                    placeholder="Describe your feature request in detail. What problem does it solve? How would it work?"
-                    value={featureDescription}
-                    onChange={(e) => setFeatureDescription(e.target.value)}
-                  ></textarea>
-                </div>
-
-                {/* Anonymous Toggle */}
-                <div className="form-control mt-4">
-                  <label className="label cursor-pointer justify-start gap-3">
-                    <input
-                      type="checkbox"
-                      className="toggle toggle-primary"
-                      checked={isAnonymousRequest}
-                      onChange={(e) => setIsAnonymousRequest(e.target.checked)}
-                    />
-                    <span className="label-text">Submit anonymously</span>
-                  </label>
-                  <p className="text-xs text-base-content/60 mt-1">
-                    {isAnonymousRequest
-                      ? "Your request will be submitted without your name or contact information."
-                      : "Your request will be associated with your account."
-                    }
-                  </p>
-                </div>
-
                 <button
-                  className="btn btn-primary mt-6"
-                  onClick={handleFeatureRequest}
+                  className="btn btn-lg bg-accent-content text-accent hover:bg-accent-content/90 gap-2"
+                  onClick={() => setShowKibubuModal(true)}
                 >
-                  <Send className="w-4 h-4 mr-2" />
-                  Submit Request {!isAnonymousRequest && "(Public)"}
+                  <Send className="w-5 h-5" />
+                  Submit Your Idea
                 </button>
               </div>
             </div>
+
+            {/* KIBUBU Modal */}
+            {showKibubuModal && (
+              <div className="modal modal-open">
+                <div className="modal-box w-full max-w-3xl max-h-[90vh] flex flex-col p-0">
+                  {/* Modal Header */}
+                  <div className="flex-shrink-0 bg-gradient-to-r from-accent to-info text-accent-content p-6 border-b border-accent-content/20">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-lg bg-accent-content/20 flex items-center justify-center">
+                          <Zap className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <h3 className="text-2xl font-bold">Submit to KIBUBU</h3>
+                          <p className="text-sm text-accent-content/80">Share your brilliant idea</p>
+                        </div>
+                      </div>
+                      <button
+                        className="btn btn-sm btn-circle btn-ghost"
+                        onClick={() => setShowKibubuModal(false)}
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Modal Content */}
+                  <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                    {/* Category Selection */}
+                    <div className="form-control">
+                      <label className="label">
+                        <span className="label-text font-semibold">Category</span>
+                      </label>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        {FEATURE_CATEGORIES.map((cat) => {
+                          const Icon = cat.icon;
+                          return (
+                            <button
+                              key={cat.id}
+                              className={`btn btn-sm ${featureCategory === cat.id ? 'btn-accent' : 'btn-outline'}`}
+                              onClick={() => setFeatureCategory(cat.id)}
+                            >
+                              <Icon className="w-4 h-4 mr-1" />
+                              {cat.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Title */}
+                    <div className="form-control w-full">
+                      <label className="label">
+                        <span className="label-text font-semibold">Idea Title</span>
+                        <span className="label-text-alt text-xs">{featureTitle.length}/100</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g., Dark mode for chat interface"
+                        className="input input-bordered w-full"
+                        value={featureTitle}
+                        onChange={(e) => setFeatureTitle(e.target.value)}
+                        maxLength={100}
+                      />
+                    </div>
+
+                    {/* Description */}
+                    <div className="form-control w-full">
+                      <label className="label">
+                        <span className="label-text font-semibold">Detailed Description</span>
+                        <span className="label-text-alt text-xs">{featureDescription.length}/1000</span>
+                      </label>
+                      <textarea
+                        className="textarea textarea-bordered w-full h-40 resize-none"
+                        placeholder="Describe your idea in detail. What problem does it solve? How would it work?"
+                        value={featureDescription}
+                        onChange={(e) => setFeatureDescription(e.target.value)}
+                        maxLength={1000}
+                      ></textarea>
+                    </div>
+
+                    {/* Anonymous Toggle */}
+                    <div className="form-control">
+                      <label className="label cursor-pointer justify-start gap-3">
+                        <input
+                          type="checkbox"
+                          className="toggle toggle-accent"
+                          checked={isAnonymousRequest}
+                          onChange={(e) => setIsAnonymousRequest(e.target.checked)}
+                        />
+                        <div>
+                          <span className="label-text font-semibold">Submit anonymously</span>
+                          <p className="text-xs text-base-content/60 mt-1">
+                            {isAnonymousRequest
+                              ? "Your idea will be submitted without your name."
+                              : "Your idea will be associated with your account."}
+                          </p>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Modal Footer */}
+                  <div className="flex-shrink-0 border-t border-base-300 p-4 bg-base-200">
+                    <div className="flex gap-3 justify-end">
+                      <button
+                        className="btn btn-ghost"
+                        onClick={() => setShowKibubuModal(false)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        className="btn btn-accent gap-2"
+                        onClick={handleFeatureRequest}
+                        disabled={!featureTitle.trim() || !featureDescription.trim()}
+                      >
+                        <Send className="w-4 h-4" />
+                        Submit Idea
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className="modal-backdrop" onClick={() => setShowKibubuModal(false)}></div>
+              </div>
+            )}
+
+
 
             {/* Popular Requests */}
             <div className="card bg-base-200 shadow-lg">
               <div className="card-body">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="card-title text-base">Trending Requests</h3>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
+                      <TrendingUp className="w-6 h-6 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="card-title text-lg">Trending Ideas</h3>
+                      <p className="text-xs text-base-content/60">Community's most popular requests</p>
+                    </div>
+                  </div>
                   <div className="flex items-center gap-2">
                     {featureRequests.length > 0 && (
-                      <span className="badge badge-ghost badge-sm">
-                        {featureRequests.length} request{featureRequests.length !== 1 ? 's' : ''}
+                      <span className="badge badge-primary badge-sm">
+                        {featureRequests.length} idea{featureRequests.length !== 1 ? 's' : ''}
                       </span>
                     )}
                     <button
-                      className="btn btn-ghost btn-sm"
+                      className="btn btn-ghost btn-sm btn-circle"
                       onClick={fetchFeatureRequests}
                       disabled={requestsLoading}
                       title="Refresh requests"
@@ -775,7 +732,7 @@ export default function DonateView() {
                       {requestsLoading ? (
                         <div className="loading loading-spinner loading-xs"></div>
                       ) : (
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                         </svg>
                       )}
@@ -784,9 +741,9 @@ export default function DonateView() {
                 </div>
 
                 {requestsLoading ? (
-                  <div className="text-center py-8">
-                    <div className="loading loading-spinner loading-md mx-auto mb-3"></div>
-                    <p className="text-sm text-base-content/60">Loading feature requests...</p>
+                  <div className="text-center py-12">
+                    <div className="loading loading-spinner loading-lg mx-auto mb-4"></div>
+                    <p className="text-sm text-base-content/60">Loading brilliant ideas...</p>
                   </div>
                 ) : requestsError ? (
                   <div className="alert alert-error">
@@ -794,21 +751,39 @@ export default function DonateView() {
                     <span>{requestsError}</span>
                   </div>
                 ) : featureRequests.length > 0 ? (
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {featureRequests.map((request) => (
-                      <div key={request._id} className="card bg-base-300 shadow">
-                        <div className="card-body p-4">
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className={`badge badge-sm ${request.category === 'bug' ? 'badge-error' :
+                      <div key={request._id} className="card bg-base-300 shadow-md hover:shadow-xl transition-all border border-base-content/10">
+                        <div className="card-body p-5">
+                          <div className="flex items-start gap-4">
+                            {/* Voting Section - Left Side */}
+                            <div className="flex flex-col items-center gap-2 min-w-[60px]">
+                              <button
+                                className={`btn btn-sm btn-circle ${request.userVote === 'up' ? 'btn-primary' : 'btn-ghost'}`}
+                                onClick={() => handleVote(request._id, 'up')}
+                              >
+                                <ThumbsUp className="w-4 h-4" />
+                              </button>
+                              <div className="font-bold text-lg">{request.voteScore || 0}</div>
+                              <button
+                                className={`btn btn-sm btn-circle ${request.userVote === 'down' ? 'btn-error' : 'btn-ghost'}`}
+                                onClick={() => handleVote(request._id, 'down')}
+                              >
+                                <ThumbsUp className="w-4 h-4 rotate-180" />
+                              </button>
+                            </div>
+
+                            {/* Content - Right Side */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                <span className={`badge ${request.category === 'bug' ? 'badge-error' :
                                   request.category === 'feature' ? 'badge-primary' :
                                     request.category === 'improvement' ? 'badge-secondary' :
                                       'badge-accent'
                                   }`}>
                                   {request.category}
                                 </span>
-                                <span className={`badge badge-sm ${request.status === 'pending' ? 'badge-neutral' :
+                                <span className={`badge ${request.status === 'pending' ? 'badge-neutral' :
                                   request.status === 'reviewing' ? 'badge-warning' :
                                     request.status === 'approved' ? 'badge-success' :
                                       request.status === 'implemented' ? 'badge-info' :
@@ -817,38 +792,23 @@ export default function DonateView() {
                                   {request.status}
                                 </span>
                               </div>
-                              <h4 className="font-semibold text-sm mb-2">{request.title}</h4>
-                              <p className="text-xs text-base-content/70 mb-3 line-clamp-2">
+                              <h4 className="font-bold text-base mb-2">{request.title}</h4>
+                              <p className="text-sm text-base-content/80 mb-3">
                                 {request.description}
                               </p>
                               <div className="flex items-center gap-4 text-xs text-base-content/60">
-                                <span>By: {request.submittedBy?.fullName || 'Anonymous'}</span>
-                                <span>{new Date(request.createdAt).toLocaleDateString()}</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Voting Section */}
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <button
-                                className={`btn btn-ghost btn-sm gap-1 ${request.userVote === 'up' ? 'btn-primary' : ''
-                                  }`}
-                                onClick={() => handleVote(request._id, 'up')}
-                              >
-                                <ThumbsUp className="w-4 h-4" />
-                                <span className="text-xs">{request.upvotes}</span>
-                              </button>
-                              <button
-                                className={`btn btn-ghost btn-sm gap-1 ${request.userVote === 'down' ? 'btn-secondary' : ''
-                                  }`}
-                                onClick={() => handleVote(request._id, 'down')}
-                              >
-                                <ThumbsUp className="w-4 h-4 rotate-180" />
-                                <span className="text-xs">{request.downvotes}</span>
-                              </button>
-                              <div className="badge badge-ghost badge-sm">
-                                Score: {request.voteScore || 0}
+                                <div className="flex items-center gap-1">
+                                  <Users className="w-3 h-3" />
+                                  <span>{request.submittedBy?.fullName || 'Anonymous'}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  <span>{new Date(request.createdAt).toLocaleDateString()}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <ThumbsUp className="w-3 h-3" />
+                                  <span>{request.upvotes} up</span>
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -857,10 +817,10 @@ export default function DonateView() {
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-8 text-base-content/60">
-                    <Zap className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    <p className="text-sm">No feature requests yet. Be the first to suggest an improvement!</p>
-                    <p className="text-xs mt-2 opacity-70">Submit your ideas above and help shape the future of this app.</p>
+                  <div className="text-center py-16 text-base-content/60">
+                    <Zap className="w-20 h-20 mx-auto mb-4 opacity-20" />
+                    <p className="text-lg font-semibold mb-2">No ideas yet!</p>
+                    <p className="text-sm">Be the first to share your brilliant idea and help shape de_monax!</p>
                   </div>
                 )}
               </div>
@@ -1209,18 +1169,64 @@ export default function DonateView() {
               </div>
             </div>
 
-            {/* Top Contributors */}
+            {/* Top Supporters */}
             <div className="card bg-base-200 shadow-lg">
               <div className="card-body">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="card-title">Top Contributors</h3>
-                  <span className="badge badge-ghost badge-sm">Coming Soon</span>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-secondary/20 flex items-center justify-center">
+                      <Gift className="w-6 h-6 text-secondary" />
+                    </div>
+                    <div>
+                      <h3 className="card-title">Top Supporters</h3>
+                      <p className="text-xs text-base-content/60">Our amazing contributors</p>
+                    </div>
+                  </div>
+                  {stats?.recentDonations?.length > 0 && (
+                    <span className="badge badge-secondary badge-sm">
+                      {stats.recentDonations.length} supporter{stats.recentDonations.length !== 1 ? 's' : ''}
+                    </span>
+                  )}
                 </div>
-                <div className="text-center py-8 text-base-content/60">
-                  <Gift className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                  <p className="text-sm">No contributors yet. Be among the first to support and shape this project!</p>
-                  <p className="text-xs mt-2 opacity-70">Your contributions will be featured here as we grow.</p>
-                </div>
+                
+                {stats?.recentDonations?.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {stats.recentDonations.map((supporter, idx) => (
+                      <div key={supporter.id} className="card bg-base-300 shadow hover:shadow-lg transition-shadow">
+                        <div className="card-body p-4">
+                          <div className="flex items-center gap-3">
+                            <div className="avatar placeholder">
+                              <div className="bg-secondary text-secondary-content rounded-full w-12">
+                                {supporter.avatar ? (
+                                  <img src={supporter.avatar} alt={supporter.name} className="rounded-full" />
+                                ) : (
+                                  <span className="text-lg">{supporter.name[0]}</span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-bold text-sm truncate">{supporter.name}</div>
+                              <div className="badge badge-secondary badge-xs">
+                                {supporter.amount.toLocaleString()} TSh
+                              </div>
+                            </div>
+                            {idx < 3 && (
+                              <div className="text-2xl">
+                                {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-base-content/60">
+                    <Gift className="w-16 h-16 mx-auto mb-4 opacity-30" />
+                    <p className="text-lg font-semibold mb-2">No supporters yet</p>
+                    <p className="text-sm">Be among the first to support and shape this project!</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

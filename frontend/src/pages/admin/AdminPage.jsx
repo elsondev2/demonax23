@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { axiosInstance } from "../../lib/axios";
 import { useAuthStore } from "../../store/useAuthStore";
 import { useNavigate, useLocation, Routes, Route, Navigate } from "react-router";
-import { Users, MessageSquare, Layers, Image, LayoutDashboard, Download, FileText, Megaphone, MessageCircle } from "lucide-react";
+import { Users, MessageSquare, Layers, Image, LayoutDashboard, Download, FileText, Megaphone, MessageCircle, DollarSign } from "lucide-react";
 import toast from "react-hot-toast";
 import AnnouncementModal from "../../components/AnnouncementModal";
 import AppearanceModal from "../../components/AppearanceModal";
@@ -21,7 +21,8 @@ import {
   StatusesView,
   AnnouncementsView,
   FeatureRequestsView,
-  FollowLeaderboardView
+  FollowLeaderboardView,
+  PaymentsView
 } from "./views";
 
 export default function AdminPage() {
@@ -81,6 +82,9 @@ export default function AdminPage() {
   const [uploadsPage, setUploadsPage] = useState(1);
   const [uploadsTotal, setUploadsTotal] = useState(0);
   const [uploadsPerPage, setUploadsPerPage] = useState(50);
+
+  const [payments, setPayments] = useState([]);
+  const [paymentStats, setPaymentStats] = useState(null);
 
   const [posts, setPosts] = useState([]);
   const [postsQ, setPostsQ] = useState("");
@@ -242,6 +246,13 @@ export default function AdminPage() {
       } else if (activeTab === "follow-leaderboard") {
         const res = await fetchCached(`follow_leaderboard_${followLeaderboardLimit}`, () => axiosInstance.get(`/api/admin/follow-leaderboard?limit=${followLeaderboardLimit}`), 30000);
         setFollowLeaderboard(res.data || []);
+      } else if (activeTab === "payments") {
+        const [paymentsRes, statsRes] = await Promise.all([
+          fetchCached('payments_all', () => axiosInstance.get('/api/payments/all'), 30000),
+          fetchCached('payment_stats', () => axiosInstance.get('/api/payments/stats'), 30000)
+        ]);
+        setPayments(paymentsRes.data || []);
+        setPaymentStats(statsRes.data || null);
       } else if (activeTab === "community") {
         const res = await fetchCached('community_groups', () => axiosInstance.get('/api/admin/community-groups'), 30000);
         setCommunityGroups(res.data || []);
@@ -462,6 +473,7 @@ export default function AdminPage() {
   const tabs = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "users", label: "Users", icon: Users },
+    { id: "payments", label: "Payments", icon: DollarSign },
     { id: "messages", label: "Messages", icon: MessageSquare },
     { id: "groups", label: "Groups", icon: Layers },
     { id: "community", label: "Community", icon: Users },
@@ -516,6 +528,7 @@ export default function AdminPage() {
               <Routes>
                 <Route index element={<DashboardView overview={overview} users={users} messages={messages} groups={groups} statuses={statuses} recentActivity={recentActivity} featureRequests={featureRequests} groupConversations={groupConversations} />} />
                 <Route path="users" element={<UsersView users={users} setEditModal={setEditModal} setDeleteModal={setDeleteModal} />} />
+                <Route path="payments" element={<PaymentsView payments={payments} stats={paymentStats} onRefresh={loadData} loading={loading} />} />
                 <Route path="messages" element={(
                   <MessagesView
                     messagesSubTab={messagesSubTab}

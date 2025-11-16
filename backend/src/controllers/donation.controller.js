@@ -4,33 +4,55 @@ import User from '../models/User.js';
 // Get donation statistics for the donate view
 export const getDonationStats = async (req, res) => {
   try {
-    const stats = await Donation.getStats();
-
-    // Get recent donations for display (last 10, non-anonymous only)
-    const recentDonations = await Donation.find({
-      isAnonymous: false,
-      status: 'completed'
+    // Get supporters from User model (users who have donated)
+    const supporters = await User.find({
+      isSupporter: true,
+      totalDonated: { $gt: 0 }
     })
-      .populate('donatedBy', 'fullName profilePic')
-      .sort({ createdAt: -1 })
-      .limit(10)
-      .select('amount donorName message tier createdAt donatedBy')
+      .select('fullName profilePic totalDonated supporterTier lastDonationDate donationHistory')
+      .sort({ totalDonated: -1 })
+      .limit(20)
       .lean();
 
-    // Format recent donations for display
-    const formattedRecentDonations = recentDonations.map(donation => ({
-      id: donation._id,
-      name: donation.donatedBy?.fullName || donation.donorName,
-      amount: donation.amount,
-      message: donation.message,
-      tier: donation.tier,
-      time: getTimeAgo(donation.createdAt),
-      avatar: donation.donatedBy?.profilePic
-    }));
+    // Format supporters for display
+    const formattedSupporters = supporters.map(supporter => {
+      // Get the last donation message if available
+      const lastDonation = supporter.donationHistory && supporter.donationHistory.length > 0
+        ? supporter.donationHistory[supporter.donationHistory.length - 1]
+        : null;
+
+      return {
+        id: supporter._id,
+        name: supporter.fullName,
+        amount: supporter.totalDonated,
+        message: lastDonation?.note || '',
+        tier: supporter.supporterTier,
+        time: getTimeAgo(supporter.lastDonationDate || new Date()),
+        avatar: supporter.profilePic
+      };
+    });
+
+    // Calculate stats
+    const totalSupporters = await User.countDocuments({ isSupporter: true });
+    const allSupporters = await User.find({ isSupporter: true }).select('totalDonated lastDonationDate');
+    
+    // Calculate monthly donations (last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const monthlyDonations = allSupporters
+      .filter(s => s.lastDonationDate && s.lastDonationDate >= thirtyDaysAgo)
+      .reduce((sum, s) => sum + (s.totalDonated || 0), 0);
+
+    const stats = {
+      totalSupporters,
+      monthlyDonations,
+      totalRevenue: allSupporters.reduce((sum, s) => sum + (s.totalDonated || 0), 0)
+    };
 
     res.json({
       stats,
-      recentDonations: formattedRecentDonations,
+      recentDonations: formattedSupporters,
       success: true
     });
   } catch (error) {

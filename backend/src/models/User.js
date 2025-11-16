@@ -46,6 +46,43 @@ const userSchema = new mongoose.Schema(
       default: "user",
     },
     isBanned: { type: Boolean, default: false },
+    
+    // Premium/Subscription fields
+    isPremium: { type: Boolean, default: false },
+    premiumTier: {
+      type: String,
+      enum: ["free", "basic", "pro", "lifetime"],
+      default: "free",
+    },
+    premiumStartDate: { type: Date, default: null },
+    premiumEndDate: { type: Date, default: null },
+    premiumDuration: { type: Number, default: 0 }, // in days
+    
+    // Supporter/Donation fields
+    isSupporter: { type: Boolean, default: false },
+    supporterTier: {
+      type: String,
+      enum: ["none", "bronze", "silver", "gold", "platinum"],
+      default: "none",
+    },
+    totalDonated: { type: Number, default: 0 },
+    lastDonationDate: { type: Date, default: null },
+    donationHistory: [{
+      amount: { type: Number, required: true },
+      date: { type: Date, default: Date.now },
+      note: { type: String, default: "" },
+      addedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    }],
+    
+    // Payment tracking
+    paymentStatus: {
+      type: String,
+      enum: ["active", "expired", "cancelled", "pending", "none"],
+      default: "none",
+    },
+    autoRenew: { type: Boolean, default: false },
+    paymentNotes: { type: String, default: "" },
+    
     friends: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

@@ -20,10 +20,12 @@ import donationRoutes from "./routes/donation.route.js";
 import featureRequestRoutes from "./routes/featureRequest.route.js";
 import mentionRoutes from "./routes/mention.route.js";
 import linkPreviewRoutes from "./routes/linkPreview.route.js";
+import paymentRoutes from "./routes/payment.route.js";
 import { app, server } from "./lib/socket.js";
 import { startStatusCleanupJob } from "./lib/statusCleanup.js";
 import { startPostCleanupJob } from "./lib/postCleanup.js";
 import { initFeatureRequestCleanup } from "./lib/featureRequestCleanup.js";
+import { startPremiumExpirationJob } from "./lib/premiumExpiration.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config();
@@ -79,6 +81,7 @@ app.use("/api/donations", donationRoutes);
 app.use("/api/feature-requests", featureRequestRoutes);
 app.use("/api/mentions", mentionRoutes);
 app.use("/api/link", linkPreviewRoutes);
+app.use("/api/payments", paymentRoutes);
 
 if (ENV.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "../frontend/dist")));
@@ -95,4 +98,5 @@ server.listen(PORT, () => {
   try { startStatusCleanupJob(); } catch (e) { console.log('Failed to start status cleanup job:', e?.message); }
   try { startPostCleanupJob(); } catch (e) { console.log('Failed to start post cleanup job:', e?.message); }
   try { initFeatureRequestCleanup(); } catch (e) { console.log('Failed to start feature request cleanup job:', e?.message); }
+  try { startPremiumExpirationJob(); } catch (e) { console.log('Failed to start premium expiration job:', e?.message); }
 });

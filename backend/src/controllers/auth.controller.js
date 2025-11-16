@@ -128,6 +128,8 @@ export const signup = async (req, res) => {
         username: savedUser.username,
         profilePic: savedUser.profilePic,
         isVerified: savedUser.isVerified,
+        isBanned: savedUser.isBanned || false,
+        role: savedUser.role || 'user',
         token, // Include token for immediate login
       });
     } else {
@@ -185,14 +187,24 @@ export const login = async (req, res) => {
       console.log("Failed to auto-join default community group:", err);
     }
 
-    res.status(200).json({
+    const responseData = {
       _id: user._id,
       fullName: user.fullName,
       email: user.email,
       username: user.username,
       profilePic: user.profilePic,
+      isBanned: user.isBanned || false,
+      role: user.role || 'user',
       token, // Include token in response for cross-origin requests
+    };
+
+    console.log('🔍 Login Response - User Data:', {
+      email: responseData.email,
+      isBanned: responseData.isBanned,
+      role: responseData.role
     });
+
+    res.status(200).json(responseData);
   } catch (error) {
     console.log("Error in login controller:", error);
     res.status(500).json({ message: "Internal server error" });

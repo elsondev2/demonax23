@@ -18,6 +18,7 @@ import AppearanceModal from "./components/AppearanceModal";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminProtectedRoute from "./components/AdminProtectedRoute";
 import AnnouncementBanner from "./components/AnnouncementBanner";
+import BannedAccountScreen from "./components/BannedAccountScreen";
 
 import { Toaster } from "react-hot-toast";
 import { SocketProvider } from "./contexts/SocketContext.jsx";
@@ -26,6 +27,21 @@ function AppContent() {
   const location = useLocation();
   const { authUser } = useAuthStore();
   const isLandingPage = location.pathname === '/';
+  
+  // Check if user is banned (but allow admins to bypass)
+  const isBanned = authUser?.isBanned === true && authUser?.role !== 'admin';
+
+  // Debug logging for banned status
+  useEffect(() => {
+    if (authUser) {
+      console.log('🔍 User Ban Status Check:', {
+        email: authUser.email,
+        isBanned: authUser.isBanned,
+        role: authUser.role,
+        willShowBanScreen: isBanned
+      });
+    }
+  }, [authUser, isBanned]);
 
   // Don't apply overflow-hidden to landing page
   // Fix mobile scrolling: remove overflow-hidden on mobile, keep on desktop
@@ -43,6 +59,11 @@ function AppContent() {
       console.log('🔍 App.jsx Debug - overflow-hidden applied:', containerClass.includes('overflow-hidden'));
     }
   }, [containerClass, isLandingPage]);
+
+  // Show banned screen if user is banned
+  if (isBanned) {
+    return <BannedAccountScreen />;
+  }
 
   return (
     <SocketProvider>

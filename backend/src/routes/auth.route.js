@@ -51,6 +51,13 @@ router.post("/send-otp", sendOTP);
 router.post("/verify-otp", verifyOTPCode);
 router.get("/verification-status/:userId", checkVerificationStatus);
 
-router.get("/check", protectRoute, (req, res) => res.status(200).json(req.user));
+router.get("/check", protectRoute, (req, res) => {
+  console.log('🔍 Auth Check - User Data:', {
+    email: req.user.email,
+    isBanned: req.user.isBanned,
+    role: req.user.role
+  });
+  return res.status(200).json(req.user);
+});
 
 export default router;
