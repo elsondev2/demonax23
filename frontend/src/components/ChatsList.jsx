@@ -363,6 +363,18 @@ function ChatsList() {
     return `${month}.${day}, ${hours}:${minutes}${ampm}`;
   };
 
+  // Helper function to strip markdown formatting from text
+  const stripMarkdown = (text) => {
+    if (!text) return text;
+    // Remove markdown formatting: **bold**, *italic*, ~~strike~~, __underline__
+    return text
+      .replace(/\*\*([^*]+)\*\*/g, '$1')  // **bold** -> bold
+      .replace(/\*([^*]+)\*/g, '$1')      // *italic* -> italic
+      .replace(/__([^_]+)__/g, '$1')      // __underline__ -> underline
+      .replace(/_([^_]+)_/g, '$1')        // _italic_ -> italic
+      .replace(/~~([^~]+)~~/g, '$1');     // ~~strike~~ -> strike
+  };
+
   // Function to format last message preview
   const formatLastMessagePreview = (chat) => {
     // Check if someone is typing in this chat
@@ -406,6 +418,9 @@ function ChatsList() {
         }
       }
     }
+
+    // Strip markdown formatting from preview
+    messageText = stripMarkdown(messageText);
 
     // Truncate message to 30 characters max
     const truncatedMessage = messageText.length > 30

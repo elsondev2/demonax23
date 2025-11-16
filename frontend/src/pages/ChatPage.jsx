@@ -26,8 +26,11 @@ import CallScreen from "../components/CallScreen";
 import SocketStatusIndicator from "../components/SocketStatusIndicator";
 import WelcomeTour from "../components/WelcomeTour";
 import ResizableSidebar from "../components/ResizableSidebar";
+import BottomNavBar from "../components/BottomNavBar";
+import NotificationsModal from "../components/NotificationsModal";
 import { useWelcomeTour } from "../hooks/useWelcomeTour";
 import { useCallStore } from "../store/useCallStore";
+import useFriendStore from "../store/useFriendStore";
 
 
 function ChatPage() {
@@ -48,6 +51,12 @@ function ChatPage() {
 
   const navigate = useNavigate();
   const location = useLocation();
+  
+  // Bottom nav state
+  const [showNotifications, setShowNotifications] = useState(false);
+  const { requests, fetchRequests } = useFriendStore();
+  
+
   const { userId, groupId } = useParams();
   const [isAuthorizationChecked, setIsAuthorizationChecked] = useState(false);
 
@@ -388,6 +397,21 @@ function ChatPage() {
           }}
         />
       )}
+
+      {/* Bottom Navigation Bar */}
+      <BottomNavBar
+        totalNotifications={requests?.incomingPending?.length || 0}
+        onNotificationsClick={() => {
+          fetchRequests().catch(() => {});
+          setShowNotifications(true);
+        }}
+      />
+
+      {/* Notifications Modal */}
+      <NotificationsModal
+        isOpen={showNotifications}
+        onClose={() => setShowNotifications(false)}
+      />
     </div>
   );
 }

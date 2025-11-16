@@ -76,17 +76,18 @@ io.on("connection", (socket) => {
 
   // ===== CALL SIGNALING EVENTS =====
 
-  // Handle call request
+  // Handle call request (Agora)
   socket.on("call-request", (data) => {
     console.log('📞 BACKEND - call-request received:', {
       from: socket.userId,
       to: data.to,
       callType: data.callType,
+      channelName: data.channelName,
       callerInfo: data.callerInfo?.fullName,
       timestamp: new Date().toISOString()
     });
     
-    const { to, callType, offer, callerInfo } = data;
+    const { to, callType, channelName, callerInfo } = data;
     const targetSocketId = getReceiverSocketId(to);
 
     console.log('📞 BACKEND - Target user lookup:', {
@@ -99,7 +100,7 @@ io.on("connection", (socket) => {
       const callData = {
         from: socket.userId,
         callType,
-        offer,
+        channelName,
         callerInfo
       };
       
@@ -108,6 +109,7 @@ io.on("connection", (socket) => {
         callData: {
           from: callData.from,
           callType: callData.callType,
+          channelName: callData.channelName,
           callerName: callData.callerInfo?.fullName
         }
       });
@@ -120,15 +122,15 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Handle call answer
+  // Handle call answer (Agora)
   socket.on("call-answer", (data) => {
-    const { to, answer } = data;
+    const { to, accepted } = data;
     const targetSocketId = getReceiverSocketId(to);
 
     if (targetSocketId) {
       io.to(targetSocketId).emit("call-answer", {
         from: socket.userId,
-        answer
+        accepted: accepted !== false // Default to true
       });
     }
   });
@@ -161,18 +163,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Handle ICE candidates
-  socket.on("ice-candidate", (data) => {
-    const { to, candidate } = data;
-    const targetSocketId = getReceiverSocketId(to);
 
-    if (targetSocketId) {
-      io.to(targetSocketId).emit("ice-candidate", {
-        from: socket.userId,
-        candidate
-      });
-    }
-  });
 
   // Handle call history message
   socket.on("call-history-message", async (data) => {

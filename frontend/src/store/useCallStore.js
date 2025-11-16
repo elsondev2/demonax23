@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { useAuthStore } from "./useAuthStore";
 import toast from "react-hot-toast";
-import { getVoiceCallConstraints } from "../utils/audioProcessor";
+import { agoraService } from "../lib/agoraService";
 
 // Initialize call socket listeners
 export const initializeCallSocketListeners = (callStore) => {
@@ -21,8 +21,8 @@ export const initializeCallSocketListeners = (callStore) => {
   });
 
   // Handle call answer
-  socket.on("call-answer", (data) => {
-    callStore.getState().handleCallAnswer(data);
+  socket.on("call-answer", () => {
+    callStore.getState().handleCallAnswer();
   });
 
   // Handle call rejection
@@ -55,33 +55,7 @@ export const cleanupCallSocketListeners = () => {
   }
 };
 
-// WebRTC configuration optimized for faster connections
-const rtcConfiguration = {
-  iceServers: [
-    // STUN servers for NAT traversal (reduced for faster gathering)
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    
-    // Free TURN servers for better connectivity behind firewalls
-    {
-      urls: 'turn:openrelay.metered.ca:80',
-      username: 'openrelayproject',
-      credential: 'openrelayproject'
-    },
-    {
-      urls: 'turn:openrelay.metered.ca:443',
-      username: 'openrelayproject',
-      credential: 'openrelayproject'
-    }
-  ],
-  iceCandidatePoolSize: 5, // Reduced for faster gathering
-  iceTransportPolicy: 'all', // Use all available transports
-  bundlePolicy: 'max-bundle', // Bundle media for faster setup
-  rtcpMuxPolicy: 'require', // Multiplex RTP and RTCP for efficiency
-  // Faster ICE gathering
-  iceGatheringTimeout: 3000, // 3 seconds timeout
-  iceCheckingTimeout: 5000   // 5 seconds checking timeout
-};
+// Removed WebRTC configuration - now using Agora
 
 export const useCallStore = create((set, get) => ({
   // Call State
@@ -95,10 +69,13 @@ export const useCallStore = create((set, get) => ({
   callerInfo: null,
   calleeInfo: null,
 
-  // Media Streams
-  localStream: null,
-  remoteStream: null,
-  peerConnection: null,
+  // Media Streams (Agora)
+  localAudioTrack: null,
+  localVideoTrack: null,
+  remoteUserId: null,
+  hasRemoteAudio: false,
+  hasRemoteVideo: false,
+  channelName: null,
 
   // Call Settings
   isMuted: false,
@@ -132,278 +109,35 @@ export const useCallStore = create((set, get) => ({
     }
   })(),
 
-  // Initialize WebRTC peer connection
-  initializePeerConnection: async () => {
+  // Initialize Agora connection
+  initializeAgoraConnection: async () => {
     try {
-      console.log('🔄 Initializing peer connection...');
+      console.log('🔄 Initializing Agora connection...');
 
-      // Create peer connection
-      const peerConnection = new RTCPeerConnection(rtcConfiguration);
+      // Initialize Agora service
+      const { localAudioTrack, localVideoTrack } = await agoraService.initialize(get().callType);
 
-      // Get local media stream with optimized audio settings for calls
-      let localStream;
-      try {
-        const audioConstraints = getVoiceCallConstraints();
-        const constraints = {
-          ...audioConstraints,
-          video: get().callType === 'video'
-        };
-
-        console.log('🎤 Requesting media with constraints:', constraints);
-        localStream = await navigator.mediaDevices.getUserMedia(constraints);
-        console.log('✅ Media stream obtained successfully');
-      } catch (mediaError) {
-        console.warn('⚠️ Advanced constraints failed, trying basic constraints:', mediaError);
-        
-        // Fallback to basic constraints
-        const basicConstraints = {
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true
-          },
-          video: get().callType === 'video'
-        };
-
-        try {
-          localStream = await navigator.mediaDevices.getUserMedia(basicConstraints);
-          console.log('✅ Media stream obtained with basic constraints');
-        } catch (basicError) {
-          console.error('❌ Failed to get media stream with basic constraints:', basicError);
-          throw new Error(`Failed to access microphone: ${basicError.message}`);
-        }
-      }
-
-      // Add local tracks to peer connection with enhanced verification
-      localStream.getTracks().forEach((track, index) => {
-        // Force enable all tracks before adding
-        track.enabled = true;
-        
-        console.log(`🎤 Adding local ${track.kind} track ${index}:`, {
-          enabled: track.enabled,
-          readyState: track.readyState,
-          muted: track.muted,
-          label: track.label,
-          settings: track.getSettings()
-        });
-        
-        peerConnection.addTrack(track, localStream);
+      // Setup Agora event listeners
+      agoraService.setOnUserJoined((user) => {
+        console.log('👤 Remote user joined:', user.uid);
       });
 
-      // Verify local audio tracks are enabled and working
-      const audioTracks = localStream.getAudioTracks();
-      console.log('🎤 Local audio tracks:', audioTracks.length);
-      
-      if (audioTracks.length === 0) {
-        console.error('❌ NO LOCAL AUDIO TRACKS - Other user cannot hear you!');
-        throw new Error('No audio tracks available - microphone not accessible');
-      }
-      
-      audioTracks.forEach((track, index) => {
-        // Force enable
-        track.enabled = true;
-        
-        console.log(`🎤 Local audio track ${index} status:`, {
-          enabled: track.enabled,
-          readyState: track.readyState,
-          muted: track.muted,
-          label: track.label
-        });
-        
-        if (track.readyState !== 'live') {
-          console.error(`❌ Local audio track ${index} is not live:`, track.readyState);
-        }
-        
-        if (track.muted) {
-          console.warn(`⚠️ Local audio track ${index} is muted at system level`);
-        }
+      agoraService.setOnUserLeft((user) => {
+        console.log('👤 Remote user left:', user.uid);
+        // End call when remote user leaves
+        get().endCall('ended');
       });
 
-      // Handle remote stream with enhanced audio reliability
-      peerConnection.ontrack = (event) => {
-        console.log('🔊 ONTRACK EVENT - Received remote track:', {
-          kind: event.track.kind,
-          label: event.track.label,
-          id: event.track.id,
-          readyState: event.track.readyState,
-          enabled: event.track.enabled,
-          muted: event.track.muted
-        });
+      agoraService.setOnUserPublished(async (user, mediaType) => {
+        console.log('📡 Remote user published:', user.uid, mediaType);
         
-        console.log('🔊 ONTRACK EVENT - Event streams:', event.streams.length);
-        
-        if (event.streams.length === 0) {
-          console.error('❌ ONTRACK EVENT - No streams in track event!');
-          // Create a new MediaStream with the track if no streams provided
-          const newStream = new MediaStream([event.track]);
-          console.log('🔧 ONTRACK EVENT - Created new stream with track');
+        // Play remote audio automatically
+        if (mediaType === 'audio') {
+          agoraService.playRemoteAudio(user.uid);
           
-          set({ remoteStream: newStream });
-          return;
-        }
-        
-        const remoteStream = event.streams[0];
-        console.log('🔊 ONTRACK EVENT - Remote stream:', {
-          id: remoteStream.id,
-          active: remoteStream.active,
-          audioTracks: remoteStream.getAudioTracks().length,
-          videoTracks: remoteStream.getVideoTracks().length
-        });
-
-        // Ensure all audio tracks are enabled and properly configured
-        const audioTracks = remoteStream.getAudioTracks();
-        if (audioTracks.length === 0) {
-          console.error('❌ ONTRACK EVENT - No audio tracks in remote stream!');
-          
-          // If this is an audio track but not in the stream, add it
-          if (event.track.kind === 'audio') {
-            console.log('🔧 ONTRACK EVENT - Adding audio track to stream');
-            remoteStream.addTrack(event.track);
-          }
-        }
-        
-        // Process all audio tracks with enhanced reliability
-        remoteStream.getAudioTracks().forEach((track, index) => {
-          console.log(`🔊 ONTRACK EVENT - Remote audio track ${index}:`, {
-            id: track.id,
-            kind: track.kind,
-            label: track.label,
-            enabled: track.enabled,
-            readyState: track.readyState,
-            muted: track.muted,
-            settings: track.getSettings()
-          });
-          
-          // Force enable the track and ensure it's not muted
-          track.enabled = true;
-          
-          // Apply audio constraints for better quality
-          if (track.applyConstraints) {
-            track.applyConstraints({
-              echoCancellation: true,
-              noiseSuppression: true,
-              autoGainControl: true
-            }).catch(error => {
-              console.warn('Failed to apply audio constraints to remote track:', error);
-            });
-          }
-          
-          // Add comprehensive event listeners
-          track.onended = () => {
-            console.log(`🔊 Remote audio track ${index} ended`);
-          };
-          
-          track.onmute = () => {
-            console.log(`🔊 Remote audio track ${index} muted`);
-            // Try to unmute if possible
-            if (track.enabled === false) {
-              track.enabled = true;
-              console.log(`🔧 Attempted to re-enable muted track ${index}`);
-            }
-          };
-          
-          track.onunmute = () => {
-            console.log(`🔊 Remote audio track ${index} unmuted`);
-          };
-        });
-
-        console.log('🔊 ONTRACK EVENT - Setting remote stream in store');
-        set({ remoteStream });
-        
-        // Enhanced verification with retry mechanism
-        setTimeout(() => {
-          const currentState = get();
-          if (currentState.remoteStream) {
-            console.log('✅ ONTRACK EVENT - Remote stream successfully set in store');
-            
-            // Double-check audio tracks are still enabled
-            const verifyTracks = currentState.remoteStream.getAudioTracks();
-            verifyTracks.forEach((track, index) => {
-              if (!track.enabled) {
-                console.warn(`🔧 Re-enabling disabled audio track ${index}`);
-                track.enabled = true;
-              }
-            });
-          } else {
-            console.error('❌ ONTRACK EVENT - Failed to set remote stream in store, retrying...');
-            // Retry setting the stream
-            set({ remoteStream });
-          }
-        }, 100);
-        
-        // Additional verification after 1 second
-        setTimeout(() => {
-          const finalState = get();
-          if (finalState.remoteStream) {
-            const finalTracks = finalState.remoteStream.getAudioTracks();
-            console.log('🔍 Final audio track verification:', {
-              trackCount: finalTracks.length,
-              allEnabled: finalTracks.every(t => t.enabled),
-              allLive: finalTracks.every(t => t.readyState === 'live')
-            });
-          }
-        }, 1000);
-      };
-
-      // Handle ICE gathering state for better user feedback
-      peerConnection.onicegatheringstatechange = () => {
-        console.log('🧊 ICE gathering state:', peerConnection.iceGatheringState);
-        
-        switch (peerConnection.iceGatheringState) {
-          case 'gathering':
-            console.log('🔄 Gathering ICE candidates...');
-            break;
-          case 'complete':
-            console.log('✅ ICE candidate gathering complete');
-            break;
-        }
-      };
-
-      // Handle ICE candidates
-      peerConnection.onicecandidate = (event) => {
-        if (event.candidate) {
-          console.log('🧊 New ICE candidate:', event.candidate.type, event.candidate.protocol);
-          
-          const { socket } = useAuthStore.getState();
-          const { callee, caller, callDirection } = get();
-
-          // Send to the other party (caller if incoming, callee if outgoing)
-          const targetUser = callDirection === 'incoming' ? caller : callee;
-
-          if (socket && socket.connected && targetUser) {
-            try {
-              // Convert candidate to plain object to avoid circular references
-              const candidateData = {
-                candidate: event.candidate.candidate,
-                sdpMLineIndex: event.candidate.sdpMLineIndex,
-                sdpMid: event.candidate.sdpMid,
-                usernameFragment: event.candidate.usernameFragment
-              };
-
-              socket.emit('ice-candidate', {
-                to: String(targetUser),
-                candidate: candidateData
-              });
-              console.log('📡 ICE candidate sent to peer');
-            } catch (error) {
-              console.error('Failed to emit ICE candidate:', error);
-            }
-          }
-        } else {
-          console.log('🧊 ICE candidate gathering finished (null candidate)');
-        }
-      };
-
-      // Handle ICE connection state changes - this is faster than connection state
-      peerConnection.oniceconnectionstatechange = () => {
-        console.log('🧊 ICE connection state:', peerConnection.iceConnectionState);
-        
-        switch (peerConnection.iceConnectionState) {
-          case 'connected':
-          case 'completed': {
-            // ICE connection established - transition to connected immediately
-            console.log('✅ ICE connection established, transitioning to connected');
-            
+          // Transition to connected when remote audio is available
+          const currentStatus = get().callStatus;
+          if (currentStatus === 'connecting' || currentStatus === 'calling') {
             // Clear connection timeout
             const { connectionTimeout } = get();
             if (connectionTimeout) {
@@ -411,125 +145,76 @@ export const useCallStore = create((set, get) => ({
               set({ connectionTimeout: null });
             }
             
-            // Verify audio tracks are being sent
-            const senders = peerConnection.getSenders();
-            console.log('🎤 CONNECTED - Verifying audio senders:');
-            senders.forEach((sender, index) => {
-              if (sender.track && sender.track.kind === 'audio') {
-                console.log(`Audio sender ${index}:`, {
-                  trackId: sender.track.id,
-                  enabled: sender.track.enabled,
-                  readyState: sender.track.readyState,
-                  muted: sender.track.muted
-                });
-                
-                // Force enable if disabled
-                if (!sender.track.enabled) {
-                  console.warn(`🔧 Re-enabling disabled audio sender ${index}`);
-                  sender.track.enabled = true;
-                }
-              }
-            });
-            
+            console.log('✅ Remote audio received - transitioning to connected');
             set({
               callStatus: 'connected',
               callStartTime: new Date(),
               showCallScreen: true,
               showCallModal: false,
               showIncomingCall: false,
-              isMuted: false // Ensure not muted when connected
+              isMuted: false
             });
             toast.success('Call connected!');
-            break;
           }
-          case 'checking':
-            console.log('🔄 ICE checking connectivity...');
-            set({ callStatus: 'connecting' });
-            break;
-          case 'failed':
-            console.error('❌ ICE connection failed');
-            toast.error('Connection failed. Please try again.');
-            get().endCall();
-            break;
-          case 'disconnected':
-            console.warn('⚠️ ICE connection disconnected');
-            // Don't end call immediately, might reconnect
-            break;
         }
-      };
-
-      // Handle connection state changes - backup for ICE state
-      peerConnection.onconnectionstatechange = () => {
-        console.log('🌐 Connection state:', peerConnection.connectionState);
         
-        switch (peerConnection.connectionState) {
-          case 'connected': {
-            // Only update if not already connected (ICE state is faster)
-            if (get().callStatus !== 'connected') {
-              console.log('✅ Peer connection established');
-              
-              // Clear connection timeout
-              const { connectionTimeout } = get();
-              if (connectionTimeout) {
-                clearTimeout(connectionTimeout);
-                set({ connectionTimeout: null });
-              }
-              
-              set({
-                callStatus: 'connected',
-                callStartTime: new Date(),
-                showCallScreen: true,
-                showCallModal: false,
-                showIncomingCall: false
-              });
-              toast.success('Call connected!');
-            }
-            break;
-          }
-          case 'connecting':
-            console.log('🔄 Peer connection establishing...');
-            set({ callStatus: 'connecting' });
-            break;
-          case 'disconnected':
-            console.warn('⚠️ Peer connection disconnected');
-            break;
-          case 'failed':
-            console.error('❌ Peer connection failed');
-            get().endCall();
-            toast.error('Call disconnected');
-            break;
-        }
-      };
-
-      set({
-        peerConnection,
-        localStream,
-        isVideoEnabled: get().callType === 'video',
-        isMuted: false // Ensure not muted initially
+        // Store remote user info
+        set({ 
+          remoteUserId: user.uid,
+          hasRemoteAudio: mediaType === 'audio' || get().hasRemoteAudio,
+          hasRemoteVideo: mediaType === 'video' || get().hasRemoteVideo
+        });
       });
 
-      // Final verification that audio tracks are enabled
-      setTimeout(() => {
-        const tracks = localStream.getAudioTracks();
-        console.log('🎤 FINAL VERIFICATION - Local audio tracks:');
-        tracks.forEach((track, index) => {
-          console.log(`Track ${index}:`, {
-            enabled: track.enabled,
-            readyState: track.readyState,
-            muted: track.muted
-          });
+      agoraService.setOnConnectionStateChange((curState, prevState) => {
+        console.log('🌐 Agora connection state:', prevState, '->', curState);
+        
+        if (curState === 'CONNECTED') {
+          const currentCallStatus = get().callStatus;
           
-          // Force enable if somehow disabled
-          if (!track.enabled) {
-            console.warn(`🔧 Re-enabling disabled track ${index}`);
-            track.enabled = true;
+          // Only transition to connected if we're currently connecting
+          // This prevents re-triggering when already connected
+          if (currentCallStatus === 'connecting' || currentCallStatus === 'calling') {
+            // Clear connection timeout
+            const { connectionTimeout } = get();
+            if (connectionTimeout) {
+              clearTimeout(connectionTimeout);
+              set({ connectionTimeout: null });
+            }
+            
+            console.log('✅ Transitioning to connected state');
+            set({
+              callStatus: 'connected',
+              callStartTime: new Date(),
+              showCallScreen: true,
+              showCallModal: false,
+              showIncomingCall: false,
+              isMuted: false
+            });
+            toast.success('Call connected!');
           }
-        });
-      }, 500);
+        } else if (curState === 'DISCONNECTED' || curState === 'DISCONNECTING') {
+          console.warn('⚠️ Agora connection disconnected');
+        } else if (curState === 'RECONNECTING') {
+          console.log('🔄 Agora reconnecting...');
+          // Don't change status if already connected
+          if (get().callStatus !== 'connected') {
+            set({ callStatus: 'connecting' });
+          }
+        }
+      });
 
-      return peerConnection;
+      set({
+        localAudioTrack,
+        localVideoTrack,
+        isVideoEnabled: get().callType === 'video',
+        isMuted: false
+      });
+
+      console.log('✅ Agora connection initialized successfully');
+      return true;
     } catch (error) {
-      console.error('Failed to initialize peer connection:', error);
+      console.error('Failed to initialize Agora connection:', error);
       toast.error('Failed to access camera/microphone');
       throw error;
     }
@@ -545,36 +230,28 @@ export const useCallStore = create((set, get) => ({
         return;
       }
 
+      // Generate channel name (use sorted user IDs for consistency)
+      const userIds = [authUser._id, targetUser._id].sort();
+      const channelName = `call_${userIds[0]}_${userIds[1]}`;
+
       set({
         callStatus: 'initiating',
         callType,
         callDirection: 'outgoing',
         callee: targetUser._id,
         calleeInfo: targetUser,
+        channelName,
         showCallModal: true
       });
 
-      // Initialize peer connection
-      await get().initializePeerConnection();
-
-      // Create and send offer with optimized settings
-      const { peerConnection } = get();
-      const offer = await peerConnection.createOffer({
-        offerToReceiveAudio: true,
-        offerToReceiveVideo: get().callType === 'video',
-        iceRestart: false // Don't restart ICE unless necessary
-      });
-      await peerConnection.setLocalDescription(offer);
-      console.log('📤 Offer created and set as local description');
+      // Initialize Agora connection
+      await get().initializeAgoraConnection();
 
       try {
         socket.emit('call-request', {
           to: String(targetUser._id),
           callType: String(callType),
-          offer: {
-            type: offer.type,
-            sdp: offer.sdp
-          },
+          channelName: String(channelName),
           callerInfo: {
             _id: String(authUser._id),
             fullName: String(authUser.fullName),
@@ -623,43 +300,27 @@ export const useCallStore = create((set, get) => ({
       
       console.log('📞 ACCEPT - UI updated, call status: connecting');
 
-      console.log('🔄 Initializing peer connection for incoming call...');
-      // Initialize peer connection
-      await get().initializePeerConnection();
+      console.log('🔄 Initializing Agora connection for incoming call...');
+      // Initialize Agora connection
+      await get().initializeAgoraConnection();
 
-      const { peerConnection, incomingOffer, caller } = get();
+      const { channelName, caller } = get();
 
-      if (!peerConnection) {
-        throw new Error('Failed to create peer connection');
+      if (!channelName) {
+        throw new Error('No channel name available');
       }
 
-      // Set remote description (offer)
-      if (incomingOffer) {
-        console.log('📥 Setting remote description (offer)...');
-        await peerConnection.setRemoteDescription(incomingOffer);
-        console.log('✅ Remote description set successfully');
-      } else {
-        throw new Error('No incoming offer available');
-      }
-
-      // Create and send answer with optimized settings
-      console.log('📤 Creating answer...');
-      const answer = await peerConnection.createAnswer({
-        offerToReceiveAudio: true,
-        offerToReceiveVideo: get().callType === 'video'
-      });
-      await peerConnection.setLocalDescription(answer);
-      console.log('✅ Answer created and set as local description');
+      // Join the Agora channel
+      console.log('🚪 Joining Agora channel:', channelName);
+      await agoraService.joinChannel(channelName);
+      console.log('✅ Joined Agora channel successfully');
 
       // Send answer via socket
       try {
-        console.log('📡 Sending answer via socket...');
+        console.log('📡 Sending call answer via socket...');
         socket.emit('call-answer', {
           to: String(caller),
-          answer: {
-            type: answer.type,
-            sdp: answer.sdp
-          }
+          accepted: true
         });
         console.log('✅ Answer sent successfully');
       } catch (emitError) {
@@ -682,7 +343,7 @@ export const useCallStore = create((set, get) => ({
           toast.error('Connection timeout. Please try again.');
           get().endCall('timeout');
         }
-      }, 15000); // 15 second timeout
+      }, 30000); // 30 second timeout (increased for Agora connection)
 
       set({ connectionTimeout: timeoutId });
 
@@ -697,10 +358,8 @@ export const useCallStore = create((set, get) => ({
       let errorMessage = 'Failed to accept call';
       if (error.message.includes('microphone')) {
         errorMessage = 'Cannot access microphone. Please check permissions.';
-      } else if (error.message.includes('offer')) {
+      } else if (error.message.includes('channel')) {
         errorMessage = 'Call setup failed. Please try again.';
-      } else if (error.message.includes('answer')) {
-        errorMessage = 'Failed to respond to call. Please try again.';
       }
       
       toast.error(errorMessage);
@@ -740,7 +399,7 @@ export const useCallStore = create((set, get) => ({
 
   // End call
   endCall: (reason = 'ended') => {
-    const { peerConnection, localStream, callStartTime, caller, callee, callDirection, callStatus, callType, connectionTimeout } = get();
+    const { callStartTime, caller, callee, callDirection, callStatus, callType, connectionTimeout } = get();
     const { socket } = useAuthStore.getState();
 
     // Don't do anything if there's no active call
@@ -849,15 +508,8 @@ export const useCallStore = create((set, get) => ({
       }
     }
 
-    // Close peer connection
-    if (peerConnection) {
-      peerConnection.close();
-    }
-
-    // Stop local stream
-    if (localStream) {
-      localStream.getTracks().forEach(track => track.stop());
-    }
+    // Cleanup Agora resources
+    agoraService.cleanup();
 
     set({
       callStatus: 'idle',
@@ -867,15 +519,17 @@ export const useCallStore = create((set, get) => ({
       callee: null,
       callerInfo: null,
       calleeInfo: null,
-      localStream: null,
-      remoteStream: null,
-      peerConnection: null,
+      localAudioTrack: null,
+      localVideoTrack: null,
+      remoteUserId: null,
+      hasRemoteAudio: false,
+      hasRemoteVideo: false,
+      channelName: null,
       isMuted: false,
       isVideoEnabled: false,
       showCallModal: false,
       showCallScreen: false,
       showIncomingCall: false,
-      incomingOffer: null,
       callStartTime: null,
       callDuration: finalDuration,
       connectionTimeout: null,
@@ -1028,7 +682,7 @@ export const useCallStore = create((set, get) => ({
       caller: data.from,
       callerInfo: data.callerInfo,
       callType: data.callType || 'voice',
-      incomingOffer: data.offer,
+      channelName: data.channelName,
       showIncomingCall: true,
       showCallModal: true,
       lastUpdate: Date.now()
@@ -1083,23 +737,24 @@ export const useCallStore = create((set, get) => ({
   },
 
   // Handle call answer
-  handleCallAnswer: async (data) => {
+  handleCallAnswer: async () => {
     try {
       console.log('📞 CALL ANSWERED - Stopping caller tone');
       
       // Stop caller waiting tone immediately
       get().stopCallerTone();
       
-      const { peerConnection } = get();
+      const { channelName } = get();
 
-      if (!peerConnection) {
+      if (!channelName) {
+        console.error('No channel name available');
         return;
       }
 
-      if (data.answer) {
-        await peerConnection.setRemoteDescription(data.answer);
-        console.log('📞 CALL ANSWERED - Remote description set');
-      }
+      // Join the Agora channel
+      console.log('� JoiAning Agora channel:', channelName);
+      await agoraService.joinChannel(channelName);
+      console.log('✅ Joined Agora channel successfully');
 
       set({ callStatus: 'connecting' });
       console.log('📞 CALL ANSWERED - Status updated to connecting');
@@ -1111,54 +766,20 @@ export const useCallStore = create((set, get) => ({
     }
   },
 
-  // Handle ICE candidate
-  handleICECandidate: async (data) => {
-    try {
-      const { peerConnection } = get();
 
-      if (!peerConnection) {
-        return;
-      }
-
-      if (data.candidate) {
-        // Reconstruct RTCIceCandidate from plain object
-        const candidate = new RTCIceCandidate(data.candidate);
-        await peerConnection.addIceCandidate(candidate);
-      }
-    } catch (error) {
-      console.error('Failed to handle ICE candidate:', error);
-    }
-  },
 
   // Toggle mute
   toggleMute: () => {
-    const { localStream, isMuted } = get();
-
-    if (localStream) {
-      const newMutedState = !isMuted;
-      localStream.getAudioTracks().forEach((track, index) => {
-        track.enabled = !newMutedState; // If muted, disable track
-        console.log(`🎤 Local audio track ${index} ${newMutedState ? 'muted' : 'unmuted'}:`, {
-          enabled: track.enabled,
-          readyState: track.readyState
-        });
-      });
-    }
-
-    set({ isMuted: !isMuted });
+    const newMutedState = agoraService.toggleAudio();
+    set({ isMuted: !newMutedState });
+    console.log('🎤 Audio toggled:', newMutedState ? 'unmuted' : 'muted');
   },
 
   // Toggle video
   toggleVideo: () => {
-    const { localStream, isVideoEnabled } = get();
-
-    if (localStream) {
-      localStream.getVideoTracks().forEach(track => {
-        track.enabled = isVideoEnabled;
-      });
-    }
-
-    set({ isVideoEnabled: !isVideoEnabled });
+    const newVideoState = agoraService.toggleVideo();
+    set({ isVideoEnabled: newVideoState });
+    console.log('📹 Video toggled:', newVideoState ? 'enabled' : 'disabled');
   },
 
   // Toggle speaker
@@ -1205,7 +826,6 @@ export const useCallStore = create((set, get) => ({
       socket.off("call-answer");
       socket.off("call-reject");
       socket.off("call-end");
-      socket.off("ice-candidate");
 
       // Handle incoming call request - simplified and more stable
       socket.on("call-request", (data) => {
@@ -1236,12 +856,13 @@ export const useCallStore = create((set, get) => ({
             caller: data.from,
             callerInfo: data.callerInfo,
             callType: data.callType || 'voice',
-            incomingOffer: data.offer,
+            channelName: data.channelName,
             showIncomingCall: true,
             showCallModal: true,
             lastUpdate: Date.now()
           };
           
+          console.log('📞 SOCKET EVENT - Channel name:', data.channelName);
           set(incomingCallState);
           
           // Play ringtone
@@ -1277,8 +898,8 @@ export const useCallStore = create((set, get) => ({
       });
 
       // Handle other call events
-      socket.on("call-answer", (data) => {
-        get().handleCallAnswer(data);
+      socket.on("call-answer", () => {
+        get().handleCallAnswer();
       });
 
       socket.on("call-reject", () => {
@@ -1290,10 +911,6 @@ export const useCallStore = create((set, get) => ({
       socket.on("call-end", (data) => {
         const reason = data.reason || 'ended';
         get().endCall(reason);
-      });
-
-      socket.on("ice-candidate", (data) => {
-        get().handleICECandidate(data);
       });
 
       console.log('📞 INIT - All socket listeners registered successfully');

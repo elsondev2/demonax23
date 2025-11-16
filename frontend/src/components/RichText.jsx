@@ -2,17 +2,19 @@ import React from 'react';
 import MentionChip from './mentions/MentionChip';
 
 /**
- * Component that renders text with both clickable links and mention chips
- * Combines URL detection and mention parsing
+ * Component that renders text with both clickable links, mention chips, and markdown formatting
+ * Supports: **bold**, *italic*, ~~strikethrough~~, __underline__
  */
 const RichText = ({ text, mentions = [], className = '' }) => {
   if (!text) return null;
 
   const textStr = String(text);
   
-  // Combined regex for URLs and mentions
+  // Combined regex for URLs, mentions, and markdown formatting
   const urlRegex = /(https?:\/\/[^\s]+)|(www\.[^\s]+)|([a-zA-Z0-9][a-zA-Z0-9-]+\.[a-zA-Z]{2,}[^\s]*)/g;
   const mentionRegex = /(@everyone|@here|@[\w.-]+|#[\w\s-]+)/g;
+  // Markdown formatting regex - order matters for proper parsing
+  const markdownRegex = /(\*\*[^*]+\*\*)|(\*[^*]+\*)|(__[^_]+__)|(_[^_]+_)|(~~[^~]+~~)/g;
 
   // Create a map of mention positions for quick lookup
   const mentionMap = new Map();
@@ -27,7 +29,7 @@ const RichText = ({ text, mentions = [], className = '' }) => {
     }
   });
 
-  // Find all matches (URLs and mentions)
+  // Find all matches (URLs, mentions, and markdown)
   const matches = [];
   let match;
 
@@ -87,10 +89,44 @@ const RichText = ({ text, mentions = [], className = '' }) => {
     });
   }
 
+  // Find markdown formatting
+  while ((match = markdownRegex.exec(textStr)) !== null) {
+    const matchText = match[0];
+    let formatType = 'text';
+    let innerText = matchText;
+    
+    // Determine format type and extract inner text
+    if (matchText.startsWith('**') && matchText.endsWith('**')) {
+      formatType = 'bold';
+      innerText = matchText.slice(2, -2);
+    } else if (matchText.startsWith('~~') && matchText.endsWith('~~')) {
+      formatType = 'strikethrough';
+      innerText = matchText.slice(2, -2);
+    } else if (matchText.startsWith('__') && matchText.endsWith('__')) {
+      formatType = 'underline';
+      innerText = matchText.slice(2, -2);
+    } else if (matchText.startsWith('*') && matchText.endsWith('*')) {
+      formatType = 'italic';
+      innerText = matchText.slice(1, -1);
+    } else if (matchText.startsWith('_') && matchText.endsWith('_')) {
+      formatType = 'italic';
+      innerText = matchText.slice(1, -1);
+    }
+
+    matches.push({
+      type: 'markdown',
+      start: match.index,
+      end: match.index + matchText.length,
+      content: matchText,
+      formatType,
+      innerText,
+    });
+  }
+
   // Sort matches by position
   matches.sort((a, b) => a.start - b.start);
 
-  // Remove overlapping matches (prefer mentions over URLs)
+  // Remove overlapping matches (priority: mentions > URLs > markdown)
   const filteredMatches = [];
   for (let i = 0; i < matches.length; i++) {
     const current = matches[i];
@@ -98,8 +134,11 @@ const RichText = ({ text, mentions = [], className = '' }) => {
     
     if (!prev || current.start >= prev.end) {
       filteredMatches.push(current);
-    } else if (current.type === 'mention' && prev.type === 'url') {
-      // Replace URL with mention if they overlap
+    } else if (current.type === 'mention' && (prev.type === 'url' || prev.type === 'markdown')) {
+      // Replace URL/markdown with mention if they overlap
+      filteredMatches[filteredMatches.length - 1] = current;
+    } else if (current.type === 'url' && prev.type === 'markdown') {
+      // Replace markdown with URL if they overlap
       filteredMatches[filteredMatches.length - 1] = current;
     }
   }
@@ -147,6 +186,26 @@ const RichText = ({ text, mentions = [], className = '' }) => {
           name={match.mentionName}
         />
       );
+    } else if (match.type === 'markdown') {
+      // Render markdown formatted text
+      let element;
+      switch (match.formatType) {
+        case 'bold':
+          element = <strong key={`md-${keyCounter++}`}>{match.innerText}</strong>;
+          break;
+        case 'italic':
+          element = <em key={`md-${keyCounter++}`}>{match.innerText}</em>;
+          break;
+        case 'strikethrough':
+          element = <span key={`md-${keyCounter++}`} className="line-through">{match.innerText}</span>;
+          break;
+        case 'underline':
+          element = <span key={`md-${keyCounter++}`} className="underline">{match.innerText}</span>;
+          break;
+        default:
+          element = <React.Fragment key={`md-${keyCounter++}`}>{match.content}</React.Fragment>;
+      }
+      parts.push(element);
     }
 
     lastIndex = match.end;

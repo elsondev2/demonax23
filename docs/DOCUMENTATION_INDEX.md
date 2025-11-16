@@ -37,6 +37,11 @@ Initial setup and configuration guides:
 
 Feature documentation and comparisons:
 
+- **[Markdown User Guide](./docs/features/MARKDOWN_USER_GUIDE.md)** - How to format messages ⭐ NEW
+- **[Markdown Toolbar](./docs/features/MARKDOWN_TOOLBAR_IMPLEMENTATION.md)** - Toolbar & shortcuts ⭐ NEW
+- **[Markdown Formatting](./docs/features/MARKDOWN_FORMATTING.md)** - Technical documentation ⭐ NEW
+- **[Markdown Visual Guide](./docs/features/MARKDOWN_VISUAL_GUIDE.md)** - Visual examples ⭐ NEW
+- **[Markdown Examples](./docs/features/MARKDOWN_EXAMPLES.md)** - Copy-paste templates ⭐ NEW
 - **[Feature Comparison](./docs/features/FEATURE_COMPARISON.md)** - Detailed comparison
 - **[Call Modal Design](./docs/features/CALL_MODAL_DESIGN.md)** - Call modal specs
 - **[Audio Enhancements](./docs/features/AUDIO_ENHANCEMENTS.md)** - Audio improvements

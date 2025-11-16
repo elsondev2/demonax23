@@ -33,4 +33,7 @@ export const ENV = {
   EMAIL_FROM_NAME: process.env.EMAIL_FROM_NAME || "de_monax",
   // MailerSend
   MAILERSEND_API_KEY: process.env.MAILERSEND_API_KEY,
+  // Agora
+  AGORA_APP_ID: process.env.AGORA_APP_ID,
+  AGORA_APP_CERTIFICATE: process.env.AGORA_APP_CERTIFICATE,
 };

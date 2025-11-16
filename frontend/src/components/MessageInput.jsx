@@ -5,6 +5,7 @@ import { SendIcon, XIcon, Smile, Paperclip, Mic, StopCircle, Sparkles } from "lu
 import AttachmentTypeModal from "./AttachmentTypeModal";
 import EmojiPickerModal from "./EmojiPickerModal";
 import CaptionImageModal from "./CaptionImageModal";
+import FormattingToolbar from "./FormattingToolbar";
 import { axiosInstance } from "../lib/axios";
 import { useAuthStore } from "../store/useAuthStore";
 import useFriendStore from "../store/useFriendStore";
@@ -52,6 +53,15 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
   const [mentionPosition, setMentionPosition] = useState({ top: 0, left: 0 });
   const [mentions, setMentions] = useState([]); // Track mentions in message
   const inputRef = useRef(null);
+
+  // Formatting State
+  const [isFormattingExpanded, setIsFormattingExpanded] = useState(false);
+  const [activeFormats, setActiveFormats] = useState({
+    bold: false,
+    italic: false,
+    underline: false,
+    strikethrough: false
+  });
 
   // Keyboard handling state removed - using sticky positioning instead
 
@@ -245,6 +255,52 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
 
           setTypingTimeout(timeout);
         }
+      }
+    }
+  };
+
+  // Handle format toggle (activates/deactivates formatting mode)
+  const handleFormatToggle = (formatType) => {
+    setActiveFormats(prev => ({
+      ...prev,
+      [formatType]: !prev[formatType]
+    }));
+  };
+
+  // Handle text formatting with keyboard shortcuts
+  const handleFormat = (type, syntax) => {
+    const input = inputRef.current;
+    if (!input) return;
+
+    const start = input.selectionStart;
+    const end = input.selectionEnd;
+    const selectedText = text.substring(start, end);
+
+    if (selectedText) {
+      // Wrap selected text with formatting syntax
+      const beforeText = text.substring(0, start);
+      const afterText = text.substring(end);
+      const formattedText = `${syntax}${selectedText}${syntax}`;
+      const newText = beforeText + formattedText + afterText;
+      
+      setText(newText);
+      
+      // Set cursor position after formatted text
+      setTimeout(() => {
+        const newCursorPos = start + formattedText.length;
+        input.setSelectionRange(newCursorPos, newCursorPos);
+        input.focus();
+      }, 0);
+    } else {
+      // Toggle format mode
+      const formatMap = {
+        'bold': 'bold',
+        'italic': 'italic',
+        'underline': 'underline',
+        'strikethrough': 'strikethrough'
+      };
+      if (formatMap[type]) {
+        handleFormatToggle(formatMap[type]);
       }
     }
   };
@@ -692,6 +748,26 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
                 playKeystrokeSound();
               }
 
+              // Keyboard shortcuts for formatting
+              if ((e.ctrlKey || e.metaKey) && !e.shiftKey) {
+                if (e.key === 'b' || e.key === 'B') {
+                  e.preventDefault();
+                  handleFormat('bold', '**');
+                } else if (e.key === 'i' || e.key === 'I') {
+                  e.preventDefault();
+                  handleFormat('italic', '*');
+                } else if (e.key === 'u' || e.key === 'U') {
+                  e.preventDefault();
+                  handleFormat('underline', '__');
+                }
+              }
+              
+              // Ctrl+Shift+X for strikethrough
+              if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'x' || e.key === 'X')) {
+                e.preventDefault();
+                handleFormat('strikethrough', '~~');
+              }
+
               // Handle Enter key
               if (e.key === 'Enter') {
                 // On desktop: Shift+Enter = new line, Enter = send
@@ -889,6 +965,17 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
             <Mic className="h-5 w-5" />
           )}
           </button>
+          
+          {/* Formatting Toolbar - Inside textarea */}
+          <div className="absolute right-14 top-1/2 -translate-y-1/2">
+            <FormattingToolbar 
+              isExpanded={isFormattingExpanded}
+              onToggle={() => setIsFormattingExpanded(!isFormattingExpanded)}
+              activeFormats={activeFormats}
+              onFormatToggle={handleFormatToggle}
+              disabled={isSending || limitInfo.isLimited}
+            />
+          </div>
           
           {/* Character count */}
           {text.length > 1800 && (
