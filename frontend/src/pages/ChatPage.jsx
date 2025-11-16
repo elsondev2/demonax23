@@ -1,5 +1,5 @@
 import { useChatStore } from "../store/useChatStore";
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useAuthStore } from "../store/useAuthStore";
 import { trackRender } from "../utils/performanceMonitor";
 
@@ -86,28 +86,30 @@ function ChatPage() {
   }, []);
 
   // Determine initial view index based on route (mobile only)
+  // 0 = Chat, 1 = Home (Sidebar), 2 = Cassisiacum, 3 = Notices, 4 = Apps, 5 = Donate
   const getInitialIndex = () => {
-    if (isFeatureRoute) return 1; // Right view when directly on feature routes
-    return 0; // Sidebar (home)
+    if (userId || groupId) return 0; // Chat view
+    if (isPostsRoute) return 2; // Cassisiacum
+    if (isNoticesRoute) return 3; // Notices
+    if (isAppsRoute) return 4; // Apps
+    if (isDonateRoute) return 5; // Donate
+    return 1; // Home (Sidebar) - default
   };
 
   const [currentViewIndex, setCurrentViewIndex] = useState(getInitialIndex());
-  // Track the last right-side destination (1 = Chat, 2 = Feature)
-  const [lastRightView, setLastRightView] = useState(() => (isFeatureRoute ? 2 : 1));
+  const [showChatSelectToast, setShowChatSelectToast] = useState(false);
+  const isUserSwipingRef = useRef(false);
 
-  // Only track the index (routing is handled in onSwipeDirection and other actions)
-  const handleIndexChange = useCallback((index) => {
-    setCurrentViewIndex(index);
-  }, []);
 
-  // Update view index and lastRightView when route changes externally (mobile)
+
+  // Update view index when route changes externally (mobile)
+  // But don't interfere with user swipes
   useEffect(() => {
+    if (!isMobile || isUserSwipingRef.current) return;
     const newIndex = getInitialIndex();
     if (newIndex !== currentViewIndex) {
       setCurrentViewIndex(newIndex);
     }
-    // Update lastRightView based on route
-    if (isFeatureRoute) setLastRightView(2);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname, isMobile]);
 
@@ -186,19 +188,14 @@ function ChatPage() {
     }
   }, [socket, socket?.connected]); // Re-run when socket connects
 
-  // When a chat or contact is selected on mobile, go to Chat view and mark as lastRight
+  // When a chat or contact is selected on mobile, go to Chat view
   useEffect(() => {
-    const toChat = () => { if (isMobile) setCurrentViewIndex(1); setLastRightView(1); };
-    const toFeature = () => { setLastRightView(2); };
+    const toChat = () => { if (isMobile) setCurrentViewIndex(0); }; // Index 0 = Chat view
     window.addEventListener('chatSelected', toChat);
     window.addEventListener('contactSelected', toChat);
-    window.addEventListener('postsOpened', toFeature);
-    window.addEventListener('featureOpened', toFeature);
     return () => {
       window.removeEventListener('chatSelected', toChat);
       window.removeEventListener('contactSelected', toChat);
-      window.removeEventListener('postsOpened', toFeature);
-      window.removeEventListener('featureOpened', toFeature);
     };
   }, [isMobile]);
 
@@ -244,42 +241,26 @@ function ChatPage() {
     }
   }, [userId, groupId, chats, setSelectedUser, setSelectedGroup, navigate]);
 
-  // Also watch selectedUser/Group to switch to Chat view and update URL
+  // Watch selectedUser/Group to update URL when in chat view
+  // Don't auto-switch views - let user control navigation
   useEffect(() => {
     if (selectedUser || selectedGroup) {
-      setLastRightView(1);
-      // Only navigate away from feature routes if user explicitly selected a chat
-      // Don't auto-navigate when just visiting feature routes
-      if (isMobile) setCurrentViewIndex(1);
-
-      // Update URL to match selected chat
-      if (selectedUser && location.pathname !== `/chat/user/${selectedUser._id}`) {
-        navigate(`/chat/user/${selectedUser._id}`, { replace: true });
-      } else if (selectedGroup && location.pathname !== `/chat/group/${selectedGroup._id}`) {
-        navigate(`/chat/group/${selectedGroup._id}`, { replace: true });
+      // Only update URL if we're actually in the chat view (index 0) on mobile
+      // Or always update on desktop
+      if (!isMobile || currentViewIndex === 0) {
+        if (selectedUser && location.pathname !== `/chat/user/${selectedUser._id}`) {
+          navigate(`/chat/user/${selectedUser._id}`, { replace: true });
+        } else if (selectedGroup && location.pathname !== `/chat/group/${selectedGroup._id}`) {
+          navigate(`/chat/group/${selectedGroup._id}`, { replace: true });
+        }
       }
     } else if (!userId && !groupId && !isFeatureRoute && location.pathname !== '/chat') {
-      // No chat selected and not on a feature route, go back to /chat
+      // No chat selected and not on a feature route, go back to home
       navigate('/chat', { replace: true });
     }
-  }, [selectedUser, selectedGroup, isMobile, isFeatureRoute, navigate, location.pathname, userId, groupId]);
+  }, [selectedUser, selectedGroup, isMobile, isFeatureRoute, navigate, location.pathname, userId, groupId, currentViewIndex]);
 
-  // Handle direct switch to feature views in mobile
-  useEffect(() => {
-    const handleSwitchToFeature = () => {
-      if (isMobile) {
-        setCurrentViewIndex(1); // Switch to feature view (index 1)
-        setLastRightView(2); // Set feature as the last right view
-      }
-    };
 
-    window.addEventListener('switchToPostsView', handleSwitchToFeature);
-    window.addEventListener('switchToFeatureView', handleSwitchToFeature);
-    return () => {
-      window.removeEventListener('switchToPostsView', handleSwitchToFeature);
-      window.removeEventListener('switchToFeatureView', handleSwitchToFeature);
-    };
-  }, [isMobile]);
 
   // Define two swipeable views (mobile only): Sidebar and Right (Chat or Feature)
   const getRightComponent = () => {
@@ -290,19 +271,17 @@ function ChatPage() {
     return <FeedView />;
   };
 
+  // Mobile swipe views: Chat | Home (Sidebar) | Cassisiacum | Notices | Apps | Donate
   const views = [
-    { name: 'Sidebar', component: <ChatsView onShowTour={() => setManualTourOpen(true)} /> },
-    { name: 'Right', component: getRightComponent() },
+    { name: 'Chat', component: <FeedView /> },
+    { name: 'Home', component: <ChatsView onShowTour={() => setManualTourOpen(true)} /> },
+    { name: 'Cassisiacum', component: <PostsView /> },
+    { name: 'Notices', component: <NoticeView /> },
+    { name: 'Apps', component: <AppsView /> },
+    { name: 'Donate', component: <DonateView /> },
   ];
 
-  // On mobile, if we're on the Right view but no conversation is selected and not in feature route,
-  // immediately bounce back to Sidebar (avoid staying on the placeholder)
-  useEffect(() => {
-    if (!isMobile) return;
-    if (!isFeatureRoute && currentViewIndex === 1 && !(selectedUser || selectedGroup)) {
-      setCurrentViewIndex(0);
-    }
-  }, [isMobile, isFeatureRoute, currentViewIndex, selectedUser, selectedGroup]);
+
 
   // Cleanup on unmount
   useEffect(() => {
@@ -343,25 +322,61 @@ function ChatPage() {
           <SwipeableViews
             views={views}
             index={currentViewIndex}
-            onIndexChange={handleIndexChange}
-            onSwipeDirection={(dir, idx) => {
-              if (dir === 'left' && idx === 1) { navigate('/', { replace: true }); return 0; }
-              if (dir === 'right' && idx === 0) {
-                const targetRoute = lastRightView === 2 ? (
-                  isPostsRoute ? '/posts' :
-                    isNoticesRoute ? '/notices' :
-                      isAppsRoute ? '/apps' :
-                        isDonateRoute ? '/donate' : '/posts'
-                ) : '/';
-                navigate(targetRoute, { replace: true });
-                return 1;
+            onIndexChange={(newIndex) => {
+              // Mark that user is swiping to prevent route sync from interfering
+              isUserSwipingRef.current = true;
+              setCurrentViewIndex(newIndex);
+              
+              // Update route based on view index
+              // DON'T clear selectedUser/selectedGroup - keep chat in memory
+              if (newIndex === 0 && (selectedUser || selectedGroup)) {
+                // Chat view - navigate to selected chat
+                if (selectedUser) navigate(`/chat/user/${selectedUser._id}`, { replace: true });
+                else if (selectedGroup) navigate(`/chat/group/${selectedGroup._id}`, { replace: true });
+              } else if (newIndex === 1) {
+                // Home - navigate to /chat but keep selected chat in memory
+                if (location.pathname !== '/chat') {
+                  navigate('/chat', { replace: true });
+                }
+              } else if (newIndex === 2) {
+                // Cassisiacum - keep chat selected in background
+                navigate('/posts', { replace: true });
+              } else if (newIndex === 3) {
+                // Notices - keep chat selected in background
+                navigate('/notices', { replace: true });
+              } else if (newIndex === 4) {
+                // Apps - keep chat selected in background
+                navigate('/apps', { replace: true });
+              } else if (newIndex === 5) {
+                // Donate - keep chat selected in background
+                navigate('/donate', { replace: true });
               }
-              return undefined; // do nothing
+              
+              // Reset flag after navigation completes
+              setTimeout(() => {
+                isUserSwipingRef.current = false;
+              }, 100);
+            }}
+            onSwipeDirection={(dir, idx) => {
+              // Swipe right from Home (idx 1) - go to chat or show toast
+              // "right" swipe means finger moves right, which goes to previous view (lower index)
+              if (dir === 'right' && idx === 1) {
+                if (selectedUser || selectedGroup) {
+                  return 0; // Go to chat
+                } else {
+                  // Show toast and stay on Home
+                  setShowChatSelectToast(true);
+                  setTimeout(() => setShowChatSelectToast(false), 3000);
+                  return 1; // Stay on Home
+                }
+              }
+              return undefined; // Allow normal swipe
             }}
             allowMouseDrag={false}
             showDots={false}
             showTitle={false}
-            swipeThreshold={220}
+            swipeThreshold={140}
+            edgeZoneWidth={80}
           />
         ) : (
           <div className="w-full h-full flex overflow-hidden">
@@ -401,6 +416,7 @@ function ChatPage() {
       {/* Bottom Navigation Bar */}
       <BottomNavBar
         totalNotifications={requests?.incomingPending?.length || 0}
+        totalUnreadMessages={(chats || []).reduce((sum, chat) => sum + (chat.unreadCount || 0), 0)}
         onNotificationsClick={() => {
           fetchRequests().catch(() => {});
           setShowNotifications(true);
@@ -412,6 +428,15 @@ function ChatPage() {
         isOpen={showNotifications}
         onClose={() => setShowNotifications(false)}
       />
+
+      {/* Toast for "Select a chat" */}
+      {showChatSelectToast && (
+        <div className="toast toast-top toast-center z-50">
+          <div className="alert alert-info">
+            <span>Please select a chat to view messages</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

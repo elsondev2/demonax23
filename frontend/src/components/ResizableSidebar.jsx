@@ -5,7 +5,7 @@ import { useState, useRef, useEffect } from 'react';
  * Min width: 384px (w-96), Max width: 50vw
  */
 const ResizableSidebar = ({ children, className = '' }) => {
-  const [width, setWidth] = useState(384); // Default 384px (w-96)
+  const [width, setWidth] = useState(480); // Default 480px (increased from 384px)
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef(null);
 

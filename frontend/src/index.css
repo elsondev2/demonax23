@@ -871,3 +871,19 @@ hin scrollbar styles - nearly invisible */
     box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
   }
 }
+
+/* Bottom Nav Bar fade-in animation for text labels */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
