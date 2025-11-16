@@ -59,6 +59,22 @@ const LinkPreview = ({ url, isOwnMessage }) => {
         }
       }
 
+      // Spotify
+      if (hostname.includes('spotify.com')) {
+        // Match patterns like:
+        // /track/xxx, /album/xxx, /playlist/xxx, /artist/xxx
+        // /intl-xx/track/xxx (international URLs)
+        const match = urlObj.pathname.match(/\/(track|album|playlist|artist)\/([a-zA-Z0-9]+)/);
+        if (match) {
+          const [, type, id] = match;
+          return {
+            type: 'spotify',
+            embedUrl: `https://open.spotify.com/embed/${type}/${id}`,
+            spotifyType: type,
+          };
+        }
+      }
+
       return null;
     } catch {
       return null;
@@ -107,24 +123,57 @@ const LinkPreview = ({ url, isOwnMessage }) => {
     };
   }, [url, embedInfo]);
 
-  // Show embedded video
+  // Show embedded content
   if (embedInfo) {
+    // Spotify embeds have different heights based on type
+    const isSpotify = embedInfo.type === 'spotify';
+    // Responsive heights: mobile (80px/232px) and desktop (152px/352px)
+    const spotifyHeight = embedInfo.spotifyType === 'track' 
+      ? { mobile: '80px', desktop: '152px' }
+      : { mobile: '232px', desktop: '352px' };
+    
     return (
-      <div className={`mt-2 rounded-lg overflow-hidden ${
+      <div className={`mt-2 rounded-lg overflow-hidden w-full max-w-sm ${
         isOwnMessage 
           ? 'bg-primary-content/10 border border-primary-content/20' 
           : 'bg-base-200 border border-base-300'
       }`}>
-        <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
-          <iframe
-            src={embedInfo.embedUrl}
-            className="absolute top-0 left-0 w-full h-full"
-            frameBorder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            title="Embedded video"
-          />
-        </div>
+        {isSpotify ? (
+          // Spotify embed with responsive height
+          <>
+            {/* Mobile view */}
+            <div className="relative w-full md:hidden" style={{ height: spotifyHeight.mobile }}>
+              <iframe
+                src={embedInfo.embedUrl}
+                className="w-full h-full border-0"
+                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                loading="lazy"
+                title="Spotify embed"
+              />
+            </div>
+            {/* Desktop view */}
+            <div className="relative w-full hidden md:block" style={{ height: spotifyHeight.desktop }}>
+              <iframe
+                src={embedInfo.embedUrl}
+                className="w-full h-full border-0"
+                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                loading="lazy"
+                title="Spotify embed"
+              />
+            </div>
+          </>
+        ) : (
+          // Video embed with 16:9 aspect ratio
+          <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+            <iframe
+              src={embedInfo.embedUrl}
+              className="absolute top-0 left-0 w-full h-full border-0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              title="Embedded video"
+            />
+          </div>
+        )}
         <div className="p-2 text-xs flex items-center gap-1 text-blue-500">
           <ExternalLink className="w-3 h-3" />
           <a href={url} target="_blank" rel="noopener noreferrer" className="truncate hover:underline">

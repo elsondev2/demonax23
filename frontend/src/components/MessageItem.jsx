@@ -263,7 +263,7 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
           <div
             ref={messageRef}
             {...swipeHandlers}
-            className={`max-w-[150%] ${message.audio?.url ? 'min-w-[300px]' : 'min-w-[100px]'} rounded-lg px-3 py-2 pr-9 relative ${isOwnMessage
+            className={`max-w-md ${message.audio?.url ? 'min-w-[300px]' : 'min-w-[100px]'} rounded-lg px-3 py-2 pr-9 relative ${isOwnMessage
               ? 'bg-primary text-primary-content ml-auto'
               : isUnread && !isOwnMessage
                 ? 'bg-accent/30 text-base-content border-l-4 border-accent shadow-md'

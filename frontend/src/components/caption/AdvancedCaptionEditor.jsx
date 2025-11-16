@@ -184,57 +184,59 @@ const AdvancedCaptionEditor = ({
 
   return (
     <div className="advanced-caption-editor w-full">
-      {/* Toolbar */}
-      <div className="bg-base-200 rounded-t-lg p-2 border-b border-base-300">
-        <div className="flex flex-wrap items-center gap-1">
+      {/* Main Editor Card */}
+      <div className="bg-base-100 border border-base-300 rounded-xl shadow-sm overflow-hidden">
+        {/* Toolbar */}
+        <div className="bg-base-200/50 p-2 md:p-3 border-b border-base-300">
+          <div className="flex flex-wrap items-center gap-1">
           {/* Text Formatting */}
-          <div className="flex items-center gap-1 border-r border-base-300 pr-2">
+          <div className="flex items-center gap-0.5 md:gap-1 pr-2 border-r border-base-300">
             <button
               type="button"
               onClick={() => applyFormat('bold')}
-              className="btn btn-xs btn-ghost"
+              className="btn btn-xs md:btn-sm btn-ghost hover:bg-base-300"
               title="Bold (Ctrl+B)"
             >
-              <Bold className="w-4 h-4" />
+              <Bold className="w-3.5 h-3.5 md:w-4 md:h-4" />
             </button>
             <button
               type="button"
               onClick={() => applyFormat('italic')}
-              className="btn btn-xs btn-ghost"
+              className="btn btn-xs md:btn-sm btn-ghost hover:bg-base-300"
               title="Italic (Ctrl+I)"
             >
-              <Italic className="w-4 h-4" />
+              <Italic className="w-3.5 h-3.5 md:w-4 md:h-4" />
             </button>
             <button
               type="button"
               onClick={() => applyFormat('underline')}
-              className="btn btn-xs btn-ghost"
+              className="btn btn-xs md:btn-sm btn-ghost hover:bg-base-300"
               title="Underline (Ctrl+U)"
             >
-              <Underline className="w-4 h-4" />
+              <Underline className="w-3.5 h-3.5 md:w-4 md:h-4" />
             </button>
             <button
               type="button"
               onClick={() => applyFormat('strikeThrough')}
-              className="btn btn-xs btn-ghost"
+              className="btn btn-xs md:btn-sm btn-ghost hover:bg-base-300"
               title="Strikethrough"
             >
-              <Strikethrough className="w-4 h-4" />
+              <Strikethrough className="w-3.5 h-3.5 md:w-4 md:h-4" />
             </button>
           </div>
 
           {/* Font Size */}
-          <div className="dropdown dropdown-bottom border-r border-base-300 pr-2">
+          <div className="dropdown dropdown-bottom pr-2 border-r border-base-300">
             <button
               type="button"
               tabIndex={0}
-              className="btn btn-xs btn-ghost gap-1"
+              className="btn btn-xs md:btn-sm btn-ghost gap-1 hover:bg-base-300"
               title="Font Size"
             >
-              <Type className="w-4 h-4" />
-              <span className="text-xs hidden sm:inline">{fontSize}</span>
+              <Type className="w-3.5 h-3.5 md:w-4 md:h-4" />
+              <span className="text-xs hidden md:inline capitalize">{fontSize}</span>
             </button>
-            <ul tabIndex={0} className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-40 z-50">
+            <ul tabIndex={0} className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-lg w-40 z-50 border border-base-300">
               {fontSizes.map((size) => (
                 <li key={size.value}>
                   <button
@@ -250,40 +252,40 @@ const AdvancedCaptionEditor = ({
           </div>
 
           {/* Text Color */}
-          <div className="relative border-r border-base-300 pr-2">
+          <div className="relative pr-2 border-r border-base-300">
             <button
               type="button"
               onClick={() => setShowColorPicker(!showColorPicker)}
-              className="btn btn-xs btn-ghost gap-1"
+              className="btn btn-xs md:btn-sm btn-ghost gap-1 hover:bg-base-300"
               title="Text Color"
             >
-              <Palette className="w-4 h-4" />
+              <Palette className="w-3.5 h-3.5 md:w-4 md:h-4" />
               <div 
-                className="w-3 h-3 rounded border border-base-300"
+                className="w-3 h-3 rounded-full border-2 border-base-300 shadow-sm"
                 style={{ backgroundColor: selectedColor }}
               />
             </button>
             
             {showColorPicker && (
-              <div className="absolute top-full left-0 mt-1 bg-base-100 rounded-lg shadow-lg p-3 z-50 border border-base-300">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold">Text Color</span>
+              <div className="absolute top-full left-0 mt-2 bg-base-100 rounded-xl shadow-xl p-4 z-50 border border-base-300">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-semibold">Text Color</span>
                   <button
                     type="button"
                     onClick={() => setShowColorPicker(false)}
-                    className="btn btn-xs btn-ghost btn-circle"
+                    className="btn btn-xs btn-ghost btn-circle hover:bg-base-200"
                   >
-                    <X className="w-3 h-3" />
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
-                <div className="grid grid-cols-7 gap-1">
+                <div className="grid grid-cols-7 gap-1.5">
                   {colors.map((color) => (
                     <button
                       key={color}
                       type="button"
                       onClick={() => applyColor(color)}
-                      className={`w-6 h-6 rounded border-2 ${
-                        selectedColor === color ? 'border-primary' : 'border-base-300'
+                      className={`w-7 h-7 rounded-lg border-2 transition-all hover:scale-110 ${
+                        selectedColor === color ? 'border-primary ring-2 ring-primary/30' : 'border-base-300'
                       }`}
                       style={{ backgroundColor: color }}
                       title={color}
@@ -295,67 +297,67 @@ const AdvancedCaptionEditor = ({
           </div>
 
           {/* Text Alignment */}
-          <div className="flex items-center gap-1 border-r border-base-300 pr-2">
+          <div className="flex items-center gap-0.5 md:gap-1 pr-2 border-r border-base-300">
             <button
               type="button"
               onClick={() => applyAlignment('left')}
-              className={`btn btn-xs btn-ghost ${textAlign === 'left' ? 'btn-active' : ''}`}
+              className={`btn btn-xs md:btn-sm btn-ghost hover:bg-base-300 ${textAlign === 'left' ? 'bg-base-300' : ''}`}
               title="Align Left"
             >
-              <AlignLeft className="w-4 h-4" />
+              <AlignLeft className="w-3.5 h-3.5 md:w-4 md:h-4" />
             </button>
             <button
               type="button"
               onClick={() => applyAlignment('center')}
-              className={`btn btn-xs btn-ghost ${textAlign === 'center' ? 'btn-active' : ''}`}
+              className={`btn btn-xs md:btn-sm btn-ghost hover:bg-base-300 ${textAlign === 'center' ? 'bg-base-300' : ''}`}
               title="Align Center"
             >
-              <AlignCenter className="w-4 h-4" />
+              <AlignCenter className="w-3.5 h-3.5 md:w-4 md:h-4" />
             </button>
             <button
               type="button"
               onClick={() => applyAlignment('right')}
-              className={`btn btn-xs btn-ghost ${textAlign === 'right' ? 'btn-active' : ''}`}
+              className={`btn btn-xs md:btn-sm btn-ghost hover:bg-base-300 ${textAlign === 'right' ? 'bg-base-300' : ''}`}
               title="Align Right"
             >
-              <AlignRight className="w-4 h-4" />
+              <AlignRight className="w-3.5 h-3.5 md:w-4 md:h-4" />
             </button>
             <button
               type="button"
               onClick={() => applyAlignment('justify')}
-              className={`btn btn-xs btn-ghost ${textAlign === 'justify' ? 'btn-active' : ''}`}
+              className={`btn btn-xs md:btn-sm btn-ghost hover:bg-base-300 ${textAlign === 'justify' ? 'bg-base-300' : ''}`}
               title="Justify"
             >
-              <AlignJustify className="w-4 h-4" />
+              <AlignJustify className="w-3.5 h-3.5 md:w-4 md:h-4" />
             </button>
           </div>
 
           {/* Special Inserts */}
-          <div className="flex items-center gap-1 border-r border-base-300 pr-2">
+          <div className="flex items-center gap-0.5 md:gap-1 pr-2 border-r border-base-300">
             <button
               type="button"
               ref={emojiBtnRef}
               onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              className="btn btn-xs btn-ghost"
+              className="btn btn-xs md:btn-sm btn-ghost hover:bg-base-300"
               title="Add Emoji"
             >
-              <Smile className="w-4 h-4" />
+              <Smile className="w-3.5 h-3.5 md:w-4 md:h-4" />
             </button>
             <button
               type="button"
               onClick={insertMention}
-              className="btn btn-xs btn-ghost"
+              className="btn btn-xs md:btn-sm btn-ghost hover:bg-base-300"
               title="Mention (@)"
             >
-              <AtSign className="w-4 h-4" />
+              <AtSign className="w-3.5 h-3.5 md:w-4 md:h-4" />
             </button>
             <button
               type="button"
               onClick={insertHashtag}
-              className="btn btn-xs btn-ghost"
+              className="btn btn-xs md:btn-sm btn-ghost hover:bg-base-300"
               title="Hashtag (#)"
             >
-              <Hash className="w-4 h-4" />
+              <Hash className="w-3.5 h-3.5 md:w-4 md:h-4" />
             </button>
           </div>
 
@@ -363,71 +365,81 @@ const AdvancedCaptionEditor = ({
           <button
             type="button"
             onClick={() => setShowPreview(!showPreview)}
-            className={`btn btn-xs btn-ghost ${showPreview ? 'btn-active' : ''}`}
+            className={`btn btn-xs md:btn-sm btn-ghost gap-1 hover:bg-base-300 ${showPreview ? 'bg-base-300' : ''}`}
             title="Toggle Preview"
           >
-            {showPreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            <span className="text-xs hidden sm:inline ml-1">Preview</span>
+            {showPreview ? <EyeOff className="w-3.5 h-3.5 md:w-4 md:h-4" /> : <Eye className="w-3.5 h-3.5 md:w-4 md:h-4" />}
+            <span className="text-xs hidden md:inline">Preview</span>
           </button>
         </div>
-      </div>
+        </div>
 
-      {/* Editor / Preview */}
-      <div className="relative">
-        {showPreview ? (
-          <div className="min-h-[200px] p-4 bg-base-100 rounded-b-lg border border-base-300 border-t-0">
-            <div 
-              className="prose max-w-none"
-              dangerouslySetInnerHTML={{ __html: editorRef.current?.innerHTML || '' }}
+        {/* Editor / Preview */}
+        <div className="relative">
+          {showPreview ? (
+            <div className="min-h-[200px] md:min-h-[250px] p-4 md:p-5 bg-base-100">
+              <div 
+                className="prose prose-sm md:prose-base max-w-none"
+                dangerouslySetInnerHTML={{ __html: editorRef.current?.innerHTML || '' }}
+              />
+            </div>
+          ) : (
+            <div
+              ref={editorRef}
+              contentEditable
+              onInput={handleInput}
+              className={`min-h-[200px] md:min-h-[250px] p-4 md:p-5 bg-base-100 focus:outline-none text-sm md:text-base ${
+                isOverLimit ? 'text-error' : 'text-base-content'
+              }`}
+              data-placeholder={placeholder}
+              style={{
+                maxHeight: '400px',
+                overflowY: 'auto'
+              }}
             />
+          )}
+
+          {/* Character Counter Badge */}
+          <div className="absolute bottom-3 right-3 md:bottom-4 md:right-4">
+            <div className={`badge badge-sm md:badge-md font-medium ${
+              isOverLimit 
+                ? 'badge-error' 
+                : charCount > maxLength * 0.9 
+                  ? 'badge-warning' 
+                  : 'badge-ghost'
+            }`}>
+              {charCount}/{maxLength}
+            </div>
           </div>
-        ) : (
-          <div
-            ref={editorRef}
-            contentEditable
-            onInput={handleInput}
-            className={`min-h-[200px] p-4 bg-base-100 rounded-b-lg border focus:outline-none focus:border-primary ${
-              isOverLimit ? 'border-error' : 'border-base-300'
-            } border-t-0`}
-            data-placeholder={placeholder}
-            style={{
-              maxHeight: '400px',
-              overflowY: 'auto'
-            }}
-          />
-        )}
-
-        {/* Character counter */}
-        <div className={`absolute bottom-2 right-2 text-xs px-2 py-1 rounded bg-base-200 ${
-          isOverLimit ? 'text-error' : charCount > maxLength * 0.9 ? 'text-warning' : 'text-base-content/60'
-        }`}>
-          {charCount}/{maxLength}
         </div>
-      </div>
 
-      {/* Actions */}
-      <div className="flex items-center justify-between mt-3">
-        <div className="text-xs text-base-content/60">
-          Tip: Use Ctrl+B (bold), Ctrl+I (italic), Ctrl+U (underline), Ctrl+S (save)
-        </div>
-        <div className="flex items-center gap-2">
-          {onCancel && (
+        {/* Divider */}
+        <div className="border-t border-base-300"></div>
+
+        {/* Actions */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 md:p-4 bg-base-200/50">
+          <div className="text-xs text-base-content/50 hidden md:block">
+            💡 Tip: <kbd className="kbd kbd-xs">Ctrl</kbd>+<kbd className="kbd kbd-xs">B</kbd> (bold), <kbd className="kbd kbd-xs">Ctrl</kbd>+<kbd className="kbd kbd-xs">I</kbd> (italic), <kbd className="kbd kbd-xs">Ctrl</kbd>+<kbd className="kbd kbd-xs">U</kbd> (underline), <kbd className="kbd kbd-xs">Ctrl</kbd>+<kbd className="kbd kbd-xs">S</kbd> (save)
+          </div>
+          <div className="flex items-center gap-2 justify-end">
+            {onCancel && (
+              <button
+                type="button"
+                onClick={handleCancel}
+                className="btn btn-sm btn-ghost hover:bg-base-300"
+              >
+                Cancel
+              </button>
+            )}
             <button
               type="button"
-              onClick={handleCancel}
-              className="btn btn-sm btn-ghost"
+              onClick={handleSave}
+              disabled={!text.trim() || isOverLimit}
+              className="btn btn-sm btn-primary shadow-sm"
             >
-              Cancel
+              Save Caption
             </button>
-          )}
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={!text.trim() || isOverLimit}
-            className="btn btn-sm btn-primary"
-          >
-            Save Caption
-          </button>
+          </div>
         </div>
       </div>
 

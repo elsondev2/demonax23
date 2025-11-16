@@ -25,6 +25,7 @@ import CallModal from "../components/CallModal";
 import CallScreen from "../components/CallScreen";
 import SocketStatusIndicator from "../components/SocketStatusIndicator";
 import WelcomeTour from "../components/WelcomeTour";
+import ResizableSidebar from "../components/ResizableSidebar";
 import { useWelcomeTour } from "../hooks/useWelcomeTour";
 import { useCallStore } from "../store/useCallStore";
 
@@ -355,10 +356,10 @@ function ChatPage() {
           />
         ) : (
           <div className="w-full h-full flex overflow-hidden">
-            {/* Sidebar - Fixed width, scrollable content */}
-            <div className="w-96 h-full bg-base-200 border-r border-base-300 flex-shrink-0 overflow-hidden">
+            {/* Sidebar - Resizable, scrollable content */}
+            <ResizableSidebar>
               <ChatsView onShowTour={() => setManualTourOpen(true)} />
-            </div>
+            </ResizableSidebar>
             {/* Main content area - Takes remaining space */}
             <div className="flex-1 h-full overflow-hidden">
               {getRightComponent()}

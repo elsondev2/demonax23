@@ -198,115 +198,144 @@ const CaptionMaker = ({
 
     return (
         <div className="caption-maker w-full">
-            {/* Textarea */}
-            <div className="relative">
-                <textarea
-                    ref={textareaRef}
-                    value={text}
-                    onChange={handleTextChange}
-                    placeholder={placeholder}
-                    className={`textarea textarea-bordered w-full resize-none ${isOverLimit ? 'textarea-error' : 'focus:textarea-primary'
+            {/* Main Editor Card */}
+            <div className="bg-base-100 border border-base-300 rounded-xl shadow-sm overflow-hidden">
+                {/* Textarea Container */}
+                <div className="relative">
+                    <textarea
+                        ref={textareaRef}
+                        value={text}
+                        onChange={handleTextChange}
+                        placeholder={placeholder}
+                        className={`w-full px-4 py-3 md:px-5 md:py-4 bg-transparent resize-none outline-none text-sm md:text-base transition-colors ${
+                            isOverLimit 
+                                ? 'text-error' 
+                                : 'text-base-content placeholder:text-base-content/40'
                         }`}
-                    rows={mode === 'quick' ? 3 : 6}
-                    style={{ minHeight: mode === 'quick' ? '80px' : '150px' }}
-                />
+                        rows={mode === 'quick' ? 4 : 6}
+                        style={{ 
+                            minHeight: mode === 'quick' ? '100px' : '160px',
+                            maxHeight: '400px'
+                        }}
+                    />
 
-                {/* Character counter */}
-                <div className={`absolute bottom-2 right-2 text-xs ${isOverLimit ? 'text-error' : charCount > actualMaxLength * 0.9 ? 'text-warning' : 'text-base-content/60'
-                    }`}>
-                    {charCount}/{actualMaxLength}
+                    {/* Character Counter Badge */}
+                    <div className="absolute bottom-3 right-3 md:bottom-4 md:right-4">
+                        <div className={`badge badge-sm md:badge-md font-medium ${
+                            isOverLimit 
+                                ? 'badge-error' 
+                                : charCount > actualMaxLength * 0.9 
+                                    ? 'badge-warning' 
+                                    : 'badge-ghost'
+                        }`}>
+                            {charCount}/{actualMaxLength}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Divider */}
+                <div className="border-t border-base-300"></div>
+
+                {/* Format Toolbar */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 md:p-4 bg-base-200/50">
+                    {/* Formatting Tools */}
+                    <div className="flex items-center gap-1 flex-wrap">
+                        {allowedFormats.includes('bold') && (
+                            <button
+                                type="button"
+                                onClick={() => applyFormat('bold')}
+                                className="btn btn-sm btn-ghost gap-1 hover:bg-base-300"
+                                title="Bold (Ctrl+B)"
+                            >
+                                <Bold className="w-4 h-4" />
+                                <span className="hidden sm:inline text-xs">Bold</span>
+                            </button>
+                        )}
+
+                        {allowedFormats.includes('italic') && (
+                            <button
+                                type="button"
+                                onClick={() => applyFormat('italic')}
+                                className="btn btn-sm btn-ghost gap-1 hover:bg-base-300"
+                                title="Italic (Ctrl+I)"
+                            >
+                                <Italic className="w-4 h-4" />
+                                <span className="hidden sm:inline text-xs">Italic</span>
+                            </button>
+                        )}
+
+                        {(allowedFormats.includes('emoji') || allowedFormats.includes('mention') || allowedFormats.includes('hashtag')) && (
+                            <div className="w-px h-6 bg-base-300 mx-1"></div>
+                        )}
+
+                        {allowedFormats.includes('emoji') && (
+                            <button
+                                type="button"
+                                ref={emojiBtnRef}
+                                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                                className="btn btn-sm btn-ghost gap-1 hover:bg-base-300"
+                                title="Add Emoji"
+                            >
+                                <Smile className="w-4 h-4" />
+                                <span className="hidden sm:inline text-xs">Emoji</span>
+                            </button>
+                        )}
+
+                        {allowedFormats.includes('mention') && (
+                            <button
+                                type="button"
+                                onClick={insertMention}
+                                className="btn btn-sm btn-ghost gap-1 hover:bg-base-300"
+                                title="Mention (@)"
+                            >
+                                <AtSign className="w-4 h-4" />
+                                <span className="hidden sm:inline text-xs">Mention</span>
+                            </button>
+                        )}
+
+                        {allowedFormats.includes('hashtag') && (
+                            <button
+                                type="button"
+                                onClick={insertHashtag}
+                                className="btn btn-sm btn-ghost gap-1 hover:bg-base-300"
+                                title="Hashtag (#)"
+                            >
+                                <Hash className="w-4 h-4" />
+                                <span className="hidden sm:inline text-xs">Hashtag</span>
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-2 justify-end">
+                        {onCancel && (
+                            <button
+                                type="button"
+                                onClick={handleCancel}
+                                className="btn btn-sm btn-ghost hover:bg-base-300"
+                            >
+                                Cancel
+                            </button>
+                        )}
+
+                        <button
+                            type="button"
+                            onClick={handleSave}
+                            disabled={!text.trim() || isOverLimit}
+                            className="btn btn-sm btn-primary shadow-sm"
+                        >
+                            {context === 'message' ? 'Send' : 'Save Caption'}
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            {/* Format Toolbar */}
-            <div className="flex items-center justify-between mt-2 p-2 bg-base-200 rounded-lg">
-                <div className="flex items-center gap-1">
-                    {allowedFormats.includes('bold') && (
-                        <button
-                            type="button"
-                            onClick={() => applyFormat('bold')}
-                            className="btn btn-xs btn-ghost"
-                            title="Bold (Ctrl+B)"
-                        >
-                            <Bold className="w-4 h-4" />
-                        </button>
-                    )}
-
-                    {allowedFormats.includes('italic') && (
-                        <button
-                            type="button"
-                            onClick={() => applyFormat('italic')}
-                            className="btn btn-xs btn-ghost"
-                            title="Italic (Ctrl+I)"
-                        >
-                            <Italic className="w-4 h-4" />
-                        </button>
-                    )}
-
-                    <div className="divider divider-horizontal mx-1"></div>
-
-                    {allowedFormats.includes('emoji') && (
-                        <button
-                            type="button"
-                            ref={emojiBtnRef}
-                            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                            className="btn btn-xs btn-ghost"
-                            title="Add Emoji"
-                        >
-                            <Smile className="w-4 h-4" />
-                        </button>
-                    )}
-
-                    {allowedFormats.includes('mention') && (
-                        <button
-                            type="button"
-                            onClick={insertMention}
-                            className="btn btn-xs btn-ghost"
-                            title="Mention (@)"
-                        >
-                            <AtSign className="w-4 h-4" />
-                        </button>
-                    )}
-
-                    {allowedFormats.includes('hashtag') && (
-                        <button
-                            type="button"
-                            onClick={insertHashtag}
-                            className="btn btn-xs btn-ghost"
-                            title="Hashtag (#)"
-                        >
-                            <Hash className="w-4 h-4" />
-                        </button>
-                    )}
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-2">
-                    {onCancel && (
-                        <button
-                            type="button"
-                            onClick={handleCancel}
-                            className="btn btn-xs btn-ghost"
-                        >
-                            Cancel
-                        </button>
-                    )}
-
-                    <button
-                        type="button"
-                        onClick={handleSave}
-                        disabled={!text.trim() || isOverLimit}
-                        className="btn btn-xs btn-primary"
-                    >
-                        {context === 'message' ? 'Send' : 'Save'}
-                    </button>
-                </div>
-            </div>
-
-            {/* Helper text */}
+            {/* Helper Text */}
             {mode === 'quick' && (
-                <div className="text-xs text-base-content/60 mt-2">
-                    Tip: Select text and use Ctrl+B for bold, Ctrl+I for italic
+                <div className="flex items-center gap-2 mt-3 px-1">
+                    <div className="text-xs text-base-content/50">
+                        💡 Tip: Select text and press <kbd className="kbd kbd-xs">Ctrl</kbd> + <kbd className="kbd kbd-xs">B</kbd> for bold, <kbd className="kbd kbd-xs">Ctrl</kbd> + <kbd className="kbd kbd-xs">I</kbd> for italic
+                    </div>
                 </div>
             )}
 
