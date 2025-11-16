@@ -17,8 +17,14 @@ const RichText = ({ text, mentions = [], className = '' }) => {
   // Create a map of mention positions for quick lookup
   const mentionMap = new Map();
   mentions.forEach(mention => {
-    const key = `${mention.type}:${mention.name || mention.username}`;
-    mentionMap.set(key, mention);
+    // Map by username for users (primary key)
+    if (mention.username) {
+      mentionMap.set(`user:${mention.username}`, mention);
+    }
+    // Map by name as fallback
+    if (mention.name) {
+      mentionMap.set(`${mention.type}:${mention.name}`, mention);
+    }
   });
 
   // Find all matches (URLs and mentions)
@@ -53,10 +59,19 @@ const RichText = ({ text, mentions = [], className = '' }) => {
 
     // Try to find mention details
     let mentionId = null;
-    const mentionKey = `${mentionType}:${mentionName}`;
+    let mentionData = null;
     
-    if (mentionMap.has(mentionKey)) {
-      const mentionData = mentionMap.get(mentionKey);
+    // Try username lookup first for users
+    if (mentionType === 'user') {
+      mentionData = mentionMap.get(`user:${mentionName}`);
+    }
+    
+    // Fallback to name lookup
+    if (!mentionData) {
+      mentionData = mentionMap.get(`${mentionType}:${mentionName}`);
+    }
+    
+    if (mentionData) {
       mentionId = mentionData.id;
       mentionName = mentionData.name || mentionName;
     }

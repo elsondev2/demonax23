@@ -173,7 +173,16 @@
 /* Enhanced placeholder styles for better theme compatibility */
 .input::placeholder,
 .textarea::placeholder {
-  color: hsl(var(--bc) / 0.6);
+  color: hsl(var(--bc) / 0.4);
+  font-size: 0.875rem;
+}
+
+/* Global placeholder styles for all inputs and textareas */
+input::placeholder,
+textarea::placeholder {
+  color: hsl(var(--bc) / 0.4);
+  font-size: 0.875rem;
+  opacity: 0.6;
 }
 
 /* Auth component utilities using DaisyUI color variables */

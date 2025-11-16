@@ -116,7 +116,7 @@ export const getGroupMessages = async (req, res) => {
 
 export const sendMessage = async (req, res) => {
   try {
-    const { text, image, groupId, quotedMessage, attachments = [], audio = null } = req.body;
+    const { text, image, groupId, quotedMessage, attachments = [], audio = null, mentions = [] } = req.body;
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
 
@@ -167,6 +167,7 @@ export const sendMessage = async (req, res) => {
         attachments,
         audio,
         quotedMessage,
+        mentions: mentions || [],
         deliveredBy: [],
         readBy: [senderId],
       });
@@ -241,6 +242,7 @@ export const sendMessage = async (req, res) => {
         attachments,
         audio,
         quotedMessage,
+        mentions: mentions || [],
         deliveredBy: [],
         readBy: [senderId],
       });

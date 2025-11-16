@@ -10,8 +10,15 @@ const MentionChip = ({ type, id, name, className = '' }) => {
   const [showPopover, setShowPopover] = useState(false);
   const [popoverPosition, setPopoverPosition] = useState({ x: 0, y: 0 });
 
-  const handleClick = (e) => {
+  const handleClick = async (e) => {
     e.stopPropagation();
+    
+    // Only show popover if we have a valid ID or it's a special mention
+    if (!id && type !== 'everyone' && type !== 'here') {
+      console.warn('Mention clicked but no ID available:', { type, name });
+      return;
+    }
+    
     const rect = e.currentTarget.getBoundingClientRect();
     setPopoverPosition({
       x: rect.left + rect.width / 2,
@@ -24,15 +31,15 @@ const MentionChip = ({ type, id, name, className = '' }) => {
   const getStyles = () => {
     switch (type) {
       case 'user':
-        return 'bg-blue-500/20 text-blue-600 hover:bg-blue-500/30 border-blue-500/30';
+        return 'bg-blue-500/20 text-base-content hover:bg-blue-500/30 border-blue-500/30';
       case 'group':
-        return 'bg-purple-500/20 text-purple-600 hover:bg-purple-500/30 border-purple-500/30';
+        return 'bg-purple-500/20 text-base-content hover:bg-purple-500/30 border-purple-500/30';
       case 'community':
-        return 'bg-green-500/20 text-green-600 hover:bg-green-500/30 border-green-500/30';
+        return 'bg-green-500/20 text-base-content hover:bg-green-500/30 border-green-500/30';
       case 'everyone':
-        return 'bg-orange-500/20 text-orange-600 hover:bg-orange-500/30 border-orange-500/30';
+        return 'bg-orange-500/20 text-base-content hover:bg-orange-500/30 border-orange-500/30';
       case 'here':
-        return 'bg-yellow-500/20 text-yellow-600 hover:bg-yellow-500/30 border-yellow-500/30';
+        return 'bg-yellow-500/20 text-base-content hover:bg-yellow-500/30 border-yellow-500/30';
       default:
         return 'bg-base-300 text-base-content hover:bg-base-300/80';
     }

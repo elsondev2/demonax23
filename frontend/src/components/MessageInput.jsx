@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useChatStore } from "../store/useChatStore";
-import { ImageUpIcon, SendIcon, XIcon, Smile, Paperclip, Mic, StopCircle, FileText, Sparkles } from "lucide-react";
+import { SendIcon, XIcon, Smile, Paperclip, Mic, StopCircle, Sparkles } from "lucide-react";
+import AttachmentTypeModal from "./AttachmentTypeModal";
 import EmojiPickerModal from "./EmojiPickerModal";
 import CaptionImageModal from "./CaptionImageModal";
 import { axiosInstance } from "../lib/axios";
@@ -18,7 +19,7 @@ import {
   supportsAdvancedAudioProcessing 
 } from "../utils/audioProcessor";
 
-const MessageInput = ({ onInputFocus, onLocalTypingChange, onHeightChange }) => {
+const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
   const [text, setText] = useState("");
   const [image, setImage] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
@@ -37,7 +38,9 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange, onHeightChange }) => 
   const { sendMessage, selectedUser, selectedGroup, messageInputText, setMessageInputText, quotedMessage, clearQuotedMessage, messages, playKeystrokeSound } = useChatStore();
   const [isEmojiOpen, setIsEmojiOpen] = useState(false);
   const [showCaptionImageModal, setShowCaptionImageModal] = useState(false);
+  const [showAttachmentTypeModal, setShowAttachmentTypeModal] = useState(false);
   const emojiBtnRef = useRef(null);
+  const fileInputRef = useRef(null);
   const { authUser } = useAuthStore();
   const friendStore = useFriendStore();
 
@@ -50,9 +53,7 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange, onHeightChange }) => 
   const [mentions, setMentions] = useState([]); // Track mentions in message
   const inputRef = useRef(null);
 
-  // Keyboard handling state
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+  // Keyboard handling state removed - using sticky positioning instead
 
   // Check message limit for non-friends - memoized to prevent recalculation on every render
   const limitInfo = useMemo(() => {
@@ -79,40 +80,7 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange, onHeightChange }) => 
   const selectedUserId = selectedUser?._id;
   const selectedGroupId = selectedGroup?._id;
 
-  // Detect keyboard height using visualViewport API
-  useEffect(() => {
-    if (!window.visualViewport) return;
-
-    const handleResize = () => {
-      const viewport = window.visualViewport;
-      const windowHeight = window.innerHeight;
-      const viewportHeight = viewport.height;
-      const heightDiff = windowHeight - viewportHeight;
-
-      // Keyboard is open if height difference > 150px
-      if (heightDiff > 150) {
-        setKeyboardHeight(heightDiff);
-        setIsKeyboardOpen(true);
-        // Notify parent component of height change
-        onHeightChange?.(heightDiff + 80); // 80px for input height
-      } else {
-        setKeyboardHeight(0);
-        setIsKeyboardOpen(false);
-        onHeightChange?.(80); // Just input height
-      }
-    };
-
-    // Initial check
-    handleResize();
-
-    window.visualViewport.addEventListener('resize', handleResize);
-    window.visualViewport.addEventListener('scroll', handleResize);
-
-    return () => {
-      window.visualViewport.removeEventListener('resize', handleResize);
-      window.visualViewport.removeEventListener('scroll', handleResize);
-    };
-  }, [onHeightChange]);
+  // Keyboard handling removed - using sticky positioning and dvh units instead
 
   // Update recording duration
   useEffect(() => {
@@ -297,14 +265,20 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange, onHeightChange }) => 
     const newText = beforeMention + mentionText + ' ' + afterMention;
     setText(newText);
 
-    // Track mention
-    setMentions(prev => [...prev, {
-      type: mentionTriggerType,
-      id: item._id || item.id,
-      name: item.fullName || item.name,
-      username: item.username,
-      position: mentionStartIndex
-    }]);
+    // Track mention with full details
+    setMentions(prev => {
+      // Remove any existing mention at this position
+      const filtered = prev.filter(m => m.position !== mentionStartIndex);
+      
+      return [...filtered, {
+        type: mentionTriggerType,
+        id: item._id || item.id,
+        name: item.fullName || item.name,
+        username: item.username,
+        position: mentionStartIndex,
+        validated: true // Mark as validated since it was selected from dropdown
+      }];
+    });
 
     // Close dropdown
     setShowMentionDropdown(false);
@@ -330,16 +304,6 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange, onHeightChange }) => 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showMentionDropdown]);
-
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setImage(file);
-      const reader = new FileReader();
-      reader.onload = (e) => setPreviewImage(e.target.result);
-      reader.readAsDataURL(file);
-    }
-  };
 
   const handlePaste = (e) => {
     const items = e.clipboardData?.items;
@@ -409,6 +373,9 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange, onHeightChange }) => 
     }
 
     try {
+      // Validate mentions before sending
+      const validatedMentions = await validateMentionsBeforeSend(text, mentions);
+      
       let imageData = null;
       if (image) {
         // Silently compress and convert image to base64
@@ -416,7 +383,7 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange, onHeightChange }) => 
         imageData = await compressImageToBase64(image);
       }
 
-      await sendMessage({ text, image: imageData, attachments, audio, mentions });
+      await sendMessage({ text, image: imageData, attachments, audio, mentions: validatedMentions });
       setText("");
       setImage(null);
       setPreviewImage(null);
@@ -433,6 +400,49 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange, onHeightChange }) => 
       console.error("Failed to send message:", error);
     } finally {
       setIsSending(false);
+    }
+  };
+
+  // Validate mentions before sending
+  const validateMentionsBeforeSend = async (messageText, mentionsList) => {
+    if (!messageText || mentionsList.length === 0) return mentionsList;
+
+    try {
+      // Extract all @mentions and #groups from text
+      const mentionPattern = /(@everyone|@here|@[\w.-]+|#[\w\s-]+)/g;
+      const foundMentions = [];
+      let match;
+
+      while ((match = mentionPattern.exec(messageText)) !== null) {
+        const matchText = match[0];
+        let type = 'user';
+        let name = matchText.substring(1);
+
+        if (matchText.startsWith('#')) {
+          type = 'group';
+        } else if (matchText === '@everyone') {
+          type = 'everyone';
+          name = 'everyone';
+        } else if (matchText === '@here') {
+          type = 'here';
+          name = 'here';
+        }
+
+        foundMentions.push({ type, name, text: matchText });
+      }
+
+      // Validate each mention against the tracked mentions list
+      const validMentions = mentionsList.filter(mention => {
+        return foundMentions.some(found => 
+          found.type === mention.type && 
+          (found.name === mention.name || found.name === mention.username)
+        );
+      });
+
+      return validMentions;
+    } catch (error) {
+      console.error('Error validating mentions:', error);
+      return mentionsList;
     }
   };
 
@@ -582,44 +592,82 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange, onHeightChange }) => 
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="flex items-center gap-2">
-        {/* IMAGE INPUT */}
-        <div className="relative">
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleImageChange}
-            className="file-input file-input-bordered hidden"
-            id="image-input"
-            disabled={isSending || limitInfo.isLimited}
-          />
-          <label
-            htmlFor="image-input"
-            className={`cursor-pointer transition-colors ${isSending ? 'text-base-content/50' : 'text-base-content/70 hover:text-primary'}`}
-          >
-            <ImageUpIcon className="h-5 w-5" />
-          </label>
+      {/* MENTION PREVIEW - Show validated mentions */}
+      {mentions.length > 0 && text.trim() && (
+        <div className="flex flex-wrap gap-2 mb-2 p-2 bg-base-200 rounded-lg border border-base-300">
+          <span className="text-xs text-base-content/60 font-medium">Mentioning:</span>
+          {mentions.map((mention, idx) => (
+            <span
+              key={idx}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-primary/10 text-base-content border border-primary/20"
+            >
+              {mention.type === 'user' ? '@' : '#'}
+              {mention.username || mention.name}
+            </span>
+          ))}
         </div>
+      )}
 
-        {/* DOCUMENT ATTACHMENTS */}
-        <div className="relative">
-          <input type="file" multiple onChange={async (e) => {
+      <form onSubmit={handleSubmit} className="flex items-center gap-2">
+        {/* HIDDEN FILE INPUT */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          disabled={isSending || limitInfo.isLimited}
+          onChange={async (e) => {
             const files = Array.from(e.target.files || []);
             const { compressImageToBase64 } = await import('../utils/imageCompression');
+            
+            // File size limits (in bytes)
+            const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB for images
+            const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB for other files
+            
             for (const f of files) {
-              // Silently compress in background
-              const base64 = await compressImageToBase64(f);
-              try {
-                const res = await axiosInstance.post('/api/messages/upload-attachment', { base64, filename: f.name });
-                setAttachments(prev => [...prev, res.data]);
-              } catch { /* empty */ }
+              // Check file size
+              const maxSize = f.type.startsWith('image/') ? MAX_IMAGE_SIZE : MAX_FILE_SIZE;
+              if (f.size > maxSize) {
+                const sizeMB = (maxSize / 1024 / 1024).toFixed(0);
+                alert(`File "${f.name}" is too large. Maximum size is ${sizeMB}MB.`);
+                continue;
+              }
+              
+              // Check if it's an image
+              if (f.type.startsWith('image/')) {
+                // Handle as image
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                  setPreviewImage(reader.result);
+                  setImage(f);
+                };
+                reader.readAsDataURL(f);
+              } else {
+                // Handle as attachment
+                const base64 = await compressImageToBase64(f);
+                try {
+                  const res = await axiosInstance.post('/api/messages/upload-attachment', { base64, filename: f.name });
+                  setAttachments(prev => [...prev, res.data]);
+                } catch (err) {
+                  console.error('Failed to upload attachment:', err);
+                  alert(`Failed to upload "${f.name}". Please try again.`);
+                }
+              }
             }
             e.target.value = '';
-          }} className="file-input file-input-bordered hidden" id="file-input" disabled={isSending || limitInfo.isLimited} />
-          <label htmlFor="file-input" className={`cursor-pointer transition-colors ${isSending || limitInfo.isLimited ? 'text-base-content/50' : 'text-base-content/70 hover:text-primary'}`}>
-            <Paperclip className="h-5 w-5" />
-          </label>
-        </div>
+          }}
+        />
+
+        {/* ATTACHMENT BUTTON */}
+        <button
+          type="button"
+          className={`transition-colors ${isSending || limitInfo.isLimited ? 'text-base-content/50' : 'text-base-content/70 hover:text-primary'}`}
+          onClick={() => setShowAttachmentTypeModal(true)}
+          disabled={isSending || limitInfo.isLimited}
+          title="Attach file"
+        >
+          <Paperclip className="h-5 w-5" />
+        </button>
 
         {/* CAPTION IMAGE */}
         <button
@@ -632,18 +680,90 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange, onHeightChange }) => 
           <Sparkles className="h-5 w-5" />
         </button>
 
-        {/* AUDIO RECORD */}
-        <button
-          type="button"
-          className={`transition-colors relative ${isSending || limitInfo.isLimited ? 'text-base-content/50' : isRecording ? 'text-error' : 'text-base-content/70 hover:text-primary'}`}
-          disabled={limitInfo.isLimited || isProcessingAudio}
-          onClick={async () => {
-            if (isRecording) {
-              // Stop recording
-              setIsProcessingAudio(true);
-              recorder?.stop();
-              setIsRecording(false);
-            } else {
+        {/* TEXT INPUT WITH AUDIO BUTTON INSIDE */}
+        <div className="flex-1 relative">
+          <textarea
+            ref={inputRef}
+            value={text}
+            onChange={(e) => handleTextChange(e.target.value)}
+            onKeyDown={(e) => {
+              // Play keystroke sound for actual typing (not special keys)
+              if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete') {
+                playKeystrokeSound();
+              }
+
+              // Handle Enter key
+              if (e.key === 'Enter') {
+                // On desktop: Shift+Enter = new line, Enter = send
+                // On mobile: Enter = new line (form submit handled by button)
+                const isMobile = window.innerWidth < 768;
+                
+                if (!isMobile && !e.shiftKey) {
+                  // Desktop: Enter without shift = send
+                  e.preventDefault();
+                  handleSubmit(e);
+                }
+                // Mobile or Shift+Enter: allow new line (default behavior)
+              }
+
+              // Close mention dropdown on Escape
+              if (e.key === 'Escape' && showMentionDropdown) {
+                e.preventDefault();
+                setShowMentionDropdown(false);
+              }
+            }}
+            onFocus={() => onInputFocus?.()}
+            onBlur={() => {
+              // Stop typing when leaving input area
+              if (isTyping) {
+                const { socket } = useAuthStore.getState();
+                if (socket && socket.connected) {
+                  const conversationId = selectedUser?._id || selectedGroup?._id;
+                  const isGroup = !!selectedGroup;
+                  
+                  if (conversationId) {
+                    socket.emit('stopTyping', {
+                      conversationId,
+                      isGroup
+                    });
+                    setIsTyping(false);
+                    setLocalTypingUsers([]);
+                    onLocalTypingChange?.([]);
+                  }
+                }
+                
+                // Clear timeout
+                if (typingTimeout) {
+                  clearTimeout(typingTimeout);
+                  setTypingTimeout(null);
+                }
+              }
+            }}
+            onPaste={handlePaste}
+            placeholder={getPlaceholder()}
+            className="textarea textarea-bordered w-full pr-12 resize-none min-h-[2.5rem] max-h-32"
+            disabled={isSending || limitInfo.isLimited}
+            maxLength={2000}
+            rows={1}
+            style={{
+              paddingTop: '0.625rem',
+              paddingBottom: '0.625rem'
+            }}
+          />
+          
+          {/* AUDIO RECORD BUTTON INSIDE TEXTAREA */}
+          <button
+            type="button"
+            className={`absolute right-2 top-1/2 -translate-y-1/2 transition-colors ${isSending || limitInfo.isLimited ? 'text-base-content/50' : isRecording ? 'text-error' : 'text-base-content/70 hover:text-primary'}`}
+            disabled={limitInfo.isLimited || isProcessingAudio}
+            title={isRecording ? "Stop recording" : "Record audio"}
+            onClick={async () => {
+              if (isRecording) {
+                // Stop recording
+                setIsProcessingAudio(true);
+                recorder?.stop();
+                setIsRecording(false);
+              } else {
               // Start recording with optimized settings for poor microphones
               try {
                 const constraints = getVoiceRecordingConstraints();
@@ -768,70 +888,25 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange, onHeightChange }) => 
           ) : (
             <Mic className="h-5 w-5" />
           )}
-        </button>
-
-        {/* TEXT INPUT */}
-        <div className="flex-1 relative">
-          <input
-            ref={inputRef}
-            type="text"
-            value={text}
-            onChange={(e) => handleTextChange(e.target.value)}
-            onKeyDown={(e) => {
-              // Play keystroke sound for actual typing (not special keys)
-              if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete') {
-                playKeystrokeSound();
-              }
-
-              // Close mention dropdown on Escape
-              if (e.key === 'Escape' && showMentionDropdown) {
-                e.preventDefault();
-                setShowMentionDropdown(false);
-              }
-            }}
-            onFocus={() => onInputFocus?.()}
-            onBlur={() => {
-              // Stop typing when leaving input area
-              if (isTyping) {
-                const { socket } = useAuthStore.getState();
-                if (socket && socket.connected) {
-                  const conversationId = selectedUser?._id || selectedGroup?._id;
-                  const isGroup = !!selectedGroup;
-                  
-                  if (conversationId) {
-                    socket.emit('stopTyping', {
-                      conversationId,
-                      isGroup
-                    });
-                    setIsTyping(false);
-                    setLocalTypingUsers([]);
-                    onLocalTypingChange?.([]);
-                  }
-                }
-                
-                // Clear timeout
-                if (typingTimeout) {
-                  clearTimeout(typingTimeout);
-                  setTypingTimeout(null);
-                }
-              }
-            }}
-            onPaste={handlePaste}
-            placeholder={getPlaceholder()}
-            className="input input-bordered w-full rounded-full"
-            disabled={isSending || limitInfo.isLimited}
-            maxLength={2000}
-          />
+          </button>
+          
+          {/* Character count */}
           {text.length > 1800 && (
             <div className="absolute -top-6 right-0 text-xs text-base-content/60 bg-base-100 px-2 py-0.5 rounded">
               {text.length}/2000
             </div>
           )}
-
         </div>
 
-        {/* EMOJI PICKER (moved to right) */}
-        <button type="button" ref={emojiBtnRef} onClick={() => setIsEmojiOpen(v => !v)} disabled={limitInfo.isLimited} className={`transition-colors ${isSending || limitInfo.isLimited ? 'text-base-content/50' : 'text-base-content/70 hover:text-primary'}`}>
+        {/* EMOJI PICKER */}
+        <button 
+          type="button" 
+          ref={emojiBtnRef} 
+          onClick={() => setIsEmojiOpen(v => !v)} 
+          disabled={limitInfo.isLimited} 
+          className={`transition-colors ${isSending || limitInfo.isLimited ? 'text-base-content/50' : 'text-base-content/70 hover:text-primary'}`}
+          title="Add emoji"
+        >
           <Smile className="h-5 w-5" />
         </button>
 
@@ -855,6 +930,19 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange, onHeightChange }) => 
 
       {/* Emoji Picker Modal - keepMounted for faster reopen */}
       <EmojiPickerModal isOpen={isEmojiOpen} onClose={() => setIsEmojiOpen(false)} onSelectEmoji={(emoji) => setText(prev => (prev || "") + emoji)} triggerRef={emojiBtnRef} keepMounted={false} />
+
+      {/* Attachment Type Modal */}
+      <AttachmentTypeModal
+        isOpen={showAttachmentTypeModal}
+        onClose={() => setShowAttachmentTypeModal(false)}
+        onSelectType={(type, accept) => {
+          setShowAttachmentTypeModal(false);
+          if (fileInputRef.current) {
+            fileInputRef.current.accept = accept;
+            fileInputRef.current.click();
+          }
+        }}
+      />
 
       {/* Caption Image Modal */}
       {showCaptionImageModal && (

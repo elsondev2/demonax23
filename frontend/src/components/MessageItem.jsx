@@ -282,10 +282,12 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
                   const rect = messageRef.current.getBoundingClientRect();
                   const viewportHeight = window.innerHeight;
                   const spaceBelow = viewportHeight - rect.bottom;
-                  const spaceAbove = rect.top;
+                  
+                  // Dropdown menu height is approximately 150-200px
+                  const dropdownHeight = 200;
 
-                  // If less than 200px space below and more space above, show dropdown upward
-                  if (spaceBelow < 200 && spaceAbove > spaceBelow) {
+                  // If not enough space below for dropdown, show it upward
+                  if (spaceBelow < dropdownHeight) {
                     setDropdownPosition('top');
                   } else {
                     setDropdownPosition('bottom');
@@ -498,6 +500,20 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
+                          
+                          // Check positioning before opening
+                          if (messageRef.current && imageMenuOpen !== 'main') {
+                            const rect = messageRef.current.getBoundingClientRect();
+                            const viewportHeight = window.innerHeight;
+                            const spaceBelow = viewportHeight - rect.bottom;
+                            
+                            if (spaceBelow < 200) {
+                              setDropdownPosition('top');
+                            } else {
+                              setDropdownPosition('bottom');
+                            }
+                          }
+                          
                           setImageMenuOpen(imageMenuOpen === 'main' ? null : 'main');
                         }}
                         className="btn btn-circle btn-xs bg-black/50 hover:bg-black/70 text-white border-none"
@@ -506,7 +522,7 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
                       </button>
                       
                       {imageMenuOpen === 'main' && (
-                        <div className="absolute right-0 top-8 bg-base-100 border border-base-300 rounded-lg shadow-xl py-1 min-w-[140px] z-50">
+                        <div className={`absolute right-0 ${dropdownPosition === 'top' ? 'bottom-8' : 'top-8'} bg-base-100 border border-base-300 rounded-lg shadow-xl py-1 min-w-[140px] z-50`}>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -586,6 +602,20 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
+                                
+                                // Check positioning before opening
+                                if (messageRef.current && imageMenuOpen !== `attachment-${idx}`) {
+                                  const rect = messageRef.current.getBoundingClientRect();
+                                  const viewportHeight = window.innerHeight;
+                                  const spaceBelow = viewportHeight - rect.bottom;
+                                  
+                                  if (spaceBelow < 200) {
+                                    setDropdownPosition('top');
+                                  } else {
+                                    setDropdownPosition('bottom');
+                                  }
+                                }
+                                
                                 setImageMenuOpen(imageMenuOpen === `attachment-${idx}` ? null : `attachment-${idx}`);
                               }}
                               className="btn btn-circle btn-xs bg-black/50 hover:bg-black/70 text-white border-none"
@@ -594,7 +624,7 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
                             </button>
                             
                             {imageMenuOpen === `attachment-${idx}` && (
-                              <div className="absolute right-0 top-8 bg-base-100 border border-base-300 rounded-lg shadow-xl py-1 min-w-[140px] z-50">
+                              <div className={`absolute right-0 ${dropdownPosition === 'top' ? 'bottom-8' : 'top-8'} bg-base-100 border border-base-300 rounded-lg shadow-xl py-1 min-w-[140px] z-50`}>
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -689,7 +719,7 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
             )}
             {/* Audio */}
             {message.audio?.url && (
-              <div className="mt-2">
+              <div className="mt-1 md:mt-2 max-w-[200px] md:max-w-sm">
                 <AudioPlayer src={message.audio.url} isOwnMessage={isOwnMessage} />
               </div>
             )}

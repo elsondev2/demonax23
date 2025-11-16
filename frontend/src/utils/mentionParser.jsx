@@ -3,17 +3,20 @@ import MentionChip from '../components/mentions/MentionChip';
 /**
  * Parses text and replaces mentions with MentionChip components
  * Supports @user, #group, @everyone, @here patterns
+ * Only renders mentions that have valid IDs (were validated)
  */
 export const parseMentions = (text, mentions = []) => {
   if (!text) return text;
 
-
-  
-  // Create a map of mention positions for quick lookup
+  // Create a map of mention names/usernames to their data for quick lookup
   const mentionMap = new Map();
   mentions.forEach(mention => {
-    const key = `${mention.type}:${mention.id || mention.name}`;
-    mentionMap.set(key, mention);
+    // Map by username for users
+    if (mention.username) {
+      mentionMap.set(`user:${mention.username}`, mention);
+    }
+    // Map by name for all types
+    mentionMap.set(`${mention.type}:${mention.name}`, mention);
   });
 
   // Pattern to match @username, #groupname, @everyone, @here
@@ -48,24 +51,33 @@ export const parseMentions = (text, mentions = []) => {
     }
 
     // Try to find mention details from mentions array
-    let mentionId = null;
-    const mentionKey = `${mentionType}:${mentionName}`;
+    let mentionData = null;
     
-    if (mentionMap.has(mentionKey)) {
-      const mentionData = mentionMap.get(mentionKey);
-      mentionId = mentionData.id;
-      mentionName = mentionData.name || mentionName;
+    // Try username lookup first for users
+    if (mentionType === 'user') {
+      mentionData = mentionMap.get(`user:${mentionName}`);
+    }
+    
+    // Fallback to name lookup
+    if (!mentionData) {
+      mentionData = mentionMap.get(`${mentionType}:${mentionName}`);
     }
 
-    // Add MentionChip component
-    parts.push(
-      <MentionChip
-        key={`mention-${keyCounter++}`}
-        type={mentionType}
-        id={mentionId}
-        name={mentionName}
-      />
-    );
+    // Only render as MentionChip if we have valid mention data with an ID
+    // or if it's a special mention (everyone/here)
+    if (mentionData && (mentionData.id || mentionType === 'everyone' || mentionType === 'here')) {
+      parts.push(
+        <MentionChip
+          key={`mention-${keyCounter++}`}
+          type={mentionType}
+          id={mentionData.id}
+          name={mentionData.name || mentionName}
+        />
+      );
+    } else {
+      // If no valid mention data, render as plain text
+      parts.push(matchText);
+    }
 
     lastIndex = matchIndex + matchText.length;
   }

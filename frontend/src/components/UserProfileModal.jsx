@@ -53,7 +53,7 @@ function UserProfileModal({ user, isOpen, onClose }) {
 
   return (
     <IOSModal isOpen={isOpen} onClose={onClose} className="max-w-2xl">
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col h-full overflow-hidden">
         {/* Enhanced Header with gradient and status indicator */}
         <div className="relative bg-gradient-to-br from-primary/10 via-secondary/5 to-accent/10 p-6 pb-24">
           <button onClick={onClose} className="absolute top-4 right-4 btn btn-sm btn-ghost btn-circle hover:bg-base-100/20" aria-label="Close">
@@ -102,8 +102,10 @@ function UserProfileModal({ user, isOpen, onClose }) {
            </div>
         </div>
 
-        {/* Info Cards */}
-        <div className="p-6 space-y-3">
+        {/* Scrollable Content Area */}
+        <div className="flex-1 overflow-y-auto">
+          {/* Info Cards */}
+          <div className="p-6 space-y-3">
           {/* Email */}
           <div className="flex items-start gap-3 p-3 rounded-lg bg-base-200/50 hover:bg-base-200 transition-colors">
             <Mail className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
@@ -174,10 +176,11 @@ function UserProfileModal({ user, isOpen, onClose }) {
               </div>
             </div>
           )}
+          </div>
         </div>
 
-        {/* Enhanced Action buttons */}
-        <div className="p-6 pt-0 space-y-3">
+        {/* Enhanced Action buttons - Fixed at bottom */}
+        <div className="p-6 pt-0 space-y-3 flex-shrink-0 bg-base-100 border-t border-base-300">
           {/* Follow/Unfollow Button - Only show if not viewing own profile */}
            {authUser?._id !== user?._id && (
              <FollowButton

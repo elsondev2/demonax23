@@ -53,6 +53,14 @@ const messageSchema = new mongoose.Schema(
       durationSec: Number,
     },
     quotedMessage: quotedMessageSchema,
+    mentions: [
+      {
+        type: { type: String, enum: ['user', 'group', 'community', 'everyone', 'here'] },
+        id: { type: mongoose.Schema.Types.ObjectId },
+        name: String,
+        username: String,
+      }
+    ],
     deliveredBy: {
       type: [mongoose.Schema.Types.ObjectId],
       ref: "User",
