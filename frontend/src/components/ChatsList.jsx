@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, memo } from "react";
+import { useEffect, useState, useRef, memo, useMemo } from "react";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { useGroupInfo } from "../hooks/useGroupInfo";
@@ -6,9 +6,146 @@ import { UsersIcon, Plus } from "lucide-react";
 import CreateGroupModal from "./CreateGroupModal";
 import useGroupStore from "../store/useGroupStore";
 import useFriendStore from "../store/useFriendStore";
+import useStatusStore from "../store/useStatusStore";
 import { Search as SearchIcon } from "lucide-react";
 import { hapticLight } from "../utils/haptic";
 import Avatar from "./Avatar";
+
+// Status Stories Strip Component
+const StatusStoriesStrip = memo(({ authUser, quickAccessChats, handleChatSelect, onlineUsers, onCreatePulse, onViewStatus }) => {
+  const { feed, fetchFeed, subscribeSockets, seen } = useStatusStore();
+  
+  // Group statuses by user
+  const statusUsers = useMemo(() => {
+    const byUser = new Map();
+    (feed || []).forEach(s => {
+      const uid = typeof s.userId === 'object' ? s.userId._id : s.userId;
+      const uObj = typeof s.userId === 'object' ? s.userId : null;
+      if (!byUser.has(uid)) byUser.set(uid, { user: uObj, items: [], hasUnseen: false });
+      const group = byUser.get(uid);
+      group.items.push(s);
+      // Check if any status is unseen
+      if (!seen[s._id]) group.hasUnseen = true;
+    });
+    return Array.from(byUser.values());
+  }, [feed, seen]);
+
+  useEffect(() => {
+    fetchFeed().catch(() => {});
+    try { subscribeSockets(); } catch { /* ignore */ }
+  }, [fetchFeed, subscribeSockets]);
+
+  // Always show exactly 10 items: status users first, then fill with recent chats
+  const displayItems = useMemo(() => {
+    const items = [];
+    // Add status users first
+    items.push(...statusUsers);
+    // Fill remaining slots with recent chats (excluding those already in status)
+    const statusUserIds = new Set(statusUsers.map(s => s.user?._id));
+    const remainingChats = quickAccessChats.filter(chat => !statusUserIds.has(chat._id));
+    items.push(...remainingChats);
+    // Return exactly 9 items (plus user's own = 10 total)
+    return items.slice(0, 9);
+  }, [statusUsers, quickAccessChats]);
+
+  return (
+    <div className="mb-3 px-1 py-1">
+      <div className="flex items-center gap-3 overflow-x-auto overflow-y-hidden no-scrollbar"
+        style={{
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
+          WebkitOverflowScrolling: 'touch'
+        }}>
+        
+        {/* User's own status - "What's your pulse now?" */}
+        <button
+          className="flex flex-col items-center gap-1 flex-shrink-0"
+          onClick={onCreatePulse}
+          title="Create your pulse"
+        >
+          <div className="relative w-14 h-14">
+            {/* Gradient ring for "add status" */}
+            <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-primary to-secondary p-[2.5px]">
+              <div className="w-full h-full rounded-full bg-base-200 flex items-center justify-center">
+                <Avatar
+                  src={authUser?.profilePic}
+                  name={authUser?.fullName}
+                  alt="You"
+                  size="w-[50px] h-[50px]"
+                  textSize="text-sm"
+                />
+              </div>
+            </div>
+            {/* Plus icon overlay */}
+            <div className="absolute bottom-0 right-0 w-4 h-4 rounded-full bg-primary flex items-center justify-center border-2 border-base-200">
+              <Plus className="w-2.5 h-2.5 text-primary-content" />
+            </div>
+          </div>
+          <span className="text-[10px] text-base-content/70 max-w-[56px] truncate">Your pulse</span>
+        </button>
+
+        {/* Status users or recent chats */}
+        {displayItems.map((item, idx) => {
+          const isStatus = item.user !== undefined;
+          const user = isStatus ? item.user : item;
+          const hasUnseen = isStatus && item.hasUnseen;
+          const isChat = !isStatus;
+          
+          return (
+            <button
+              key={user?._id || idx}
+              className="flex flex-col items-center gap-1 flex-shrink-0"
+              onClick={() => {
+                if (isStatus) {
+                  // Open status viewer directly
+                  onViewStatus(user);
+                } else {
+                  handleChatSelect(item);
+                }
+              }}
+              title={user?.fullName || item?.name || item?.fullName || 'User'}
+            >
+              <div className="relative w-14 h-14">
+                {/* Ring indicator for status */}
+                {isStatus && (
+                  <div className={`w-14 h-14 rounded-full p-[2.5px] ${
+                    hasUnseen 
+                      ? 'bg-gradient-to-tr from-primary via-secondary to-accent status-ring-unread' 
+                      : 'bg-gray-400 status-ring-read'
+                  }`}>
+                    <div className="w-full h-full rounded-full bg-base-200 flex items-center justify-center">
+                      <Avatar
+                        src={user?.profilePic}
+                        name={user?.fullName}
+                        alt={user?.fullName || 'User'}
+                        size="w-[50px] h-[50px]"
+                        textSize="text-sm"
+                      />
+                    </div>
+                  </div>
+                )}
+                {/* No ring for regular chats */}
+                {isChat && (
+                  <Avatar
+                    src={item.isGroup ? item.groupPic : item.profilePic}
+                    name={item.isGroup ? item.name : (item.fullName || 'User')}
+                    alt={item.isGroup ? item.name : (item.fullName || 'User')}
+                    size="w-14 h-14"
+                    showOnlineStatus={!item.isGroup}
+                    isOnline={!item.isGroup && onlineUsers.includes(item._id)}
+                  />
+                )}
+              </div>
+              <span className="text-[10px] text-base-content/70 max-w-[56px] truncate">
+                {user?.fullName || item?.name || item?.fullName || 'User'}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+});
 
 // Helper component for group items - OUTSIDE main component to prevent recreation
 const GroupItem = memo(({ group, onClick, formatTime }) => {
@@ -229,6 +366,13 @@ function ChatsList() {
       return () => clearTimeout(timer);
     }
   }, [isCreateGroupModalOpen, getMyChatPartners]);
+
+  // Scroll to top when switching tabs
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [activeTab]);
 
 
 
@@ -547,41 +691,21 @@ function ChatsList() {
         onDoubleClick={handleDoubleClick}
         style={{ touchAction: 'manipulation' }}
       >
-        {/* QUICK ACCESS ROW - Scrolls naturally */}
-        <div className="flex items-center gap-4 mb-3 px-1 py-1">
-          {/* Plus button navigates to Contacts */}
-          <button
-            className="btn btn-circle btn-primary shadow-md hover:shadow-lg transition-all duration-200"
-            title="Find contacts"
-            onClick={() => setActiveTab('contacts')}
-          >
-            <Plus className="w-6 h-6" />
-          </button>
-          {/* Top 3 most visited/recent chats */}
-          <div className="quick-access-scroll flex items-center gap-4 overflow-x-auto overflow-y-hidden no-scrollbar"
-            style={{
-              scrollbarWidth: 'none',
-              msOverflowStyle: 'none',
-              WebkitOverflowScrolling: 'touch'
-            }}>
-            {quickAccessChats.map(chat => {
-
-
-              return (
-                <button key={chat._id} className="relative" onClick={() => handleChatSelect(chat)} title={chat.isGroup ? chat.name : (chat.fullName || 'Deleted User')}>
-                  <Avatar
-                    src={chat.isGroup ? chat.groupPic : chat.profilePic}
-                    name={chat.isGroup ? chat.name : (chat.fullName || 'Deleted User')}
-                    alt={chat.isGroup ? chat.name : (chat.fullName || 'Deleted User')}
-                    size="w-14 h-14"
-                    showOnlineStatus={!chat.isGroup}
-                    isOnline={!chat.isGroup && onlineUsers.includes(chat._id)}
-                  />
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        {/* STATUS STORIES STRIP */}
+        <StatusStoriesStrip 
+          authUser={authUser}
+          quickAccessChats={quickAccessChats}
+          handleChatSelect={handleChatSelect}
+          onlineUsers={onlineUsers}
+          onCreatePulse={() => {
+            // Dispatch event to open pulse creator
+            window.dispatchEvent(new CustomEvent('openPulseCreator'));
+          }}
+          onViewStatus={(user) => {
+            // Dispatch event to open pulse viewer for specific user
+            window.dispatchEvent(new CustomEvent('openPulseViewer', { detail: { user } }));
+          }}
+        />
 
         {/* STICKY TABS */}
         <div className="sticky top-0 z-10 bg-base-200 pb-3">
@@ -770,6 +894,9 @@ function ChatsList() {
             })}
           </div>
         )}
+
+        {/* Extra space at bottom for comfortable scrolling */}
+        <div className="h-20"></div>
       </div>
       {/* End of scrollable content */}
 

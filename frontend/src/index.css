@@ -887,3 +887,23 @@ hin scrollbar styles - nearly invisible */
 .animate-fade-in {
   animation: fadeIn 0.2s ease-out;
 }
+
+/* Status Ring Animations */
+@keyframes statusRingShine {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+.status-ring-unread {
+  animation: statusRingShine 2s ease-in-out infinite;
+}
+
+.status-ring-read {
+  opacity: 0.5;
+}

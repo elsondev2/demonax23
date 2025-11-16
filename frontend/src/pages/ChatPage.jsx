@@ -28,9 +28,11 @@ import WelcomeTour from "../components/WelcomeTour";
 import ResizableSidebar from "../components/ResizableSidebar";
 import BottomNavBar from "../components/BottomNavBar";
 import NotificationsModal from "../components/NotificationsModal";
+import InAppNotificationBanner from "../components/InAppNotificationBanner";
 import { useWelcomeTour } from "../hooks/useWelcomeTour";
 import { useCallStore } from "../store/useCallStore";
 import useFriendStore from "../store/useFriendStore";
+import { playSound } from "../lib/soundUtils";
 
 
 function ChatPage() {
@@ -99,6 +101,7 @@ function ChatPage() {
   const [currentViewIndex, setCurrentViewIndex] = useState(getInitialIndex());
   const [showChatSelectToast, setShowChatSelectToast] = useState(false);
   const isUserSwipingRef = useRef(false);
+  const [inAppNotification, setInAppNotification] = useState(null);
 
 
 
@@ -115,7 +118,26 @@ function ChatPage() {
 
   // Set up notification callback in chat store
   useEffect(() => {
-    setNotificationCallback(notifyNewMessage);
+    // Wrap notifyNewMessage to handle in-app notifications and sound
+    const handleNotification = (message, sender, isGroup, groupName) => {
+      // Get current chat ID
+      const currentChatId = selectedUser?._id || selectedGroup?._id || null;
+      
+      // Call the notification hook
+      const result = notifyNewMessage(message, sender, isGroup, groupName, currentChatId);
+      
+      // Handle in-app notification
+      if (result?.type === 'in-app') {
+        setInAppNotification(result.data);
+        // Play sound for in-app notification
+        playSound('/sounds/notification.mp3');
+      } else if (result?.type === 'browser') {
+        // Play sound for browser notification too
+        playSound('/sounds/notification.mp3');
+      }
+    };
+    
+    setNotificationCallback(handleNotification);
     
     // Request notification permission on first load if not already granted
     if (!isNotificationGranted) {
@@ -126,7 +148,7 @@ function ChatPage() {
       
       return () => clearTimeout(timer);
     }
-  }, [setNotificationCallback, notifyNewMessage, isNotificationGranted, requestPermission]);
+  }, [setNotificationCallback, notifyNewMessage, isNotificationGranted, requestPermission, selectedUser, selectedGroup]);
 
   // Ensure socket connection
   useEffect(() => {
@@ -242,18 +264,20 @@ function ChatPage() {
   }, [userId, groupId, chats, setSelectedUser, setSelectedGroup, navigate]);
 
   // Watch selectedUser/Group to update URL when in chat view
-  // Don't auto-switch views - let user control navigation
+  // Don't auto-navigate away from user's chosen page
   useEffect(() => {
     if (selectedUser || selectedGroup) {
-      // Only update URL if we're actually in the chat view (index 0) on mobile
-      // Or always update on desktop
-      if (!isMobile || currentViewIndex === 0) {
+      // Only update URL if we're actually viewing a chat (URL contains /chat/user/ or /chat/group/)
+      const isViewingChat = location.pathname.includes('/chat/user/') || location.pathname.includes('/chat/group/');
+      
+      if (isViewingChat) {
         if (selectedUser && location.pathname !== `/chat/user/${selectedUser._id}`) {
           navigate(`/chat/user/${selectedUser._id}`, { replace: true });
         } else if (selectedGroup && location.pathname !== `/chat/group/${selectedGroup._id}`) {
           navigate(`/chat/group/${selectedGroup._id}`, { replace: true });
         }
       }
+      // If user navigated to a feature page, don't force them back to chat
     } else if (!userId && !groupId && !isFeatureRoute && location.pathname !== '/chat') {
       // No chat selected and not on a feature route, go back to home
       navigate('/chat', { replace: true });
@@ -437,6 +461,24 @@ function ChatPage() {
           </div>
         </div>
       )}
+
+      {/* In-App Notification Banner */}
+      <InAppNotificationBanner
+        notification={inAppNotification}
+        onClose={() => setInAppNotification(null)}
+        onClick={(notif) => {
+          // Navigate to the chat
+          if (notif.isGroup) {
+            const groupId = typeof notif.message.groupId === 'object' 
+              ? notif.message.groupId._id 
+              : notif.message.groupId;
+            navigate(`/chat/group/${groupId}`);
+          } else {
+            navigate(`/chat/user/${notif.sender._id}`);
+          }
+          setInAppNotification(null);
+        }}
+      />
     </div>
   );
 }

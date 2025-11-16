@@ -1555,6 +1555,24 @@ export default function PostsView() {
     }
   }, [limit, typeFilter, scope, preloadNextPosts]);
 
+  // Listen for pulse creator/viewer events from ChatsList
+  React.useEffect(() => {
+    const handleOpenPulseCreator = () => setIsPulseOpen(true);
+    const handleOpenPulseViewer = (e) => {
+      if (e.detail?.user) {
+        setPulseViewer({ open: true, user: e.detail.user });
+      }
+    };
+
+    window.addEventListener('openPulseCreator', handleOpenPulseCreator);
+    window.addEventListener('openPulseViewer', handleOpenPulseViewer);
+
+    return () => {
+      window.removeEventListener('openPulseCreator', handleOpenPulseCreator);
+      window.removeEventListener('openPulseViewer', handleOpenPulseViewer);
+    };
+  }, []);
+
   // Expose refresh function globally for auto-refresh functionality
   React.useEffect(() => {
     const handleAutoRefresh = () => {

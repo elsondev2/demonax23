@@ -966,8 +966,8 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
           )}
           </button>
           
-          {/* Formatting Toolbar - Inside textarea */}
-          <div className="absolute right-14 top-1/2 -translate-y-1/2">
+          {/* Formatting Toolbar - Inside textarea, much closer to microphone */}
+          <div className="absolute right-10 top-1/2 -translate-y-1/2">
             <FormattingToolbar 
               isExpanded={isFormattingExpanded}
               onToggle={() => setIsFormattingExpanded(!isFormattingExpanded)}
