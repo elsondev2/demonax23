@@ -234,7 +234,7 @@ export default function NoticeView() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4 relative z-10">
+      <div className="flex-1 overflow-y-auto p-4 pb-20 md:pb-4 relative z-10">
         {loading ? (
           <div className="flex justify-center items-center h-full">
             <span className="loading loading-spinner loading-lg"></span>

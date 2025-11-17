@@ -181,68 +181,101 @@ function fileIconFor(ct = "") {
 
 // Stories strip component
 function StoriesStrip({ onCreatePulse, onOpenPulse }) {
-  // PulsesRow – shows current pulses from status feed
-  const { feed, fetchFeed, subscribeSockets } = useStatusStore();
-  const pulses = useMemo(() => {
+  const { authUser } = useAuthStore();
+  const { feed, fetchFeed, subscribeSockets, seen } = useStatusStore();
+  
+  // Group statuses by user and track unseen
+  const statusUsers = useMemo(() => {
     const byUser = new Map();
     (feed || []).forEach(s => {
       const uid = typeof s.userId === 'object' ? s.userId._id : s.userId;
       const uObj = typeof s.userId === 'object' ? s.userId : null;
-      if (!byUser.has(uid)) byUser.set(uid, { user: uObj, items: [] });
-      byUser.get(uid).items.push(s);
+      if (!byUser.has(uid)) byUser.set(uid, { user: uObj, items: [], hasUnseen: false });
+      const group = byUser.get(uid);
+      group.items.push(s);
+      // Check if any status is unseen
+      if (!seen[s._id]) group.hasUnseen = true;
     });
     return Array.from(byUser.values());
-  }, [feed]);
+  }, [feed, seen]);
 
-  useEffect(() => { fetchFeed().catch(() => { }); try { subscribeSockets(); } catch { /* empty */ } }, [fetchFeed, subscribeSockets]);
+  useEffect(() => {
+    fetchFeed().catch(() => {});
+    try { subscribeSockets(); } catch { /* ignore */ }
+  }, [fetchFeed, subscribeSockets]);
 
   return (
-    <div className="mb-4 overflow-hidden stories-strip">
-      {/* Horizontal scrollable container - only horizontal scroll, no vertical */}
-      <div className="stories-container flex gap-4 md:gap-6 overflow-x-auto overflow-y-hidden scrollbar-hide px-3 md:px-4 lg:pl-32"
+    <div className="mb-4 pl-2 md:pl-16 lg:pl-32 pr-4">
+      <div className="flex items-center gap-3 md:gap-4 overflow-x-auto overflow-y-hidden no-scrollbar"
         style={{
-          maxWidth: 'calc(100vw - 2rem)',
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',
           WebkitOverflowScrolling: 'touch'
         }}>
-        {/* Create Pulse - Plus Icon */}
-        <button className="flex flex-col items-center gap-1 flex-shrink-0 min-w-[72px]" onClick={() => onCreatePulse?.()}>
-          <div className="w-16 h-16 md:w-18 md:h-18 rounded-full bg-gradient-to-tr from-primary to-secondary p-0.5">
-            <div className="w-full h-full rounded-full bg-base-100 flex items-center justify-center">
-              <Plus className="w-6 h-6 text-primary" />
+        
+        {/* User's own status - "Create your pulse" */}
+        <button
+          className="flex flex-col items-center gap-1 flex-shrink-0"
+          onClick={onCreatePulse}
+          title="Create your pulse"
+        >
+          <div className="relative w-16 h-16 md:w-20 md:h-20">
+            {/* Gradient ring for "add status" */}
+            <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-gradient-to-tr from-primary to-secondary p-[2.5px] md:p-[3px]">
+              <div className="w-full h-full rounded-full bg-base-200 flex items-center justify-center">
+                <Avatar
+                  src={authUser?.profilePic}
+                  name={authUser?.fullName}
+                  alt="You"
+                  size="w-[59px] h-[59px] md:w-[74px] md:h-[74px]"
+                  textSize="text-sm md:text-lg"
+                />
+              </div>
+            </div>
+            {/* Plus icon overlay */}
+            <div className="absolute bottom-0 right-0 w-4 h-4 md:w-5 md:h-5 rounded-full bg-primary flex items-center justify-center border-2 border-base-200">
+              <Plus className="w-2.5 h-2.5 md:w-3 md:h-3 text-primary-content" />
             </div>
           </div>
-          <div className="text-xs truncate w-16 text-center text-base-content">Create</div>
+          <span className="text-[10px] text-base-content/70 max-w-[64px] md:max-w-[80px] truncate">Your pulse</span>
         </button>
 
-        {/* Show maximum 4 contacts at a time */}
-        {pulses.slice(0, 4).map((g, idx) => (
-          <button key={g.user?._id || idx} className="flex flex-col items-center gap-1 flex-shrink-0 min-w-[72px]" onClick={() => onOpenPulse?.(g.user)}>
-            <div className="w-16 h-16 md:w-18 md:h-18 rounded-full p-[3px] cassisiacum-border">
-              <Avatar
-                src={g.user?.profilePic}
-                name={g.user?.fullName}
-                alt={g.user?.fullName || 'User'}
-                size="w-full h-full"
-                textSize="text-lg"
-              />
-            </div>
-            <div className="text-xs truncate w-16 text-center text-base-content">{g.user?.fullName || 'Pulse'}</div>
-          </button>
-        ))}
-
-        {/* Show indicator if there are more than 4 contacts */}
-        {pulses.length > 4 && (
-          <div className="flex flex-col items-center gap-1 flex-shrink-0 min-w-[72px]">
-            <div className="w-16 h-16 md:w-18 md:h-18 rounded-full bg-base-300/50 p-[3px] border-2 border-dashed border-base-content/30 flex items-center justify-center">
-              <span className="text-base-content/60 text-lg font-bold">+</span>
-            </div>
-            <div className="text-xs truncate w-16 text-center text-base-content/60">
-              +{pulses.length - 4} more
-            </div>
-          </div>
-        )}
+        {/* Status users only - no recent chats */}
+        {statusUsers.map((item, idx) => {
+          const user = item.user;
+          const hasUnseen = item.hasUnseen;
+          
+          return (
+            <button
+              key={user?._id || idx}
+              className="flex flex-col items-center gap-1 flex-shrink-0"
+              onClick={() => onOpenPulse?.(user)}
+              title={user?.fullName || 'User'}
+            >
+              <div className="relative w-16 h-16 md:w-20 md:h-20">
+                {/* Ring indicator for status */}
+                <div className={`w-16 h-16 md:w-20 md:h-20 rounded-full p-[2.5px] md:p-[3px] ${
+                  hasUnseen 
+                    ? 'bg-gradient-to-tr from-primary via-secondary to-accent status-ring-unread' 
+                    : 'bg-gray-400 status-ring-read'
+                }`}>
+                  <div className="w-full h-full rounded-full bg-base-200 flex items-center justify-center">
+                    <Avatar
+                      src={user?.profilePic}
+                      name={user?.fullName}
+                      alt={user?.fullName || 'User'}
+                      size="w-[59px] h-[59px] md:w-[74px] md:h-[74px]"
+                      textSize="text-sm md:text-lg"
+                    />
+                  </div>
+                </div>
+              </div>
+              <span className="text-[10px] text-base-content/70 max-w-[64px] md:max-w-[80px] truncate">
+                {user?.fullName || 'User'}
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -419,48 +452,49 @@ function PulseViewer({ user, onClose }) {
 
   return (
     <dialog className="modal modal-open" style={{ zIndex: 10000 }}>
-      <div className="modal-box w-full max-w-[480px] h-full max-h-screen bg-black p-0">
-        <div className="relative w-full h-full flex items-center justify-center">
-          {/* Progress bars at top */}
-          <div className="absolute top-0 left-0 right-0 z-10 flex gap-1 p-2">
-            {items.map((_, idx) => (
-              <div key={idx} className="flex-1 h-0.5 bg-white/30 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-white transition-all duration-100"
-                  style={{
-                    width: idx === index ? `${progress}%` : idx < index ? '100%' : '0%'
-                  }}
-                />
-              </div>
-            ))}
-          </div>
-
-          {/* Header with user info */}
-          <div className="absolute top-4 left-0 right-0 z-10 flex items-center justify-between px-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full border-2 border-white overflow-hidden flex-shrink-0">
+      <div className="modal-box w-full max-w-[480px] h-screen max-h-screen bg-black p-3 m-0">
+        <div className="relative w-full h-full flex flex-col rounded-3xl overflow-hidden bg-black">
+          {/* Header bar with rounded top */}
+          <div className="relative z-10 bg-base-300/90 backdrop-blur-md rounded-t-3xl px-4 py-3">
+            {/* Progress bars */}
+            <div className="flex gap-1 mb-3">
+              {items.map((_, idx) => (
+                <div key={idx} className="flex-1 h-1 bg-white/30 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-white transition-all duration-100"
+                    style={{
+                      width: idx === index ? `${progress}%` : idx < index ? '100%' : '0%'
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+            
+            {/* User info */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
                 <Avatar
                   src={user?.profilePic}
                   name={user?.fullName}
                   alt={user?.fullName}
-                  size="w-8 h-8"
-                  textSize="text-xs"
+                  size="w-10 h-10"
+                  textSize="text-sm"
                   loading="lazy"
                 />
+                <div className="flex flex-col">
+                  <span className="text-white font-semibold text-sm">{user?.fullName || 'User'}</span>
+                  <span className="text-white/70 text-xs">{formatTimeAgo(cur.createdAt)}</span>
+                </div>
               </div>
-              <div className="flex flex-col">
-                <span className="text-white font-semibold text-sm drop-shadow-lg">{user?.fullName || 'User'}</span>
-                <span className="text-white/80 text-xs drop-shadow-lg">{formatTimeAgo(cur.createdAt)}</span>
-              </div>
+              <button className="text-white hover:text-white/80 transition-colors" onClick={onClose}>
+                <X className="w-6 h-6" />
+              </button>
             </div>
-            <button className="text-white hover:text-white/80 transition-colors" onClick={onClose}>
-              <X className="w-6 h-6 drop-shadow-lg" />
-            </button>
           </div>
 
-          {/* Story content - 9:16 aspect ratio */}
+          {/* Story content */}
           <div
-            className="relative w-full h-full bg-black select-none"
+            className="relative flex-1 bg-gradient-to-br from-blue-400 to-purple-500 select-none"
             onClick={() => {
               // Only toggle pause on desktop, not mobile
               if (!isMobile) {
@@ -475,16 +509,14 @@ function PulseViewer({ user, onClose }) {
                 muted
                 playsInline
                 loop
-                className="w-full h-full object-contain touch-none"
-                style={{ aspectRatio: '9/16' }}
+                className="w-full h-full object-cover touch-none"
                 preload="metadata"
               />
             ) : (
               <img
                 src={cur.mediaUrl}
                 alt="story"
-                className="w-full h-full object-contain touch-none pointer-events-none"
-                style={{ aspectRatio: '9/16' }}
+                className="w-full h-full object-cover touch-none pointer-events-none"
                 loading="lazy"
               />
             )}
@@ -500,29 +532,36 @@ function PulseViewer({ user, onClose }) {
               </div>
             )}
 
-            {/* Caption if exists */}
-            {cur.caption && (
-              <div className="absolute bottom-20 left-0 right-0 px-4">
-                <p className="text-white text-sm drop-shadow-lg">
-                  <LinkifiedText text={cur.caption} />
-                </p>
-              </div>
-            )}
+            {/* Navigation areas (invisible clickable zones) */}
+            <button
+              className="absolute left-0 top-0 bottom-0 w-1/3 z-[5] active:bg-white/5 transition-colors"
+              onClick={goPrev}
+              onTouchStart={(e) => e.stopPropagation()}
+              aria-label="Previous story"
+            />
+            <button
+              className="absolute right-0 top-0 bottom-0 w-1/3 z-[5] active:bg-white/5 transition-colors"
+              onClick={goNext}
+              onTouchStart={(e) => e.stopPropagation()}
+              aria-label="Next story"
+            />
           </div>
 
-          {/* Navigation areas (invisible clickable zones) */}
-          <button
-            className="absolute left-0 top-0 bottom-0 w-1/3 z-[5] active:bg-white/5 transition-colors"
-            onClick={goPrev}
-            onTouchStart={(e) => e.stopPropagation()}
-            aria-label="Previous story"
-          />
-          <button
-            className="absolute right-0 top-0 bottom-0 w-1/3 z-[5] active:bg-white/5 transition-colors"
-            onClick={goNext}
-            onTouchStart={(e) => e.stopPropagation()}
-            aria-label="Next story"
-          />
+          {/* Footer bar with rounded bottom and caption */}
+          {cur.caption && (
+            <div className="relative z-10 bg-base-300/90 backdrop-blur-md rounded-b-3xl px-4 py-3">
+              <div className="flex items-center justify-between">
+                <p className="text-white text-sm flex-1 line-clamp-2">
+                  <LinkifiedText text={cur.caption} />
+                </p>
+                <div className="flex gap-2 ml-3">
+                  <div className="w-8 h-8 rounded-full bg-white/20"></div>
+                  <div className="w-8 h-8 rounded-full bg-white/20"></div>
+                  <div className="w-8 h-8 rounded-full bg-white/20"></div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </dialog>
@@ -2119,15 +2158,6 @@ export default function PostsView() {
         document.body
       )}
 
-      {/* Mobile back button - positioned within posts area on the left */}
-      <button
-        className="md:hidden absolute bottom-6 left-6 z-50 btn btn-circle btn-primary shadow-lg hover:shadow-xl transition-all duration-200"
-        onClick={() => navigate('/')}
-        title="Back to chats"
-      >
-        <ChevronLeft className="w-5 h-5" />
-      </button>
-
       {/* Floating Instruction - positioned within posts view */}
       {showInstruction && (
         <div className="absolute top-16 right-4 z-[9999] bg-base-100 border border-base-300 rounded-lg shadow-lg p-3 max-w-xs md:max-w-sm animate-fade-in-out">
@@ -2155,7 +2185,7 @@ export default function PostsView() {
       {/* Content */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto momentum-scroll p-4"
+        className="flex-1 overflow-y-auto momentum-scroll p-4 pb-20 md:pb-4"
         onDrop={onDrop}
         onDragOver={(e) => e.preventDefault()}
       >

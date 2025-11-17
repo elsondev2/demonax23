@@ -440,7 +440,7 @@ export default function DonateView() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4 donate-content-area">
+      <div className="flex-1 overflow-y-auto p-4 pb-20 md:pb-4 donate-content-area">
         {activeTab === 'donate' && (
           <div className="max-w-5xl mx-auto space-y-6">
             {/* Hero Section */}

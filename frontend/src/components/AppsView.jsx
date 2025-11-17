@@ -243,7 +243,7 @@ export default function AppsView() {
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-4 md:p-6 relative">
+            <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-20 md:pb-6 relative">
                 <div className="max-w-7xl mx-auto space-y-6">
                     {/* Info Banner */}
                     <div className="alert bg-gradient-to-r from-primary/10 to-secondary/10 border border-primary/20">

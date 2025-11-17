@@ -263,9 +263,11 @@ socket.on('statusCommented', handleStatusCommented);
 - Real-time updates
 
 ✅ **Quotes**
-- Quote status with your own text
-- Creates new status referencing original
-- Shows in feed
+- Quote button in status viewer
+- Opens message composer with status reference
+- Sends as regular chat message (not new status)
+- Message shows status preview/thumbnail
+- Recipient can tap to view the quoted status
 
 ✅ **Auto-Deletion**
 - All interactions deleted when status expires (25 hours)

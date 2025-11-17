@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, memo, useMemo } from "react";
+import { useNavigate, useLocation } from "react-router";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { useGroupInfo } from "../hooks/useGroupInfo";
@@ -232,6 +233,8 @@ const CommunityGroupItem = memo(({ group, onClick, formatTime, formatLastMessage
 });
 
 function ChatsList() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { getMyChatPartners, getAllContacts, allContacts, chats, setSelectedUser, setSelectedGroup, recordVisit, visitCounts, typingUsers } = useChatStore();
   const { getGroupById, getGroups, groups, getCommunityGroups, communityGroups, isCommunityGroupsLoading, joinCommunityGroup } = useGroupStore();
   const { fetchRequests, requests, sendRequest: sendFriendRequest, acceptRequest, rejectRequest, cancelRequest } = useFriendStore();
@@ -482,6 +485,21 @@ function ChatsList() {
         console.warn('Failed to record visit:', error);
       }
 
+      // On desktop, if we're not on the chat page, navigate to it
+      const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+      const isOnChatPage = location.pathname === '/chat' || 
+                          location.pathname.includes('/chat/user/') || 
+                          location.pathname.includes('/chat/group/');
+      
+      if (!isMobile && !isOnChatPage) {
+        // Navigate to the chat page with the selected chat
+        if (chat.isGroup) {
+          navigate(`/chat/group/${chat._id}`);
+        } else {
+          navigate(`/chat/user/${chat._id}`);
+        }
+      }
+
       // Dispatch a custom event to notify the ChatPage component to hide the sidebar
       // This will allow the ChatPage to respond to chat selection in mobile view
       if (typeof window !== 'undefined') {
@@ -698,11 +716,11 @@ function ChatsList() {
           handleChatSelect={handleChatSelect}
           onlineUsers={onlineUsers}
           onCreatePulse={() => {
-            // Dispatch event to open pulse creator
+            // Use existing pulse creator from PostsView
             window.dispatchEvent(new CustomEvent('openPulseCreator'));
           }}
           onViewStatus={(user) => {
-            // Dispatch event to open pulse viewer for specific user
+            // Use PulseViewer from PostsView
             window.dispatchEvent(new CustomEvent('openPulseViewer', { detail: { user } }));
           }}
         />
