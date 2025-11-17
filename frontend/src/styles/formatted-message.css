@@ -1,0 +1,41 @@
+/* Formatted Message Styles */
+.formatted-message {
+  line-height: 1.5;
+}
+
+.formatted-message p {
+  margin: 0;
+  margin-bottom: 0.25rem;
+}
+
+.formatted-message p:last-child {
+  margin-bottom: 0;
+}
+
+.formatted-message strong,
+.formatted-message b {
+  font-weight: 700;
+}
+
+.formatted-message em,
+.formatted-message i {
+  font-style: italic;
+}
+
+.formatted-message u {
+  text-decoration: underline;
+}
+
+.formatted-message s {
+  text-decoration: line-through;
+}
+
+/* Ensure formatting works in both light and dark themes */
+.formatted-message strong,
+.formatted-message b,
+.formatted-message em,
+.formatted-message i,
+.formatted-message u,
+.formatted-message s {
+  color: inherit;
+}

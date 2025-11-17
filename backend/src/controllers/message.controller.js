@@ -116,7 +116,7 @@ export const getGroupMessages = async (req, res) => {
 
 export const sendMessage = async (req, res) => {
   try {
-    const { text, image, groupId, quotedMessage, attachments = [], audio = null, mentions = [] } = req.body;
+    const { text, html, image, groupId, quotedMessage, attachments = [], audio = null, mentions = [] } = req.body;
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
 
@@ -161,6 +161,7 @@ export const sendMessage = async (req, res) => {
         senderId,
         groupId,
         text,
+        html,
         image: imageUrl,
         imageStorageKey: imageStorageKey || "",
         // attachments and audio are assumed already uploaded (frontend upload endpoints)
@@ -237,6 +238,7 @@ export const sendMessage = async (req, res) => {
         senderId,
         receiverId,
         text,
+        html,
         image: imageUrl,
         imageStorageKey: imageStorageKey || "",
         attachments,

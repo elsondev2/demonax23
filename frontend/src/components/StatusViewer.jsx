@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Heart, MessageCircle, Send, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
+import { useNavigate } from 'react-router';
 import useStatusStore from '../store/useStatusStore';
 import { useChatStore } from '../store/useChatStore';
 import { useAuthStore } from '../store/useAuthStore';
@@ -13,6 +14,7 @@ import toast from 'react-hot-toast';
  * Supports likes, comments, and quoting to chat
  */
 const StatusViewer = ({ user, onClose }) => {
+  const navigate = useNavigate();
   const { fetchUserStatuses, markSeen } = useStatusStore();
   const { setSelectedUser } = useChatStore();
   const { authUser } = useAuthStore();
@@ -187,17 +189,30 @@ const StatusViewer = ({ user, onClose }) => {
   };
 
   const handleQuote = () => {
+    // Create quote template
+    const statusOwner = user?.fullName || 'Unknown';
+    const timestamp = new Date(cur.createdAt).toLocaleString();
+    const quoteText = `Quoting status by ${statusOwner} at ${timestamp}\n\n`;
+    
     // Select the user in chat
     setSelectedUser(user);
+    
+    // Set the message input text
+    const chatStore = useChatStore.getState();
+    chatStore.setMessageInputText(quoteText);
+    
     // Close status viewer
     onClose();
-    // Dispatch event to open message input with quote
-    window.dispatchEvent(new CustomEvent('quoteStatus', {
-      detail: {
-        status: cur,
-        user: user
-      }
-    }));
+    
+    // Navigate to chat
+    const isMobile = window.innerWidth < 768;
+    if (isMobile) {
+      // Dispatch event to switch to chat view on mobile
+      window.dispatchEvent(new CustomEvent('chatSelected'));
+    } else {
+      // Navigate to chat route on desktop
+      navigate(`/chat/user/${user._id}`);
+    }
   };
 
   const handleScreenClick = (e) => {
@@ -373,15 +388,18 @@ const StatusViewer = ({ user, onClose }) => {
           >
             <MessageCircle className="w-6 h-6" />
           </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleQuote();
-            }}
-            className="text-white hover:bg-white/10 rounded-full p-1 transition-colors"
-          >
-            <Send className="w-6 h-6" />
-          </button>
+          {/* Quote button - only show if not owner */}
+          {!isOwner && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleQuote();
+              }}
+              className="text-white hover:bg-white/10 rounded-full p-1 transition-colors"
+            >
+              <Send className="w-6 h-6" />
+            </button>
+          )}
         </div>
       </div>
 

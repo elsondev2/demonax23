@@ -31,6 +31,11 @@ const messageSchema = new mongoose.Schema(
       trim: true,
       maxlength: 2000,
     },
+    html: {
+      type: String,
+      trim: true,
+      maxlength: 5000, // HTML is longer than plain text
+    },
     image: {
       type: String,
     },

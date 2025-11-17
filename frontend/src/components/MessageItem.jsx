@@ -9,6 +9,7 @@ import Avatar from "./Avatar";
 import AudioPlayer from "./AudioPlayer";
 import ImagePreviewModal from "./ImagePreviewModal";
 import MessageWithLinkPreviews from "./MessageWithLinkPreviews";
+import FormattedMessageText from "./FormattedMessageText";
 
 const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selectedGroup, groupPosition, isUnread }) => {
   const { authUser } = useAuthStore();
@@ -452,7 +453,7 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
                       </div>
                     );
                   }
-                  return <MessageWithLinkPreviews text={message.text} mentions={message.mentions} isOwnMessage={isOwnMessage} />;
+                  return <FormattedMessageText message={message} isOwnMessage={isOwnMessage} />;
                 })()}
               </div>
             )}

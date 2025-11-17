@@ -353,28 +353,38 @@ function ChatPage() {
               setCurrentViewIndex(newIndex);
               
               // Update route based on view index
-              // DON'T clear selectedUser/selectedGroup - keep chat in memory
               if (newIndex === 0 && (selectedUser || selectedGroup)) {
                 // Chat view - navigate to selected chat
                 if (selectedUser) navigate(`/chat/user/${selectedUser._id}`, { replace: true });
                 else if (selectedGroup) navigate(`/chat/group/${selectedGroup._id}`, { replace: true });
               } else if (newIndex === 1) {
-                // Home - navigate to /chat but keep selected chat in memory
+                // Home - navigate to /chat and clear selection for bottom nav
                 if (location.pathname !== '/chat') {
                   navigate('/chat', { replace: true });
                 }
+                // Clear chat selection when leaving chat view
+                setSelectedUser(null);
+                setSelectedGroup(null);
               } else if (newIndex === 2) {
-                // Cassisiacum - keep chat selected in background
+                // Cassisiacum - clear selection
                 navigate('/posts', { replace: true });
+                setSelectedUser(null);
+                setSelectedGroup(null);
               } else if (newIndex === 3) {
-                // Notices - keep chat selected in background
+                // Notices - clear selection
                 navigate('/notices', { replace: true });
+                setSelectedUser(null);
+                setSelectedGroup(null);
               } else if (newIndex === 4) {
-                // Apps - keep chat selected in background
+                // Apps - clear selection
                 navigate('/apps', { replace: true });
+                setSelectedUser(null);
+                setSelectedGroup(null);
               } else if (newIndex === 5) {
-                // Donate - keep chat selected in background
+                // Donate - clear selection
                 navigate('/donate', { replace: true });
+                setSelectedUser(null);
+                setSelectedGroup(null);
               }
               
               // Reset flag after navigation completes

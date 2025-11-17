@@ -6,6 +6,8 @@ import AttachmentTypeModal from "./AttachmentTypeModal";
 import EmojiPickerModal from "./EmojiPickerModal";
 import CaptionImageModal from "./CaptionImageModal";
 import FormattingToolbar from "./FormattingToolbar";
+import WYSIWYGMessageInput from "./WYSIWYGMessageInput";
+import { useWYSIWYGEditor } from "../hooks/useWYSIWYGEditor";
 import { axiosInstance } from "../lib/axios";
 import { useAuthStore } from "../store/useAuthStore";
 import useFriendStore from "../store/useFriendStore";
@@ -56,12 +58,17 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
 
   // Formatting State
   const [isFormattingExpanded, setIsFormattingExpanded] = useState(false);
-  const [activeFormats, setActiveFormats] = useState({
-    bold: false,
-    italic: false,
-    underline: false,
-    strikethrough: false
-  });
+  
+  // WYSIWYG Editor
+  const {
+    commandsRef,
+    activeFormats,
+    applyFormat,
+    clearEditor,
+    getPlainText,
+    getHtml,
+    handleFormatChange,
+  } = useWYSIWYGEditor();
 
   // Keyboard handling state removed - using sticky positioning instead
 
@@ -261,49 +268,11 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
 
   // Handle format toggle (activates/deactivates formatting mode)
   const handleFormatToggle = (formatType) => {
-    setActiveFormats(prev => ({
-      ...prev,
-      [formatType]: !prev[formatType]
-    }));
+    applyFormat(formatType);
   };
 
   // Handle text formatting with keyboard shortcuts
-  const handleFormat = (type, syntax) => {
-    const input = inputRef.current;
-    if (!input) return;
-
-    const start = input.selectionStart;
-    const end = input.selectionEnd;
-    const selectedText = text.substring(start, end);
-
-    if (selectedText) {
-      // Wrap selected text with formatting syntax
-      const beforeText = text.substring(0, start);
-      const afterText = text.substring(end);
-      const formattedText = `${syntax}${selectedText}${syntax}`;
-      const newText = beforeText + formattedText + afterText;
-      
-      setText(newText);
-      
-      // Set cursor position after formatted text
-      setTimeout(() => {
-        const newCursorPos = start + formattedText.length;
-        input.setSelectionRange(newCursorPos, newCursorPos);
-        input.focus();
-      }, 0);
-    } else {
-      // Toggle format mode
-      const formatMap = {
-        'bold': 'bold',
-        'italic': 'italic',
-        'underline': 'underline',
-        'strikethrough': 'strikethrough'
-      };
-      if (formatMap[type]) {
-        handleFormatToggle(formatMap[type]);
-      }
-    }
-  };
+  
 
   // Handle mention selection
   const handleMentionSelect = (item) => {
@@ -439,8 +408,19 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
         imageData = await compressImageToBase64(image);
       }
 
-      await sendMessage({ text, image: imageData, attachments, audio, mentions: validatedMentions });
+      // Get HTML for formatted text
+      const htmlContent = getHtml();
+      
+      await sendMessage({ 
+        text, 
+        html: htmlContent, // Add HTML for rich formatting
+        image: imageData, 
+        attachments, 
+        audio, 
+        mentions: validatedMentions 
+      });
       setText("");
+      clearEditor();
       setImage(null);
       setPreviewImage(null);
       setAttachments([]);
@@ -450,7 +430,9 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
       
       // Keep input focused after sending so user can continue typing
       setTimeout(() => {
-        inputRef.current?.focus();
+        if (commandsRef.current) {
+          commandsRef.current.focus();
+        }
       }, 0);
     } catch (error) {
       console.error("Failed to send message:", error);
@@ -738,56 +720,18 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
 
         {/* TEXT INPUT WITH AUDIO BUTTON INSIDE */}
         <div className="flex-1 relative">
-          <textarea
-            ref={inputRef}
-            value={text}
-            onChange={(e) => handleTextChange(e.target.value)}
-            onKeyDown={(e) => {
-              // Play keystroke sound for actual typing (not special keys)
-              if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete') {
-                playKeystrokeSound();
-              }
-
-              // Keyboard shortcuts for formatting
-              if ((e.ctrlKey || e.metaKey) && !e.shiftKey) {
-                if (e.key === 'b' || e.key === 'B') {
-                  e.preventDefault();
-                  handleFormat('bold', '**');
-                } else if (e.key === 'i' || e.key === 'I') {
-                  e.preventDefault();
-                  handleFormat('italic', '*');
-                } else if (e.key === 'u' || e.key === 'U') {
-                  e.preventDefault();
-                  handleFormat('underline', '__');
-                }
-              }
-              
-              // Ctrl+Shift+X for strikethrough
-              if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'x' || e.key === 'X')) {
-                e.preventDefault();
-                handleFormat('strikethrough', '~~');
-              }
-
-              // Handle Enter key
-              if (e.key === 'Enter') {
-                // On desktop: Shift+Enter = new line, Enter = send
-                // On mobile: Enter = new line (form submit handled by button)
-                const isMobile = window.innerWidth < 768;
-                
-                if (!isMobile && !e.shiftKey) {
-                  // Desktop: Enter without shift = send
-                  e.preventDefault();
-                  handleSubmit(e);
-                }
-                // Mobile or Shift+Enter: allow new line (default behavior)
-              }
-
-              // Close mention dropdown on Escape
-              if (e.key === 'Escape' && showMentionDropdown) {
-                e.preventDefault();
-                setShowMentionDropdown(false);
+          <WYSIWYGMessageInput
+            onChange={(newText) => {
+              setText(newText);
+              handleTextChange(newText);
+            }}
+            onEnter={() => {
+              const messageText = getPlainText();
+              if (messageText.trim()) {
+                handleSubmit(new Event('submit'));
               }
             }}
+            onFormatChange={handleFormatChange}
             onFocus={() => onInputFocus?.()}
             onBlur={() => {
               // Stop typing when leaving input area
@@ -815,15 +759,22 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
                 }
               }
             }}
-            onPaste={handlePaste}
             placeholder={getPlaceholder()}
-            className="textarea textarea-bordered w-full pr-12 resize-none min-h-[2.5rem] max-h-32"
             disabled={isSending || limitInfo.isLimited}
             maxLength={2000}
-            rows={1}
-            style={{
-              paddingTop: '0.625rem',
-              paddingBottom: '0.625rem'
+            commandsRef={commandsRef}
+            onPaste={handlePaste}
+            onKeyDown={(e) => {
+              // Play keystroke sound for actual typing
+              if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete') {
+                playKeystrokeSound();
+              }
+              
+              // Close mention dropdown on Escape
+              if (e.key === 'Escape' && showMentionDropdown) {
+                e.preventDefault();
+                setShowMentionDropdown(false);
+              }
             }}
           />
           
