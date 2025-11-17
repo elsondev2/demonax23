@@ -362,212 +362,6 @@ function PreviewModal({ post, index, onClose, onPrev, onNext }) {
   );
 }
 
-function PulseViewer({ user, onClose }) {
-  const { fetchUserStatuses, markSeen } = useStatusStore();
-  const [items, setItems] = useState([]);
-  const [index, setIndex] = useState(0);
-  const [progress, setProgress] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-
-  // Detect mobile
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  useEffect(() => { if (user?._id) fetchUserStatuses(user._id).then(setItems); }, [user, fetchUserStatuses]);
-  useEffect(() => { const cur = items[index]; if (cur) markSeen(cur._id); }, [items, index, markSeen]);
-
-  // Auto-progress story
-  useEffect(() => {
-    if (!items.length || isPaused) return;
-    const duration = items[index]?.mediaType === 'video' ? 15000 : 5000;
-    const interval = 50;
-    const increment = (interval / duration) * 100;
-
-    const timer = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 100) {
-          if (index < items.length - 1) {
-            setIndex(prev => prev + 1);
-            return 0;
-          } else {
-            onClose();
-            return 100;
-          }
-        }
-        return prev + increment;
-      });
-    }, interval);
-
-    return () => clearInterval(timer);
-  }, [items, index, isPaused, onClose]);
-
-  // Reset progress when index changes
-  useEffect(() => {
-    setProgress(0);
-  }, [index]);
-
-  const cur = items[index];
-  if (!cur) return null;
-
-  const goNext = () => {
-    if (index < items.length - 1) {
-      setIndex(prev => prev + 1);
-      setProgress(0);
-    } else {
-      onClose();
-    }
-  };
-
-  const goPrev = () => {
-    if (index > 0) {
-      setIndex(prev => prev - 1);
-      setProgress(0);
-    }
-  };
-
-  const isVideo = cur.mediaType === 'video';
-
-  // Format time ago in a more informative way
-  const formatTimeAgo = (date) => {
-    const now = new Date();
-    const posted = new Date(date);
-    const diffMs = now - posted;
-    const diffSecs = Math.floor(diffMs / 1000);
-    const diffMins = Math.floor(diffSecs / 60);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffSecs < 60) return 'just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays === 1) return 'yesterday';
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return posted.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  };
-
-  return (
-    <dialog className="modal modal-open" style={{ zIndex: 10000 }}>
-      <div className="modal-box w-full max-w-[480px] h-screen max-h-screen bg-black p-3 m-0">
-        <div className="relative w-full h-full flex flex-col rounded-3xl overflow-hidden bg-black">
-          {/* Header bar with rounded top */}
-          <div className="relative z-10 bg-base-300/90 backdrop-blur-md rounded-t-3xl px-4 py-3">
-            {/* Progress bars */}
-            <div className="flex gap-1 mb-3">
-              {items.map((_, idx) => (
-                <div key={idx} className="flex-1 h-1 bg-white/30 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-white transition-all duration-100"
-                    style={{
-                      width: idx === index ? `${progress}%` : idx < index ? '100%' : '0%'
-                    }}
-                  />
-                </div>
-              ))}
-            </div>
-            
-            {/* User info */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Avatar
-                  src={user?.profilePic}
-                  name={user?.fullName}
-                  alt={user?.fullName}
-                  size="w-10 h-10"
-                  textSize="text-sm"
-                  loading="lazy"
-                />
-                <div className="flex flex-col">
-                  <span className="text-white font-semibold text-sm">{user?.fullName || 'User'}</span>
-                  <span className="text-white/70 text-xs">{formatTimeAgo(cur.createdAt)}</span>
-                </div>
-              </div>
-              <button className="text-white hover:text-white/80 transition-colors" onClick={onClose}>
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-          </div>
-
-          {/* Story content */}
-          <div
-            className="relative flex-1 bg-gradient-to-br from-blue-400 to-purple-500 select-none"
-            onClick={() => {
-              // Only toggle pause on desktop, not mobile
-              if (!isMobile) {
-                setIsPaused(prev => !prev);
-              }
-            }}
-          >
-            {isVideo ? (
-              <video
-                src={cur.mediaUrl}
-                autoPlay
-                muted
-                playsInline
-                loop
-                className="w-full h-full object-cover touch-none"
-                preload="metadata"
-              />
-            ) : (
-              <img
-                src={cur.mediaUrl}
-                alt="story"
-                className="w-full h-full object-cover touch-none pointer-events-none"
-                loading="lazy"
-              />
-            )}
-
-            {/* Pause indicator - desktop only */}
-            {isPaused && !isMobile && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="bg-black/60 backdrop-blur-sm rounded-full p-4">
-                  <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
-                  </svg>
-                </div>
-              </div>
-            )}
-
-            {/* Navigation areas (invisible clickable zones) */}
-            <button
-              className="absolute left-0 top-0 bottom-0 w-1/3 z-[5] active:bg-white/5 transition-colors"
-              onClick={goPrev}
-              onTouchStart={(e) => e.stopPropagation()}
-              aria-label="Previous story"
-            />
-            <button
-              className="absolute right-0 top-0 bottom-0 w-1/3 z-[5] active:bg-white/5 transition-colors"
-              onClick={goNext}
-              onTouchStart={(e) => e.stopPropagation()}
-              aria-label="Next story"
-            />
-          </div>
-
-          {/* Footer bar with rounded bottom and caption */}
-          {cur.caption && (
-            <div className="relative z-10 bg-base-300/90 backdrop-blur-md rounded-b-3xl px-4 py-3">
-              <div className="flex items-center justify-between">
-                <p className="text-white text-sm flex-1 line-clamp-2">
-                  <LinkifiedText text={cur.caption} />
-                </p>
-                <div className="flex gap-2 ml-3">
-                  <div className="w-8 h-8 rounded-full bg-white/20"></div>
-                  <div className="w-8 h-8 rounded-full bg-white/20"></div>
-                  <div className="w-8 h-8 rounded-full bg-white/20"></div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </dialog>
-  );
-}
-
 // Nested Reply Component - renders recursively up to 5 levels
 function ReplyItem({ reply, postId, commentId, level = 1, onReplyAdded, authUser }) {
   const [showReplies, setShowReplies] = useState(false);
@@ -1311,176 +1105,6 @@ function CommentsModal({ post, onClose, onCommentAdded }) {
   );
 }
 
-function PulseComposer({ onClose }) {
-  const { postStatus, isPosting } = useStatusStore();
-  const [file, setFile] = useState(null);
-  const [preview, setPreview] = useState(null);
-  const [caption, setCaption] = useState("");
-  const [, setMentions] = useState([]);
-  const [audience, setAudience] = useState("public");
-  const [showCaptionImageModal, setShowCaptionImageModal] = useState(false);
-
-  const onFile = async (e) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-
-    // Silently compress in background (images and videos)
-    const { compressFile } = await import('../utils/imageCompression');
-    const compressed = await compressFile(f);
-
-    const reader = new FileReader();
-    reader.onloadend = () => setPreview(reader.result?.toString() || null);
-    reader.readAsDataURL(compressed);
-    setFile(compressed);
-  };
-
-  const handleCaptionImageGenerate = async (options) => {
-    try {
-      const blob = await generateCaptionImage(options);
-      const reader = new FileReader();
-      reader.readAsDataURL(blob);
-      reader.onloadend = () => {
-        setPreview(reader.result?.toString() || null);
-        setFile(blob);
-        setCaption(options.text);
-        setShowCaptionImageModal(false);
-      };
-    } catch (error) {
-      console.error('Failed to generate caption image:', error);
-      alert('Failed to generate image. Please try again.');
-    }
-  };
-
-  const onSubmit = async () => {
-    if (!preview) return;
-    const mediaType = file?.type?.startsWith('video/') ? 'video' : 'image';
-    const res = await postStatus({ base64Media: preview, mediaType, caption, audience });
-    if (res) {
-      onClose();
-      setFile(null); setPreview(null); setCaption("");
-    }
-  };
-
-  return (
-    <IOSModal isOpen={true} onClose={onClose} className="max-w-md">
-      {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-base-300 bg-base-100 flex-shrink-0">
-        <h3 className="font-bold text-lg">Create Pulse</h3>
-        <button className="btn btn-sm btn-circle btn-ghost hover:bg-base-200" onClick={onClose}>
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-base-100">
-        <div className="form-control">
-          <label className="label">
-            <span className="label-text">Select media</span>
-          </label>
-          <div className="flex gap-2">
-            <input
-              type="file"
-              accept="image/*,video/*"
-              onChange={onFile}
-              className="file-input file-input-bordered flex-1 focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-            <button
-              className="btn btn-square btn-ghost"
-              onClick={() => setShowCaptionImageModal(true)}
-              title="Create Caption Image"
-            >
-              <Sparkles className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        {preview && (
-          <div className="form-control">
-            <label className="label">
-              <span className="label-text">Preview</span>
-            </label>
-            {file?.type?.startsWith('video/') ? (
-              <video
-                src={preview}
-                controls
-                className="w-full rounded-lg max-h-72"
-                preload="metadata"
-              />
-            ) : (
-              <img
-                src={preview}
-                alt="preview"
-                className="w-full rounded-lg max-h-72 object-contain"
-                loading="lazy"
-              />
-            )}
-          </div>
-        )}
-
-        <div className="form-control">
-          <label className="label">
-            <span className="label-text">Caption (optional)</span>
-          </label>
-          <MentionTextarea
-            value={caption}
-            onChange={setCaption}
-            onMentionsChange={setMentions}
-            placeholder="Add a caption... (Type @ to mention)"
-            className="textarea textarea-bordered w-full resize-none focus:outline-none focus:ring-2 focus:ring-primary"
-            rows={3}
-            maxLength={280}
-          />
-          <div className="label">
-            <span className="label-text-alt text-base-content/60">{caption.length}/280</span>
-          </div>
-        </div>
-
-        <div className="form-control">
-          <label className="label">
-            <span className="label-text">Audience</span>
-          </label>
-          <select
-            className="select select-bordered w-full focus:outline-none focus:ring-2 focus:ring-primary"
-            value={audience}
-            onChange={e => setAudience(e.target.value)}
-          >
-            <option value="public">Public</option>
-            <option value="contacts">Contacts</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Actions */}
-      <div className="flex justify-end gap-3 px-6 py-4 border-t border-base-300 bg-base-100 flex-shrink-0">
-        <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-        <button
-          className="btn btn-primary"
-          onClick={onSubmit}
-          disabled={isPosting || !preview}
-        >
-          {isPosting ? (
-            <>
-              <span className="loading loading-spinner loading-sm"></span>
-              Posting...
-            </>
-          ) : (
-            "Post Pulse"
-          )}
-        </button>
-      </div>
-
-      {/* Caption Image Modal */}
-      {showCaptionImageModal && (
-        <CaptionImageModal
-          isOpen={showCaptionImageModal}
-          onClose={() => setShowCaptionImageModal(false)}
-          onGenerate={handleCaptionImageGenerate}
-        />
-      )}
-    </IOSModal>
-  );
-}
-
 export default function PostsView() {
   const { authUser } = useAuthStore();
   const location = useLocation();
@@ -1489,7 +1113,6 @@ export default function PostsView() {
 
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isPulseOpen, setIsPulseOpen] = useState(false);
   const [isCaptionImageModalOpen, setIsCaptionImageModalOpen] = useState(false);
   const [files, setFiles] = useState([]); // [{file, preview, type, size, ok, err, readDone}]
   const [title, setTitle] = useState("");
@@ -1504,7 +1127,6 @@ export default function PostsView() {
   const [query, setQuery] = useState("");
   const [previewPost, setPreviewPost] = useState(null); // selected post for preview
   const [previewIndex, setPreviewIndex] = useState(0); // which item within post
-  const [pulseViewer, setPulseViewer] = useState({ open: false, user: null });
   const [commentsFor, setCommentsFor] = useState(null); // post for comments
   const [downloadPost, setDownloadPost] = useState(null); // post for download modal
   const [typeFilter] = useState(""); // '', 'images', 'docs'
@@ -1594,23 +1216,7 @@ export default function PostsView() {
     }
   }, [limit, typeFilter, scope, preloadNextPosts]);
 
-  // Listen for pulse creator/viewer events from ChatsList
-  React.useEffect(() => {
-    const handleOpenPulseCreator = () => setIsPulseOpen(true);
-    const handleOpenPulseViewer = (e) => {
-      if (e.detail?.user) {
-        setPulseViewer({ open: true, user: e.detail.user });
-      }
-    };
-
-    window.addEventListener('openPulseCreator', handleOpenPulseCreator);
-    window.addEventListener('openPulseViewer', handleOpenPulseViewer);
-
-    return () => {
-      window.removeEventListener('openPulseCreator', handleOpenPulseCreator);
-      window.removeEventListener('openPulseViewer', handleOpenPulseViewer);
-    };
-  }, []);
+  // No longer needed - using global modals from GlobalStatusModals component
 
   // Expose refresh function globally for auto-refresh functionality
   React.useEffect(() => {
@@ -2190,7 +1796,10 @@ export default function PostsView() {
         onDragOver={(e) => e.preventDefault()}
       >
         {/* Pulses row */}
-        <StoriesStrip onCreatePulse={() => setIsPulseOpen(true)} onOpenPulse={(user) => setPulseViewer({ open: true, user })} />
+        <StoriesStrip 
+          onCreatePulse={() => window.dispatchEvent(new CustomEvent('openPulseCreator'))} 
+          onOpenPulse={(user) => window.dispatchEvent(new CustomEvent('openPulseViewer', { detail: { user } }))} 
+        />
 
         {filtered.length === 0 && !isLoading && (
           <div className="text-center text-base-content/60 py-8">No posts yet</div>
@@ -2256,16 +1865,6 @@ export default function PostsView() {
           onPrev={() => setPreviewIndex(i => Math.max(0, i - 1))}
           onNext={() => setPreviewIndex(i => Math.min((previewPost.items?.length || 1) - 1, i + 1))}
         />,
-        document.body
-      )}
-
-      {pulseViewer.open && createPortal(
-        <PulseViewer user={pulseViewer.user} onClose={() => setPulseViewer({ open: false, user: null })} />,
-        document.body
-      )}
-
-      {isPulseOpen && createPortal(
-        <PulseComposer onClose={() => setIsPulseOpen(false)} />,
         document.body
       )}
 

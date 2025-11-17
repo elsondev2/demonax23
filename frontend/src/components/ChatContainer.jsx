@@ -103,14 +103,14 @@ function ChatContainer() {
       try {
         if (selectedUserId) {
           console.log('Loading messages for user:', selectedUserId);
-          await getMessagesByUserId(selectedUserId, 1, 20);  // Load 20 messages for faster loading
+          await getMessagesByUserId(selectedUserId, 1, 40);  // Load 40 messages (default cache size)
           // Scroll to latest message instantly after loading
           requestAnimationFrame(() => {
             messageEndRef.current?.scrollIntoView({ behavior: "instant", block: "end" });
           });
         } else if (selectedGroupId) {
           console.log('Loading messages for group:', selectedGroupId);
-          await getGroupMessages(selectedGroupId, 1, 20);  // Load 20 messages for faster loading
+          await getGroupMessages(selectedGroupId, 1, 40);  // Load 40 messages (default cache size)
           // Scroll to latest message instantly after loading
           requestAnimationFrame(() => {
             messageEndRef.current?.scrollIntoView({ behavior: "instant", block: "end" });
@@ -158,61 +158,46 @@ function ChatContainer() {
 
 
   useEffect(() => {
-    if (!messagesContainerRef.current) return;
+    if (!messagesContainerRef.current || messages.length === 0) return;
 
     const container = messagesContainerRef.current;
+    const isInitialLoad = previousMessageCountRef.current === 0;
+    const messageCountIncreased = messages.length > previousMessageCountRef.current;
 
     // Initial load: scroll to bottom
-    if (previousMessageCountRef.current === 0 && messages.length > 0) {
-      requestAnimationFrame(() => {
+    if (isInitialLoad) {
+      setTimeout(() => {
         messageEndRef.current?.scrollIntoView({ behavior: "instant", block: "end" });
-      });
+      }, 0);
       previousMessageCountRef.current = messages.length;
       return;
     }
 
-    // Messages count increased
-    if (messages.length > previousMessageCountRef.current && previousMessageCountRef.current > 0) {
-      // Check if this is pagination (we stored scroll position before loading)
-      if (scrollPositionBeforePaginationRef.current && 
-          scrollPositionBeforePaginationRef.current.messageCount === previousMessageCountRef.current) {
-        // This is pagination - maintain scroll position relative to the content we were viewing
-        console.log('📜 Pagination detected - maintaining scroll position');
+    // Messages increased - determine if it's pagination or new message
+    if (messageCountIncreased) {
+      const isPagination = scrollPositionBeforePaginationRef.current !== null;
+
+      if (isPagination) {
+        // Loading older messages - maintain scroll position
+        const oldHeight = scrollPositionBeforePaginationRef.current.scrollHeight;
+        const oldScrollTop = scrollPositionBeforePaginationRef.current.scrollTop;
         
-        // Use double requestAnimationFrame to ensure DOM is fully rendered
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            const newScrollHeight = container.scrollHeight;
-            const oldScrollHeight = scrollPositionBeforePaginationRef.current.scrollHeight;
-            const scrollHeightDiff = newScrollHeight - oldScrollHeight;
-            
-            // Maintain position by adjusting scroll by the height of new content added at top
-            const newScrollTop = scrollPositionBeforePaginationRef.current.scrollTop + scrollHeightDiff;
-            container.scrollTop = newScrollTop;
-            
-            console.log('📜 Scroll adjusted:', {
-              oldScrollHeight,
-              newScrollHeight,
-              scrollHeightDiff,
-              oldScrollTop: scrollPositionBeforePaginationRef.current.scrollTop,
-              newScrollTop
-            });
-            
-            // Clear the stored position
-            scrollPositionBeforePaginationRef.current = null;
-          });
-        });
+        // Clear the ref
+        scrollPositionBeforePaginationRef.current = null;
+        
+        // Wait for render, then restore position
+        setTimeout(() => {
+          const heightDiff = container.scrollHeight - oldHeight;
+          container.scrollTop = oldScrollTop + heightDiff;
+        }, 0);
       } else {
-        // This is a new message at the bottom - apply smart auto-scroll
+        // New message at bottom - auto-scroll if user is near bottom or sent the message
         const lastMessage = messages[messages.length - 1];
-        const lastSender = lastMessage?.senderId?._id || lastMessage?.senderId;
+        const isSentByMe = lastMessage?.senderId?._id?.toString() === authUser?._id?.toString() ||
+                          lastMessage?.senderId?.toString() === authUser?._id?.toString();
+        const userIsNearBottom = isNearBottom();
 
-        const shouldAutoScroll =
-          (lastSender && authUser && lastSender.toString() === authUser._id.toString()) ||
-          isNearBottom() ||
-          isRecentMessage(lastMessage);
-
-        if (shouldAutoScroll) {
+        if (isSentByMe || userIsNearBottom) {
           setTimeout(() => {
             messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
           }, 100);
@@ -232,15 +217,6 @@ function ChatContainer() {
     const container = messagesContainerRef.current;
     const threshold = 100;
     return container.scrollHeight - container.scrollTop - container.clientHeight < threshold;
-  };
-
-  // Check if message is recent (within 30 seconds)
-  const isRecentMessage = (message) => {
-    if (!message?.createdAt) return false;
-    const messageTime = new Date(message.createdAt).getTime();
-    const now = Date.now();
-    const thirtySeconds = 30 * 1000;
-    return (now - messageTime) < thirtySeconds;
   };
 
   // Scroll to bottom and hide new message indicator

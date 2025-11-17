@@ -29,6 +29,7 @@ import ResizableSidebar from "../components/ResizableSidebar";
 import BottomNavBar from "../components/BottomNavBar";
 import NotificationsModal from "../components/NotificationsModal";
 import InAppNotificationBanner from "../components/InAppNotificationBanner";
+import GlobalStatusModals from "../components/GlobalStatusModals";
 import { useWelcomeTour } from "../hooks/useWelcomeTour";
 import { useCallStore } from "../store/useCallStore";
 import useFriendStore from "../store/useFriendStore";
@@ -479,6 +480,9 @@ function ChatPage() {
           setInAppNotification(null);
         }}
       />
+
+      {/* Global Status Modals - Available from anywhere */}
+      <GlobalStatusModals />
     </div>
   );
 }

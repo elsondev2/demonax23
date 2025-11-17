@@ -658,7 +658,7 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
-  getMessagesByUserId: async (userId, page = 1, limit = 20) => {
+  getMessagesByUserId: async (userId, page = 1, limit = 40) => {
     if (!userId) {
       console.warn('getMessagesByUserId called without userId');
       set({ isMessagesLoading: false });
@@ -791,7 +791,7 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
-  getGroupMessages: async (groupId, page = 1, limit = 20) => {
+  getGroupMessages: async (groupId, page = 1, limit = 40) => {
     if (!groupId) {
       console.warn('getGroupMessages called without groupId');
       set({ isMessagesLoading: false });

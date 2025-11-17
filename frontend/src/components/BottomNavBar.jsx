@@ -10,16 +10,10 @@ const BottomNavBar = ({
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Determine if we're in chat interface (only hide on mobile)
+  // Determine if we're in chat interface (only animate down on mobile)
   const isInChat = location.pathname.includes('/chat/user/') || location.pathname.includes('/chat/group/');
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
   
-  // Don't render in chat interface on mobile only
-  // Also hide on mobile when on /chat route if a chat is selected
-  if (isMobile && isInChat) {
-    return null;
-  }
-
   // On desktop, treat chat view as part of Home
   const isHome = location.pathname === '/chat' || location.pathname === '/' || (isInChat && !isMobile);
   const isCassisiacum = location.pathname.startsWith('/posts');
@@ -27,8 +21,13 @@ const BottomNavBar = ({
   const isApps = location.pathname.startsWith('/apps');
   const isDonate = location.pathname.startsWith('/donate');
 
+  // Calculate transform based on chat state (slide down on mobile when in chat)
+  const transformClass = isMobile && isInChat 
+    ? 'translate-y-[calc(100%+1rem)]' 
+    : 'translate-y-0';
+
   return (
-    <div className="fixed bottom-3 left-3 z-40 flex items-center gap-2.5">
+    <div className={`fixed bottom-3 left-3 z-40 flex items-center gap-2.5 transition-transform duration-300 ease-in-out ${transformClass}`}>
       {/* Main Navigation Bar */}
       <div className="bg-base-200/95 backdrop-blur-lg rounded-full shadow-2xl border border-base-300 px-3.5 py-2 flex items-center gap-2 transition-all duration-300 ease-in-out">
         {/* Home (Sidebar) */}

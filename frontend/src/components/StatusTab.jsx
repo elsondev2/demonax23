@@ -29,8 +29,6 @@ function StatusAvatar({ user, onClick }) {
 export default function StatusTab() {
   const { feed, fetchFeed, seen, subscribeSockets } = useStatusStore();
   const { authUser } = useAuthStore();
-  const [viewer, setViewer] = useState({ open: false, userId: null });
-  const [composerOpen, setComposerOpen] = useState(false);
 
   useEffect(() => { fetchFeed(); }, [fetchFeed]);
   useEffect(() => { try { subscribeSockets(); } catch { /* empty */ } }, [subscribeSockets]);
@@ -64,7 +62,7 @@ export default function StatusTab() {
                 <div className="text-xs text-base-content/60">Tap to add updates</div>
               </div>
             </div>
-            <button className="btn btn-sm btn-primary" onClick={() => setComposerOpen(true)}>New</button>
+            <button className="btn btn-sm btn-primary" onClick={() => window.dispatchEvent(new CustomEvent('openPulseCreator'))}>New</button>
           </div>
         </div>
       </div>
@@ -78,22 +76,19 @@ export default function StatusTab() {
               // unseen if any status item id not in seen map
               const unseen = (g.items || []).some(it => !seen[it._id]);
               return (
-                <StatusAvatar key={g.userId} user={g.user} hasUnseen={unseen} onClick={() => setViewer({ open: true, userId: g.userId })} />
+                <StatusAvatar key={g.userId} user={g.user} hasUnseen={unseen} onClick={() => window.dispatchEvent(new CustomEvent('openPulseViewer', { detail: { user: g.user } }))} />
               );
             })}
           </div>
         </div>
       </div>
-
-      <StatusComposerModal open={composerOpen} onClose={() => setComposerOpen(false)} />
-      {viewer.open && (
-        <StatusViewerModal userId={viewer.userId} user={grouped.find(g => g.userId === viewer.userId)?.user} onClose={() => setViewer({ open: false, userId: null })} />
-      )}
     </div>
   );
 }
 
-function StatusComposerModal({ open, onClose }) {
+// StatusComposerModal and StatusViewerModal removed - now using global modals from GlobalStatusModals component
+
+function StatusComposerModal_DEPRECATED({ open, onClose }) {
   const { postStatus, isPosting } = useStatusStore();
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
@@ -206,7 +201,7 @@ function StatusComposerModal({ open, onClose }) {
   );
 }
 
-function StatusViewerModal({ userId, user, onClose }) {
+function StatusViewerModal_DEPRECATED({ userId, user, onClose }) {
   const { fetchUserStatuses, markSeen } = useStatusStore();
   const [items, setItems] = useState([]);
   const [index, setIndex] = useState(0);
