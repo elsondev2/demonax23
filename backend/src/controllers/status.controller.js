@@ -181,3 +181,274 @@ export const deleteStatus = async (req, res) => {
     res.status(500).json({ message: "Failed to delete status" });
   }
 };
+  // Mark status as viewed
+export const markStatusAsViewed = async (req, res) => {
+  try {
+    const { id: statusId } = req.params;
+    const userId = req.user._id;
+    
+    const status = await Status.findById(statusId);
+    if (!status) return res.status(404).json({ message: "Status not found" });
+    
+    // Check if already viewed
+    const alreadyViewed = status.views.some(v => v.userId.toString() === userId.toString());
+    if (alreadyViewed) {
+      return res.status(200).json({ message: "Already viewed" });
+    }
+    
+    status.views.push({ userId, viewedAt: new Date() });
+    await status.save();
+    
+    // Emit socket event to status owner
+    const ownerSocketId = getReceiverSocketId(status.userId.toString());
+    if (ownerSocketId) {
+      io.to(ownerSocketId).emit("statusViewed", {
+        statusId,
+        viewer: { _id: userId, fullName: req.user.fullName, profilePic: req.user.profilePic },
+        viewedAt: new Date()
+      });
+    }
+    
+    res.status(200).json({ message: "View recorded" });
+  } catch (error) {
+    console.log("Error in markStatusAsViewed:", error.message);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Like status
+export const likeStatus = async (req, res) => {
+  try {
+    const { id: statusId } = req.params;
+    const userId = req.user._id;
+    
+    const status = await Status.findById(statusId);
+    if (!status) return res.status(404).json({ message: "Status not found" });
+    
+    const alreadyLiked = status.likes.some(l => l.userId.toString() === userId.toString());
+    if (alreadyLiked) {
+      return res.status(400).json({ message: "Already liked" });
+    }
+    
+    status.likes.push({ userId, likedAt: new Date() });
+    await status.save();
+    
+    // Emit socket event
+    const ownerSocketId = getReceiverSocketId(status.userId.toString());
+    if (ownerSocketId) {
+      io.to(ownerSocketId).emit("statusLiked", {
+        statusId,
+        liker: { _id: userId, fullName: req.user.fullName, profilePic: req.user.profilePic },
+        likedAt: new Date()
+      });
+    }
+    
+    res.status(200).json({ message: "Status liked", likesCount: status.likes.length });
+  } catch (error) {
+    console.log("Error in likeStatus:", error.message);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Unlike status
+export const unlikeStatus = async (req, res) => {
+  try {
+    const { id: statusId } = req.params;
+    const userId = req.user._id;
+    
+    const status = await Status.findById(statusId);
+    if (!status) return res.status(404).json({ message: "Status not found" });
+    
+    status.likes = status.likes.filter(l => l.userId.toString() !== userId.toString());
+    await status.save();
+    
+    // Emit socket event
+    const ownerSocketId = getReceiverSocketId(status.userId.toString());
+    if (ownerSocketId) {
+      io.to(ownerSocketId).emit("statusUnliked", {
+        statusId,
+        unliker: { _id: userId }
+      });
+    }
+    
+    res.status(200).json({ message: "Status unliked", likesCount: status.likes.length });
+  } catch (error) {
+    console.log("Error in unlikeStatus:", error.message);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Add comment
+export const addComment = async (req, res) => {
+  try {
+    const { id: statusId } = req.params;
+    const { text } = req.body;
+    const userId = req.user._id;
+    
+    if (!text || text.trim().length === 0) {
+      return res.status(400).json({ message: "Comment text required" });
+    }
+    
+    if (text.trim().length > 500) {
+      return res.status(400).json({ message: "Comment too long (max 500 chars)" });
+    }
+    
+    const status = await Status.findById(statusId);
+    if (!status) return res.status(404).json({ message: "Status not found" });
+    
+    const comment = {
+      userId,
+      text: text.trim(),
+      createdAt: new Date()
+    };
+    
+    status.comments.push(comment);
+    await status.save();
+    
+    // Get the created comment with its _id
+    const createdComment = status.comments[status.comments.length - 1];
+    
+    // Emit socket event
+    const ownerSocketId = getReceiverSocketId(status.userId.toString());
+    if (ownerSocketId) {
+      io.to(ownerSocketId).emit("statusCommented", {
+        statusId,
+        comment: {
+          _id: createdComment._id,
+          userId,
+          text: createdComment.text,
+          createdAt: createdComment.createdAt,
+          user: { _id: userId, fullName: req.user.fullName, profilePic: req.user.profilePic }
+        }
+      });
+    }
+    
+    res.status(201).json({ 
+      message: "Comment added", 
+      comment: {
+        _id: createdComment._id,
+        userId,
+        text: createdComment.text,
+        createdAt: createdComment.createdAt,
+        user: { _id: userId, fullName: req.user.fullName, profilePic: req.user.profilePic }
+      }
+    });
+  } catch (error) {
+    console.log("Error in addComment:", error.message);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Delete comment
+export const deleteComment = async (req, res) => {
+  try {
+    const { id: statusId, commentId } = req.params;
+    const userId = req.user._id;
+    
+    const status = await Status.findById(statusId);
+    if (!status) return res.status(404).json({ message: "Status not found" });
+    
+    const comment = status.comments.id(commentId);
+    if (!comment) return res.status(404).json({ message: "Comment not found" });
+    
+    // Only comment owner or status owner can delete
+    const isCommentOwner = comment.userId.toString() === userId.toString();
+    const isStatusOwner = status.userId.toString() === userId.toString();
+    
+    if (!isCommentOwner && !isStatusOwner) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+    
+    status.comments.pull(commentId);
+    await status.save();
+    
+    // Emit socket event
+    const ownerSocketId = getReceiverSocketId(status.userId.toString());
+    if (ownerSocketId) {
+      io.to(ownerSocketId).emit("statusCommentDeleted", {
+        statusId,
+        commentId
+      });
+    }
+    
+    res.status(200).json({ message: "Comment deleted" });
+  } catch (error) {
+    console.log("Error in deleteComment:", error.message);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get comments
+export const getComments = async (req, res) => {
+  try {
+    const { id: statusId } = req.params;
+    
+    const status = await Status.findById(statusId)
+      .populate('comments.userId', 'fullName profilePic username');
+    
+    if (!status) return res.status(404).json({ message: "Status not found" });
+    
+    res.status(200).json({ comments: status.comments });
+  } catch (error) {
+    console.log("Error in getComments:", error.message);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get status analytics (owner only)
+export const getStatusAnalytics = async (req, res) => {
+  try {
+    const { id: statusId } = req.params;
+    const userId = req.user._id;
+    
+    const status = await Status.findById(statusId)
+      .populate('views.userId', 'fullName profilePic username')
+      .populate('likes.userId', 'fullName profilePic username')
+      .populate('comments.userId', 'fullName profilePic username');
+    
+    if (!status) return res.status(404).json({ message: "Status not found" });
+    
+    // Only owner can see analytics
+    if (status.userId.toString() !== userId.toString()) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+    
+    res.status(200).json({
+      views: status.views,
+      likes: status.likes,
+      comments: status.comments,
+      viewsCount: status.views.length,
+      likesCount: status.likes.length,
+      commentsCount: status.comments.length
+    });
+  } catch (error) {
+    console.log("Error in getStatusAnalytics:", error.message);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get status viewers (owner only)
+export const getStatusViewers = async (req, res) => {
+  try {
+    const { id: statusId } = req.params;
+    const userId = req.user._id;
+    
+    const status = await Status.findById(statusId)
+      .populate('views.userId', 'fullName profilePic username');
+    
+    if (!status) return res.status(404).json({ message: "Status not found" });
+    
+    // Only owner can see viewers
+    if (status.userId.toString() !== userId.toString()) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+    
+    res.status(200).json({ 
+      viewers: status.views,
+      viewsCount: status.views.length 
+    });
+  } catch (error) {
+    console.log("Error in getStatusViewers:", error.message);
+    res.status(500).json({ message: "Server error" });
+  }
+};

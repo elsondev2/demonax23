@@ -1,5 +1,6 @@
 import { Home, AlignHorizontalSpaceBetween, Bell, Package, Heart, BellDot, MessageSquare } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router';
+import { useChatStore } from '../store/useChatStore';
 
 const BottomNavBar = ({ 
   totalNotifications = 0,
@@ -9,9 +10,10 @@ const BottomNavBar = ({
   const allNotifications = totalNotifications + totalUnreadMessages;
   const navigate = useNavigate();
   const location = useLocation();
+  const { selectedUser, selectedGroup } = useChatStore();
 
-  // Determine if we're in chat interface (only animate down on mobile)
-  const isInChat = location.pathname.includes('/chat/user/') || location.pathname.includes('/chat/group/');
+  // Determine if we're viewing the chat interface (a chat is selected)
+  const isInChat = !!(selectedUser || selectedGroup);
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
   
   // On desktop, treat chat view as part of Home

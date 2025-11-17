@@ -13,6 +13,22 @@ const statusSchema = new mongoose.Schema(
     audioStorageKey: { type: String, default: "" },
     audioDurationSec: { type: Number, default: 0 },
     expiresAt: { type: Date, required: true },
+    
+    // Interaction fields
+    views: [{
+      userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      viewedAt: { type: Date, default: Date.now }
+    }],
+    likes: [{
+      userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      likedAt: { type: Date, default: Date.now }
+    }],
+    comments: [{
+      _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
+      userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+      text: { type: String, required: true, maxlength: 500 },
+      createdAt: { type: Date, default: Date.now }
+    }]
   },
   { timestamps: true }
 );

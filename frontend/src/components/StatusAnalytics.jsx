@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Eye, Heart, MessageCircle } from 'lucide-react';
 import Avatar from './Avatar';
 
@@ -9,11 +9,40 @@ import Avatar from './Avatar';
  */
 const StatusAnalytics = ({ status, onClose }) => {
   const [activeTab, setActiveTab] = useState('views');
+  const [analytics, setAnalytics] = useState({
+    views: [],
+    likes: [],
+    comments: [],
+    viewsCount: 0,
+    likesCount: 0,
+    commentsCount: 0
+  });
+  const [loading, setLoading] = useState(true);
 
-  // Mock data - replace with actual API calls
-  const views = status.views || [];
-  const likes = status.likes || [];
-  const comments = status.comments || [];
+  // Fetch analytics from backend
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      try {
+        const res = await fetch(`/api/status/${status._id}/analytics`, {
+          credentials: 'include'
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setAnalytics(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch analytics:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchAnalytics();
+  }, [status._id]);
+
+  const views = analytics.views || [];
+  const likes = analytics.likes || [];
+  const comments = analytics.comments || [];
 
   const tabs = [
     { id: 'views', label: 'Views', count: views.length, icon: Eye },
@@ -102,7 +131,13 @@ const StatusAnalytics = ({ status, onClose }) => {
 
         {/* List */}
         <div className="max-h-[400px] overflow-y-auto">
-          {renderList()}
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <span className="loading loading-spinner loading-md"></span>
+            </div>
+          ) : (
+            renderList()
+          )}
         </div>
       </div>
       
