@@ -72,8 +72,7 @@ function YouTubeEmbed({ url }) {
   const iframeRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(globalMuteState);
-  const [showOverlay, setShowOverlay] = useState(true);
-  const hideTimeoutRef = useRef(null);
+  const [isVideoPaused, setIsVideoPaused] = useState(false);
 
   // Subscribe to global mute state
   useEffect(() => {
@@ -92,6 +91,7 @@ function YouTubeEmbed({ url }) {
         entries.forEach((entry) => {
           if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
             setIsPlaying(true);
+            setIsVideoPaused(false);
           } else {
             setIsPlaying(false);
           }
@@ -112,23 +112,10 @@ function YouTubeEmbed({ url }) {
     };
   }, []);
 
-  // Handle click/tap to reveal controls
-  const handleInteraction = () => {
-    setShowOverlay(false);
-    
-    // Clear any existing timeout
-    if (hideTimeoutRef.current) {
-      clearTimeout(hideTimeoutRef.current);
-    }
-    
-    // Hide overlay after 3 seconds of no interaction
-    hideTimeoutRef.current = setTimeout(() => {
-      setShowOverlay(true);
-    }, 3000);
-  };
-
   const handleMuteToggle = (e) => {
-    e.stopPropagation(); // Prevent triggering handleInteraction
+    e.preventDefault();
+    e.stopPropagation();
+    
     const newMutedState = !isMuted;
     setGlobalMuteState(newMutedState);
     
@@ -140,10 +127,26 @@ function YouTubeEmbed({ url }) {
     }
   };
 
+  const handlePlayPause = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const newPausedState = !isVideoPaused;
+    setIsVideoPaused(newPausedState);
+    
+    // Reload iframe to change autoplay state
+    if (iframeRef.current) {
+      const currentSrc = iframeRef.current.src;
+      const newSrc = currentSrc.replace(/autoplay=[01]/, `autoplay=${newPausedState ? '0' : '1'}`);
+      iframeRef.current.src = newSrc;
+    }
+  };
+
   if (!videoId) return null;
 
+  // Build embed URL with all necessary parameters
   const embedUrl = `https://www.youtube.com/embed/${videoId}?${new URLSearchParams({
-    autoplay: isPlaying ? '1' : '0',
+    autoplay: (isPlaying && !isVideoPaused) ? '1' : '0',
     mute: isMuted ? '1' : '0',
     loop: '1',
     playlist: videoId,
@@ -154,57 +157,98 @@ function YouTubeEmbed({ url }) {
     cc_load_policy: '1',
     iv_load_policy: '3',
     playsinline: '1',
-    enablejsapi: '1'
+    enablejsapi: '1',
+    origin: window.location.origin
   }).toString()}`;
 
   return (
-    <div 
-      ref={containerRef} 
-      className="relative w-full bg-black rounded-lg overflow-hidden" 
-      style={{ aspectRatio: '9/16', maxHeight: '600px' }}
-    >
-      <iframe
-        ref={iframeRef}
-        src={embedUrl}
-        className="absolute inset-0 w-full h-full"
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-        allowFullScreen
-        title="YouTube Shorts"
-        style={{ border: 'none' }}
-      />
-      
-      {/* Clickable overlay - tap to reveal native YouTube controls */}
-      {showOverlay && (
-        <div 
-          className="absolute inset-0 cursor-pointer z-10"
-          onClick={handleInteraction}
-          onTouchEnd={handleInteraction}
-          style={{
-            background: 'linear-gradient(to top, rgba(0,0,0,0.15) 0%, transparent 30%, transparent 70%, rgba(0,0,0,0.15) 100%)'
-          }}
-        />
-      )}
-
-      {/* Custom mute button - works on all devices */}
-      <button
-        onClick={handleMuteToggle}
-        onTouchEnd={(e) => {
-          e.stopPropagation();
-          handleMuteToggle(e);
-        }}
-        className="absolute bottom-4 right-4 btn btn-sm btn-circle bg-black/80 hover:bg-black border-none text-white z-20 shadow-lg active:scale-95 transition-transform"
-        title={isMuted ? 'Unmute' : 'Mute'}
+    <div className="w-full">
+      <div 
+        ref={containerRef} 
+        className="relative w-full bg-black rounded-lg overflow-hidden" 
+        style={{ aspectRatio: '9/16', maxHeight: '600px' }}
       >
-        {isMuted ? (
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM12.293 7.293a1 1 0 011.414 0L15 8.586l1.293-1.293a1 1 0 111.414 1.414L16.414 10l1.293 1.293a1 1 0 01-1.414 1.414L15 11.414l-1.293 1.293a1 1 0 01-1.414-1.414L13.586 10l-1.293-1.293a1 1 0 010-1.414z" clipRule="evenodd" />
+        {/* YouTube iframe - fully interactive */}
+        <iframe
+          ref={iframeRef}
+          src={embedUrl}
+          className="absolute inset-0 w-full h-full"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+          allowFullScreen
+          title="YouTube Shorts"
+          style={{ border: 'none' }}
+          loading="lazy"
+        />
+
+        {/* Desktop-only mute button inside video */}
+        <button
+          onPointerDown={handleMuteToggle}
+          className="hidden md:flex absolute bottom-4 right-4 btn btn-sm btn-circle bg-black/80 hover:bg-black/90 border-none text-white z-20 shadow-lg active:scale-95 transition-all touch-none select-none items-center justify-center"
+          title={isMuted ? 'Unmute all videos' : 'Mute all videos'}
+          aria-label={isMuted ? 'Unmute' : 'Mute'}
+        >
+          {isMuted ? (
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM12.293 7.293a1 1 0 011.414 0L15 8.586l1.293-1.293a1 1 0 111.414 1.414L16.414 10l1.293 1.293a1 1 0 01-1.414 1.414L15 11.414l-1.293 1.293a1 1 0 01-1.414-1.414L13.586 10l-1.293-1.293a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          ) : (
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z" clipRule="evenodd" />
+            </svg>
+          )}
+        </button>
+      </div>
+
+      {/* Mobile-only external controls below video */}
+      <div className="md:hidden flex items-center justify-center gap-4 mt-3 px-4">
+        {/* Play/Pause Button */}
+        <button
+          onPointerDown={handlePlayPause}
+          className="btn btn-circle btn-lg bg-primary hover:bg-primary/90 border-none text-primary-content shadow-lg active:scale-95 transition-all"
+          aria-label={isVideoPaused ? 'Play' : 'Pause'}
+        >
+          {isVideoPaused ? (
+            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+            </svg>
+          ) : (
+            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+          )}
+        </button>
+
+        {/* Mute/Unmute Button */}
+        <button
+          onPointerDown={handleMuteToggle}
+          className="btn btn-circle btn-lg bg-base-200 hover:bg-base-300 border-none text-base-content shadow-lg active:scale-95 transition-all"
+          aria-label={isMuted ? 'Unmute' : 'Mute'}
+        >
+          {isMuted ? (
+            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM12.293 7.293a1 1 0 011.414 0L15 8.586l1.293-1.293a1 1 0 111.414 1.414L16.414 10l1.293 1.293a1 1 0 01-1.414 1.414L15 11.414l-1.293 1.293a1 1 0 01-1.414-1.414L13.586 10l-1.293-1.293a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          ) : (
+            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z" clipRule="evenodd" />
+            </svg>
+          )}
+        </button>
+
+        {/* Fullscreen Button */}
+        <a
+          href={`https://www.youtube.com/watch?v=${videoId}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn btn-circle btn-lg bg-base-200 hover:bg-base-300 border-none text-base-content shadow-lg active:scale-95 transition-all"
+          aria-label="Open in YouTube"
+        >
+          <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
+            <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
           </svg>
-        ) : (
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z" clipRule="evenodd" />
-          </svg>
-        )}
-      </button>
+        </a>
+      </div>
     </div>
   );
 }
@@ -1527,11 +1571,11 @@ export default function PostsView() {
           }, 50);
 
           const params = new URLSearchParams();
-          params.set('limit', String(limit));
+          params.set('limit', '20'); // Load top 20 posts for caching
           params.set('skip', '0');
           params.set('scope', 'all');
 
-          console.log('📡 Fetching posts from API...');
+          console.log('📡 Fetching top 20 posts for caching...');
           const res = await axiosInstance.get(`/api/posts/feed?${params.toString()}`);
           clearInterval(progressInterval);
 
@@ -1540,8 +1584,30 @@ export default function PostsView() {
 
           setFeed(res.data);
           setSkip(0);
-          setHasMore(res.data.length === limit);
+          setHasMore(res.data.length === 20);
           setCachedPosts(new Map());
+
+          // Preload YouTube embeds and images
+          console.log('🎬 Preloading media...');
+          res.data.forEach((post, index) => {
+            // Preload first 5 YouTube videos
+            if (index < 5 && post.youtubeLink) {
+              const videoId = extractYouTubeId(post.youtubeLink);
+              if (videoId) {
+                const img = new Image();
+                img.src = `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`;
+              }
+            }
+            // Preload first 10 post images
+            if (index < 10 && post.items && post.items.length > 0) {
+              post.items.forEach(item => {
+                if (item.contentType?.startsWith('image/')) {
+                  const img = new Image();
+                  img.src = item.url;
+                }
+              });
+            }
+          });
 
           setLoadingProgress(100);
           setTimeout(() => setLoadingProgress(0), 200);

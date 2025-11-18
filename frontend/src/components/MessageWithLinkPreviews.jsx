@@ -5,9 +5,14 @@ import LinkPreview from './LinkPreview';
 /**
  * Component that displays message text with linkified URLs, mentions, and shows previews for detected links
  */
-const MessageWithLinkPreviews = ({ text, mentions = [], isOwnMessage, className = '' }) => {
-  // Extract URLs from text
+const MessageWithLinkPreviews = ({ text, mentions = [], isOwnMessage, className = '', urls: providedUrls }) => {
+  // Extract URLs from text or use provided URLs
   const urls = useMemo(() => {
+    // If URLs are provided directly, use them
+    if (providedUrls && providedUrls.length > 0) {
+      return providedUrls;
+    }
+    
     if (!text) return [];
     
     const urlRegex = /(https?:\/\/[^\s]+)|(www\.[^\s]+)|([a-zA-Z0-9][a-zA-Z0-9-]+\.[a-zA-Z]{2,}[^\s]*)/g;
@@ -31,7 +36,7 @@ const MessageWithLinkPreviews = ({ text, mentions = [], isOwnMessage, className 
     }
     
     return foundUrls;
-  }, [text]);
+  }, [text, providedUrls]);
 
   return (
     <div className={className}>

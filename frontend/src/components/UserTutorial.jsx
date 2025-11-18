@@ -129,8 +129,8 @@ export default function UserTutorial({ onComplete, onSkip }) {
 
   const calculateTooltipPosition = (element, position) => {
     const rect = element.getBoundingClientRect();
-    const tooltipWidth = 320;
-    const tooltipHeight = 200;
+    const tooltipWidth = Math.min(448, window.innerWidth * 0.9); // max-w-md = 448px or 90vw
+    const tooltipHeight = 250;
     const offset = 20;
 
     let top = 0;
@@ -246,7 +246,7 @@ export default function UserTutorial({ onComplete, onSkip }) {
           transform: step.position === 'center' ? 'translate(-50%, -50%)' : 'none',
         }}
       >
-        <div className="bg-base-100 rounded-xl shadow-2xl border border-base-300 w-80 overflow-hidden animate-in fade-in zoom-in duration-300">
+        <div className="bg-base-100 rounded-xl shadow-2xl border border-base-300 w-[90vw] max-w-md overflow-hidden animate-in fade-in zoom-in duration-300">
           {/* Progress bar */}
           <div className="h-1 bg-base-200">
             <div
@@ -256,11 +256,11 @@ export default function UserTutorial({ onComplete, onSkip }) {
           </div>
 
           {/* Content */}
-          <div className="p-6">
+          <div className="p-6 md:p-8">
             {/* Header */}
-            <div className="flex items-start justify-between mb-4">
+            <div className="flex items-start justify-between mb-5">
               <div className="flex-1">
-                <h3 className="text-lg font-bold text-base-content mb-1">
+                <h3 className="text-xl md:text-2xl font-bold text-base-content mb-2">
                   {step.title}
                 </h3>
                 <p className="text-sm text-base-content/70">
@@ -277,7 +277,7 @@ export default function UserTutorial({ onComplete, onSkip }) {
             </div>
 
             {/* Description */}
-            <p className="text-base-content/80 mb-6 leading-relaxed">
+            <p className="text-base-content/80 mb-6 leading-relaxed text-base">
               {step.description}
             </p>
 
@@ -286,19 +286,19 @@ export default function UserTutorial({ onComplete, onSkip }) {
               <button
                 onClick={handlePrevious}
                 disabled={isFirstStep}
-                className="btn btn-ghost btn-sm"
+                className="btn btn-ghost btn-sm md:btn-md"
               >
-                <ChevronLeft className="w-4 h-4" />
-                Previous
+                <ChevronLeft className="w-4 h-4 md:w-5 md:h-5" />
+                <span className="hidden sm:inline">Previous</span>
               </button>
 
-              <div className="flex gap-1">
+              <div className="flex gap-1.5">
                 {TUTORIAL_STEPS.map((_, index) => (
                   <div
                     key={index}
                     className={`w-2 h-2 rounded-full transition-all ${
                       index === currentStep
-                        ? 'bg-primary w-6'
+                        ? 'bg-primary w-8'
                         : index < currentStep
                         ? 'bg-primary/50'
                         : 'bg-base-300'
@@ -309,17 +309,17 @@ export default function UserTutorial({ onComplete, onSkip }) {
 
               <button
                 onClick={handleNext}
-                className={`btn btn-sm ${isLastStep ? 'btn-primary' : 'btn-ghost'}`}
+                className={`btn btn-sm md:btn-md ${isLastStep ? 'btn-primary' : 'btn-ghost'}`}
               >
                 {isLastStep ? (
                   <>
-                    Finish
-                    <Check className="w-4 h-4" />
+                    <span>Finish</span>
+                    <Check className="w-4 h-4 md:w-5 md:h-5" />
                   </>
                 ) : (
                   <>
-                    Next
-                    <ChevronRight className="w-4 h-4" />
+                    <span>Next</span>
+                    <ChevronRight className="w-4 h-4 md:w-5 md:h-5" />
                   </>
                 )}
               </button>
