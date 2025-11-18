@@ -22,6 +22,7 @@ export const sendFeatureRequestNotification = async (featureRequest) => {
 
     // Format the Discord message
     const discordMessage = {
+      thread_name: `${getCategoryDisplayName(featureRequest.category)}: ${featureRequest.title.substring(0, 80)}`,
       embeds: [{
         title: `🚀 New Feature Request`,
         color: embedColor,
@@ -138,7 +139,10 @@ export const sendVoteUpdateNotification = async (featureRequest, voteType, newSc
       embed.description = `🎉 This request has reached ${newScore} points!`;
     }
 
-    await axios.post(DISCORD_WEBHOOK_URL, { embeds: [embed] }, {
+    await axios.post(DISCORD_WEBHOOK_URL, { 
+      thread_name: `Vote Update: ${featureRequest.title.substring(0, 80)}`,
+      embeds: [embed] 
+    }, {
       headers: { 'Content-Type': 'application/json' },
       timeout: 5000
     });
@@ -198,7 +202,10 @@ export const sendStatusUpdateNotification = async (featureRequest, oldStatus) =>
       timestamp: new Date()
     };
 
-    await axios.post(DISCORD_WEBHOOK_URL, { embeds: [embed] }, {
+    await axios.post(DISCORD_WEBHOOK_URL, { 
+      thread_name: `Status: ${featureRequest.status.toUpperCase()} - ${featureRequest.title.substring(0, 70)}`,
+      embeds: [embed] 
+    }, {
       headers: { 'Content-Type': 'application/json' },
       timeout: 5000
     });

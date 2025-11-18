@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Heart, Coffee, DollarSign, Send, Star, TrendingUp, Zap, Gift, CheckCircle, Users, MessageSquare, ThumbsUp, ChevronDown, Bell, Grid3x3, AlertCircle, Info, Code, Shield, Target, Clock, X } from 'lucide-react';
 import { useToast } from '../hooks/useToast';
 import { useChatStore } from '../store/useChatStore';
@@ -677,20 +678,20 @@ export default function DonateView() {
               </div>
             </div>
 
-            {/* KIBUBU Modal */}
-            {showKibubuModal && (
-              <div className="modal modal-open">
-                <div className="modal-box w-full max-w-3xl max-h-[90vh] flex flex-col p-0">
+            {/* KIBUBU Modal - Rendered via Portal */}
+            {showKibubuModal && createPortal(
+              <div className="modal modal-open" style={{ position: 'fixed', zIndex: 9999 }}>
+                <div className="modal-box w-full max-w-3xl max-h-[90vh] flex flex-col p-0 relative">
                   {/* Modal Header */}
-                  <div className="flex-shrink-0 bg-gradient-to-r from-accent to-info text-accent-content p-6 border-b border-accent-content/20">
+                  <div className="flex-shrink-0 bg-gradient-to-r from-accent to-info text-accent-content p-4 md:p-6 border-b border-accent-content/20">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-lg bg-accent-content/20 flex items-center justify-center">
-                          <Zap className="w-6 h-6" />
+                      <div className="flex items-center gap-2 md:gap-3">
+                        <div className="w-10 h-10 md:w-12 md:h-12 rounded-lg bg-accent-content/20 flex items-center justify-center">
+                          <Zap className="w-5 h-5 md:w-6 md:h-6" />
                         </div>
                         <div>
-                          <h3 className="text-2xl font-bold">Submit to KIBUBU</h3>
-                          <p className="text-sm text-accent-content/80">Share your brilliant idea</p>
+                          <h3 className="text-lg md:text-2xl font-bold">Submit to KIBUBU</h3>
+                          <p className="text-xs md:text-sm text-accent-content/80">Share your brilliant idea</p>
                         </div>
                       </div>
                       <button
@@ -703,7 +704,7 @@ export default function DonateView() {
                   </div>
 
                   {/* Modal Content */}
-                  <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                  <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
                     {/* Category Selection */}
                     <div className="form-control">
                       <label className="label">
@@ -749,7 +750,7 @@ export default function DonateView() {
                         <span className="label-text-alt text-xs">{featureDescription.length}/1000</span>
                       </label>
                       <textarea
-                        className="textarea textarea-bordered w-full h-40 resize-none"
+                        className="textarea textarea-bordered w-full h-32 md:h-40 resize-none"
                         placeholder="Describe your idea in detail. What problem does it solve? How would it work?"
                         value={featureDescription}
                         onChange={(e) => setFeatureDescription(e.target.value)}
@@ -780,15 +781,15 @@ export default function DonateView() {
 
                   {/* Modal Footer */}
                   <div className="flex-shrink-0 border-t border-base-300 p-4 bg-base-200">
-                    <div className="flex gap-3 justify-end">
+                    <div className="flex gap-2 md:gap-3 justify-end">
                       <button
-                        className="btn btn-ghost"
+                        className="btn btn-ghost btn-sm md:btn-md"
                         onClick={() => setShowKibubuModal(false)}
                       >
                         Cancel
                       </button>
                       <button
-                        className="btn btn-accent gap-2"
+                        className="btn btn-accent btn-sm md:btn-md gap-2"
                         onClick={handleFeatureRequest}
                         disabled={!featureTitle.trim() || !featureDescription.trim()}
                       >
@@ -798,8 +799,11 @@ export default function DonateView() {
                     </div>
                   </div>
                 </div>
-                <div className="modal-backdrop" onClick={() => setShowKibubuModal(false)}></div>
-              </div>
+                <form method="dialog" className="modal-backdrop" onClick={() => setShowKibubuModal(false)}>
+                  <button>close</button>
+                </form>
+              </div>,
+              document.body
             )}
 
 
