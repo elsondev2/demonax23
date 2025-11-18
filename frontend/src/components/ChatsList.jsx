@@ -486,23 +486,19 @@ function ChatsList() {
         console.warn('Failed to record visit:', error);
       }
 
-      // On desktop, if we're not on the chat page, navigate to it
-      const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+      // Navigate to chat page if not already there (both mobile and desktop)
       const isOnChatPage = location.pathname === '/chat' || 
                           location.pathname.includes('/chat/user/') || 
                           location.pathname.includes('/chat/group/');
       
-      if (!isMobile && !isOnChatPage) {
-        // Navigate to the chat page with the selected chat
-        if (chat.isGroup) {
-          navigate(`/chat/group/${chat._id}`);
-        } else {
-          navigate(`/chat/user/${chat._id}`);
-        }
+      // Always navigate to the specific chat route
+      if (chat.isGroup) {
+        navigate(`/chat/group/${chat._id}`, { replace: !isOnChatPage });
+      } else {
+        navigate(`/chat/user/${chat._id}`, { replace: !isOnChatPage });
       }
 
-      // Dispatch a custom event to notify the ChatPage component to hide the sidebar
-      // This will allow the ChatPage to respond to chat selection in mobile view
+      // Dispatch a custom event to notify the ChatPage component
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('chatSelected', { detail: chat }));
       }

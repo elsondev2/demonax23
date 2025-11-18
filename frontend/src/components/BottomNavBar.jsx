@@ -16,12 +16,15 @@ const BottomNavBar = ({
   const isInChat = !!(selectedUser || selectedGroup);
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
   
-  // On desktop, treat chat view as part of Home
-  const isHome = location.pathname === '/chat' || location.pathname === '/' || (isInChat && !isMobile);
+  // Check which route we're on
   const isCassisiacum = location.pathname.startsWith('/posts');
   const isNotices = location.pathname.startsWith('/notices');
   const isApps = location.pathname.startsWith('/apps');
   const isDonate = location.pathname.startsWith('/donate');
+  
+  // On desktop, treat chat view as part of Home, but NOT if we're on another route
+  const isHome = (location.pathname === '/chat' || location.pathname === '/' || (isInChat && !isMobile)) 
+    && !isCassisiacum && !isNotices && !isApps && !isDonate;
 
   // Calculate transform based on chat state (slide down on mobile when in chat)
   const transformClass = isMobile && isInChat 
