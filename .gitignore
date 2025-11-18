@@ -7,6 +7,9 @@ node_modules/
 inspiration/
 games/
 
+# Mobile app (work in progress - not ready for git)
+mobile-app/
+
 
 # Environment variables
 .env
