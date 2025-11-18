@@ -385,18 +385,23 @@ function ChatContainer() {
   const items = prepareRenderItems();
   const firstMessageDate = messages[0]?.createdAt;
 
-  // Get current typing users - simplified
+  // Get current typing users - simple and stable
+  const typingUsers = useChatStore(state => state.typingUsers);
+  const conversationId = selectedUser?._id || selectedGroup?._id;
+  
+  // Calculate current typing users
   const currentTypingUsers = useMemo(() => {
-    // Combine local and remote typing users
-    const { typingUsers: remoteTypingState, currentConversationId } = useChatStore.getState();
+    if (!conversationId) return localTypingUsers;
+    
     const remoteUsers = [];
     
-    if (currentConversationId && remoteTypingState[currentConversationId]) {
-      const conversationTyping = remoteTypingState[currentConversationId];
+    if (typingUsers[conversationId]) {
+      const conversationTyping = typingUsers[conversationId];
       const now = Date.now();
       
       Object.values(conversationTyping).forEach((data) => {
-        if ((now - data.timestamp) < 8000) { // 8 second buffer
+        // 5 second timeout for typing indicator (generous buffer)
+        if ((now - data.timestamp) < 5000) {
           remoteUsers.push(data.name);
         }
       });
@@ -405,7 +410,7 @@ function ChatContainer() {
     // Combine and deduplicate
     const combined = [...localTypingUsers, ...remoteUsers];
     return [...new Set(combined)];
-  }, [localTypingUsers]);
+  }, [localTypingUsers, conversationId, typingUsers]);
 
   return (
     <div className="bg-base-100 text-base-content flex-1 flex flex-col h-full md:max-h-full relative overflow-hidden">

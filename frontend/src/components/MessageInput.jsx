@@ -223,20 +223,22 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
         setMentionStartIndex(-1);
       }
 
-      // NEW TYPING SYSTEM: Start typing indicator immediately
+      // TYPING SYSTEM: Emit typing event on every keystroke
       const { socket } = useAuthStore.getState();
       if (socket && socket.connected) {
         const conversationId = selectedUser?._id || selectedGroup?._id;
         const isGroup = !!selectedGroup;
         
         if (conversationId) {
-          // Start typing if not already typing
+          // Always emit typing event to keep indicator alive on receiver's side
+          socket.emit('typing', {
+            conversationId,
+            isGroup,
+            userName: authUser?.fullName
+          });
+          
+          // Set typing state if not already set
           if (!isTyping) {
-            socket.emit('typing', {
-              conversationId,
-              isGroup,
-              userName: authUser?.fullName
-            });
             setIsTyping(true);
             // Add yourself to local typing users for immediate feedback
             const newLocalUsers = [authUser?.fullName || 'You'];

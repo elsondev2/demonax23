@@ -97,25 +97,15 @@ export const useChatStore = create((set, get) => ({
   
   // Typing indicator state
   typingUsers: {}, // { conversationId: { userId: { name, timestamp } } }
+  typingCleanupInterval: null,
 
   // Set typing status for a user in a conversation
   setUserTyping: (conversationId, userId, userName) => {
-    console.log('🟢 STORE: Setting typing user:', { conversationId, userId, userName });
     const { typingUsers } = get();
     const conversationTyping = typingUsers[conversationId] || {};
-    const existingUser = conversationTyping[userId];
     
-    console.log('🟢 STORE: Current typing users:', typingUsers);
-    console.log('🟢 STORE: Existing user:', existingUser);
-    
-    // If user is already typing, don't update to prevent flickering
-    if (existingUser) {
-      console.log('🟢 STORE: User already typing, skipping update');
-      return; // User is already marked as typing, no need to update
-    }
-    
-    // Only add new typing user
-    const newState = {
+    // Always update timestamp - this is important for keeping indicator alive
+    set({
       typingUsers: {
         ...typingUsers,
         [conversationId]: {
@@ -126,15 +116,11 @@ export const useChatStore = create((set, get) => ({
           }
         }
       }
-    };
-    
-    console.log('🟢 STORE: New typing state:', newState.typingUsers);
-    set(newState);
+    });
   },
 
   // Clear typing status for a user
   clearUserTyping: (conversationId, userId) => {
-    console.log('🔴 STORE: Clearing typing user:', { conversationId, userId });
     const { typingUsers } = get();
     const conversationTyping = { ...(typingUsers[conversationId] || {}) };
     delete conversationTyping[userId];
@@ -146,8 +132,38 @@ export const useChatStore = create((set, get) => ({
       }
     };
     
-    console.log('🔴 STORE: New typing state after clear:', newState.typingUsers);
     set(newState);
+  },
+  
+  // Clean up stale typing indicators (older than 5 seconds)
+  cleanupStaleTyping: () => {
+    const { typingUsers } = get();
+    const now = Date.now();
+    const cleaned = {};
+    let hasChanges = false;
+    
+    Object.keys(typingUsers).forEach(conversationId => {
+      const conversationTyping = typingUsers[conversationId];
+      const activeUsers = {};
+      
+      Object.keys(conversationTyping).forEach(userId => {
+        const data = conversationTyping[userId];
+        // Keep only users who typed in the last 5 seconds
+        if ((now - data.timestamp) < 5000) {
+          activeUsers[userId] = data;
+        } else {
+          hasChanges = true;
+        }
+      });
+      
+      if (Object.keys(activeUsers).length > 0) {
+        cleaned[conversationId] = activeUsers;
+      }
+    });
+    
+    if (hasChanges) {
+      set({ typingUsers: cleaned });
+    }
   },
 
 
@@ -1180,28 +1196,28 @@ export const useChatStore = create((set, get) => ({
 
     // Handle typing indicators
     socket.on("userTyping", ({ conversationId, userId, userName }) => {
-      console.log('🔵 RECEIVED userTyping:', { conversationId, userId, userName });
-      // Don't process your own typing events to avoid conflicts
+      // Don't process your own typing events
       const { authUser } = useAuthStore.getState();
       if (userId !== authUser?._id) {
-        console.log('🔵 SETTING typing for other user:', userName);
         get().setUserTyping(conversationId, userId, userName);
-      } else {
-        console.log('🔵 IGNORING own typing event');
       }
     });
 
     socket.on("userStoppedTyping", ({ conversationId, userId }) => {
-      console.log('🔴 RECEIVED userStoppedTyping:', { conversationId, userId });
-      // Don't process your own typing events to avoid conflicts
+      // Don't process your own typing events
       const { authUser } = useAuthStore.getState();
       if (userId !== authUser?._id) {
-        console.log('🔴 CLEARING typing for other user');
         get().clearUserTyping(conversationId, userId);
-      } else {
-        console.log('🔴 IGNORING own stop typing event');
       }
     });
+    
+    // Auto-cleanup stale typing indicators every 2 seconds
+    const typingCleanupInterval = setInterval(() => {
+      get().cleanupStaleTyping();
+    }, 2000);
+    
+    // Store interval ID for cleanup
+    set({ typingCleanupInterval });
 
     // Handle individual messages
     socket.on("newMessage", (newMessage) => {
@@ -1827,6 +1843,16 @@ export const useChatStore = create((set, get) => ({
       socket.off("userUpdated");
       socket.off("userTyping");
       socket.off("userStoppedTyping");
+      
+      // Clear typing cleanup interval
+      const { typingCleanupInterval } = get();
+      if (typingCleanupInterval) {
+        clearInterval(typingCleanupInterval);
+        set({ typingCleanupInterval: null });
+      }
+      
+      // Clear all typing indicators
+      set({ typingUsers: {} });
 
       // Call events are cleaned up in useCallStore.cleanupCallSystem()
     }
