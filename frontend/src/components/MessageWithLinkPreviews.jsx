@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import RichText from './RichText';
 import LinkPreview from './LinkPreview';
 
@@ -15,7 +15,8 @@ const MessageWithLinkPreviews = ({ text, mentions = [], isOwnMessage, className 
     
     if (!text) return [];
     
-    const urlRegex = /(https?:\/\/[^\s]+)|(www\.[^\s]+)|([a-zA-Z0-9][a-zA-Z0-9-]+\.[a-zA-Z]{2,}[^\s]*)/g;
+    // More robust URL regex that captures full URLs including query params and paths
+    const urlRegex = /(https?:\/\/[^\s<>"']+)/g;
     const foundUrls = [];
     let match;
     
@@ -23,11 +24,8 @@ const MessageWithLinkPreviews = ({ text, mentions = [], isOwnMessage, className 
     
     while ((match = urlRegex.exec(textStr)) !== null) {
       let url = match[0];
-      
-      // Add protocol if missing
-      if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        url = 'https://' + url;
-      }
+      // Clean up trailing punctuation that's not part of the URL
+      url = url.replace(/[.,;:!?)]+$/, '');
       
       // Only add unique URLs
       if (!foundUrls.includes(url)) {
