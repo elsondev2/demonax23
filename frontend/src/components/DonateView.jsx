@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Heart, Coffee, DollarSign, Send, Star, TrendingUp, Zap, Gift, CheckCircle, Users, MessageSquare, ThumbsUp, ChevronDown, Bell, Grid3x3, AlertCircle, Info, Code, Shield, Target, Clock, X } from 'lucide-react';
 import { useToast } from '../hooks/useToast';
 import { useChatStore } from '../store/useChatStore';
@@ -99,6 +99,9 @@ export default function DonateView() {
   const [featureCategory, setFeatureCategory] = useState('feature');
   const [isAnonymousRequest, setIsAnonymousRequest] = useState(false);
   const [showKibubuModal, setShowKibubuModal] = useState(false);
+  
+  // Voting state management
+  const votingRef = useRef(new Set()); // Prevent double-click voting
 
   // Stats state
   const [stats, setStats] = useState(null);
@@ -216,18 +219,30 @@ export default function DonateView() {
     if (!socket) return;
 
     const handleVoteUpdate = (updatedRequest) => {
+      // Real-time vote update from other users
+      const upvotes = Number(updatedRequest.upvotes) || 0;
+      const downvotes = Number(updatedRequest.downvotes) || 0;
+      const voteScore = typeof updatedRequest.voteScore === 'number' ? updatedRequest.voteScore : (upvotes - downvotes);
+      
       setFeatureRequests(prevRequests =>
-        prevRequests.map(request =>
-          request._id === updatedRequest.id
-            ? {
-              ...request,
-              upvotes: updatedRequest.upvotes,
-              downvotes: updatedRequest.downvotes,
-              voteScore: updatedRequest.voteScore,
-              userVote: updatedRequest.userVote
+        prevRequests.map(request => {
+          if (request._id === updatedRequest.id) {
+            // Only update if not currently voting (to avoid conflicts)
+            if (votingRef.current.has(request._id)) {
+              return request;
             }
-            : request
-        )
+            
+            return {
+              ...request,
+              upvotes: upvotes,
+              downvotes: downvotes,
+              voteScore: voteScore,
+              // Keep current user's vote state if provided, otherwise keep existing
+              userVote: updatedRequest.userVote !== undefined ? updatedRequest.userVote : request.userVote
+            };
+          }
+          return request;
+        })
       );
     };
 
@@ -322,40 +337,125 @@ export default function DonateView() {
     }
   };
 
-  // Handle voting on feature requests
+  // Handle voting on feature requests - Similar to like system
   const handleVote = async (requestId, voteType) => {
+    // Prevent double-click voting
+    if (votingRef.current.has(requestId)) return;
+    votingRef.current.add(requestId);
+
+    // Find current request state
+    const currentRequest = featureRequests.find(r => r._id === requestId);
+    if (!currentRequest) {
+      votingRef.current.delete(requestId);
+      return;
+    }
+
+    const currentVote = currentRequest.userVote;
+    const currentUpvotes = Number(currentRequest.upvotes) || 0;
+    const currentDownvotes = Number(currentRequest.downvotes) || 0;
+
+    // Calculate optimistic update
+    let newUserVote = voteType;
+    let newUpvotes = currentUpvotes;
+    let newDownvotes = currentDownvotes;
+
+    if (currentVote === voteType) {
+      // Removing vote (clicking same button)
+      newUserVote = null;
+      if (voteType === 'up') {
+        newUpvotes = Math.max(0, currentUpvotes - 1);
+      } else {
+        newDownvotes = Math.max(0, currentDownvotes - 1);
+      }
+    } else if (currentVote) {
+      // Changing vote (switching from up to down or vice versa)
+      if (currentVote === 'up') {
+        newUpvotes = Math.max(0, currentUpvotes - 1);
+        newDownvotes = currentDownvotes + 1;
+      } else {
+        newDownvotes = Math.max(0, currentDownvotes - 1);
+        newUpvotes = currentUpvotes + 1;
+      }
+    } else {
+      // New vote
+      if (voteType === 'up') {
+        newUpvotes = currentUpvotes + 1;
+      } else {
+        newDownvotes = currentDownvotes + 1;
+      }
+    }
+
+    const newVoteScore = newUpvotes - newDownvotes;
+
+    // Optimistic update
+    setFeatureRequests(prev =>
+      prev.map(request =>
+        request._id === requestId
+          ? {
+            ...request,
+            upvotes: newUpvotes,
+            downvotes: newDownvotes,
+            voteScore: newVoteScore,
+            userVote: newUserVote
+          }
+          : request
+      )
+    );
+
     try {
       const response = await axiosInstance.post(`/api/feature-requests/${requestId}/vote`, {
         voteType
       });
 
       if (response.data.success) {
-        showToast(`Request ${voteType}voted!`, 'success');
-
-        // Update local state with new vote counts
-        setFeatureRequests(prevRequests =>
-          prevRequests.map(request =>
+        const serverData = response.data.featureRequest;
+        
+        // Update with server response for accuracy
+        const upvotes = Number(serverData.upvotes) || 0;
+        const downvotes = Number(serverData.downvotes) || 0;
+        const voteScore = typeof serverData.voteScore === 'number' ? serverData.voteScore : (upvotes - downvotes);
+        
+        setFeatureRequests(prev =>
+          prev.map(request =>
             request._id === requestId
               ? {
                 ...request,
-                upvotes: response.data.featureRequest.upvotes,
-                downvotes: response.data.featureRequest.downvotes,
-                voteScore: response.data.featureRequest.voteScore,
-                userVote: response.data.featureRequest.userVote
+                upvotes: upvotes,
+                downvotes: downvotes,
+                voteScore: voteScore,
+                userVote: serverData.userVote ?? newUserVote
               }
               : request
           )
         );
-      } else {
-        showToast(response.data.message || 'Failed to vote.', 'error');
       }
     } catch (error) {
       console.error('Error voting:', error);
+      
+      // Revert optimistic update on error
+      setFeatureRequests(prev =>
+        prev.map(request =>
+          request._id === requestId
+            ? {
+              ...request,
+              upvotes: currentUpvotes,
+              downvotes: currentDownvotes,
+              voteScore: currentUpvotes - currentDownvotes,
+              userVote: currentVote
+            }
+            : request
+        )
+      );
+
       if (error.response?.status === 401) {
-        showToast('Please log in to vote on feature requests.', 'error');
+        showToast('Please log in to vote.', 'error');
+      } else if (error.response?.status === 429) {
+        showToast('Too many votes. Please wait.', 'error');
       } else {
-        showToast('Failed to vote. Please try again.', 'error');
+        showToast('Failed to vote. Try again.', 'error');
       }
+    } finally {
+      votingRef.current.delete(requestId);
     }
   };
 
@@ -704,30 +804,32 @@ export default function DonateView() {
 
 
 
-            {/* Popular Requests */}
-            <div className="card bg-base-200 shadow-lg">
-              <div className="card-body">
-                <div className="flex items-center justify-between mb-4">
+            {/* Trending Ideas Section - Redesigned */}
+            <div className="card bg-base-200 shadow-xl border border-base-300">
+              <div className="card-body p-4 md:p-6">
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
-                      <TrendingUp className="w-6 h-6 text-primary" />
+                    <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center shadow-lg">
+                      <TrendingUp className="w-6 h-6 text-primary-content" />
                     </div>
                     <div>
-                      <h3 className="card-title text-lg">Trending Ideas</h3>
-                      <p className="text-xs text-base-content/60">Community's most popular requests</p>
+                      <h3 className="text-xl font-bold">Trending Ideas</h3>
+                      <p className="text-sm text-base-content/70">Community's most popular requests</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     {featureRequests.length > 0 && (
-                      <span className="badge badge-primary badge-sm">
-                        {featureRequests.length} idea{featureRequests.length !== 1 ? 's' : ''}
-                      </span>
+                      <div className="badge badge-primary badge-lg gap-1">
+                        <TrendingUp className="w-3 h-3" />
+                        {featureRequests.length} {featureRequests.length === 1 ? 'idea' : 'ideas'}
+                      </div>
                     )}
                     <button
-                      className="btn btn-ghost btn-sm btn-circle"
+                      className="btn btn-sm btn-circle btn-ghost"
                       onClick={fetchFeatureRequests}
                       disabled={requestsLoading}
-                      title="Refresh requests"
+                      title="Refresh"
                     >
                       {requestsLoading ? (
                         <div className="loading loading-spinner loading-xs"></div>
@@ -740,87 +842,174 @@ export default function DonateView() {
                   </div>
                 </div>
 
+                {/* Content */}
                 {requestsLoading ? (
-                  <div className="text-center py-12">
-                    <div className="loading loading-spinner loading-lg mx-auto mb-4"></div>
+                  <div className="text-center py-16">
+                    <div className="loading loading-spinner loading-lg text-primary mb-4"></div>
                     <p className="text-sm text-base-content/60">Loading brilliant ideas...</p>
                   </div>
                 ) : requestsError ? (
-                  <div className="alert alert-error">
+                  <div className="alert alert-error shadow-lg">
                     <AlertCircle className="w-5 h-5" />
                     <span>{requestsError}</span>
                   </div>
                 ) : featureRequests.length > 0 ? (
-                  <div className="space-y-3">
-                    {featureRequests.map((request) => (
-                      <div key={request._id} className="card bg-base-300 shadow-md hover:shadow-xl transition-all border border-base-content/10">
-                        <div className="card-body p-5">
-                          <div className="flex items-start gap-4">
-                            {/* Voting Section - Left Side */}
-                            <div className="flex flex-col items-center gap-2 min-w-[60px]">
-                              <button
-                                className={`btn btn-sm btn-circle ${request.userVote === 'up' ? 'btn-primary' : 'btn-ghost'}`}
-                                onClick={() => handleVote(request._id, 'up')}
-                              >
-                                <ThumbsUp className="w-4 h-4" />
-                              </button>
-                              <div className="font-bold text-lg">{request.voteScore || 0}</div>
-                              <button
-                                className={`btn btn-sm btn-circle ${request.userVote === 'down' ? 'btn-error' : 'btn-ghost'}`}
-                                onClick={() => handleVote(request._id, 'down')}
-                              >
-                                <ThumbsUp className="w-4 h-4 rotate-180" />
-                              </button>
-                            </div>
-
-                            {/* Content - Right Side */}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-2 flex-wrap">
-                                <span className={`badge ${request.category === 'bug' ? 'badge-error' :
-                                  request.category === 'feature' ? 'badge-primary' :
-                                    request.category === 'improvement' ? 'badge-secondary' :
-                                      'badge-accent'
-                                  }`}>
-                                  {request.category}
-                                </span>
-                                <span className={`badge ${request.status === 'pending' ? 'badge-neutral' :
-                                  request.status === 'reviewing' ? 'badge-warning' :
-                                    request.status === 'approved' ? 'badge-success' :
-                                      request.status === 'implemented' ? 'badge-info' :
-                                        'badge-error'
-                                  }`}>
-                                  {request.status}
-                                </span>
+                  <div className="space-y-4">
+                    {featureRequests.map((request, index) => {
+                      // Calculate vote counts with fallbacks
+                      const upvotes = Number(request.upvotes) || 0;
+                      const downvotes = Number(request.downvotes) || 0;
+                      const voteScore = Number(request.voteScore) >= 0 ? Number(request.voteScore) : (upvotes - downvotes);
+                      
+                      return (
+                        <div 
+                          key={request._id} 
+                          className="card bg-base-100 shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-base-300 hover:border-primary/30"
+                        >
+                          <div className="card-body p-4 md:p-6">
+                            <div className="flex flex-col sm:flex-row gap-4">
+                              {/* Voting Section */}
+                              <div className="flex sm:flex-col items-center justify-center gap-2 sm:gap-2 sm:min-w-[80px] bg-base-200 rounded-lg p-3 sm:p-4">
+                                <button
+                                  className={`btn btn-sm sm:btn-md btn-circle transition-all duration-200 ${
+                                    request.userVote === 'up' 
+                                      ? 'btn-success shadow-xl scale-110 ring-2 ring-success ring-offset-2 ring-offset-base-200' 
+                                      : 'btn-ghost hover:btn-success hover:scale-105'
+                                  }`}
+                                  onClick={() => handleVote(request._id, 'up')}
+                                  title={request.userVote === 'up' ? 'Remove upvote' : 'Upvote this idea'}
+                                >
+                                  <ThumbsUp className={`w-4 h-4 sm:w-5 sm:h-5 ${request.userVote === 'up' ? 'fill-current' : ''}`} />
+                                </button>
+                                
+                                <div className="flex items-center gap-2 sm:flex-col sm:gap-1 px-2 sm:px-0">
+                                  <div className="flex flex-col items-center">
+                                    <span className={`font-black text-2xl sm:text-3xl leading-none transition-colors ${
+                                      voteScore > 0 ? 'text-success' : 
+                                      voteScore < 0 ? 'text-error' : 
+                                      'text-base-content'
+                                    }`}>
+                                      {voteScore > 0 ? '+' : ''}{voteScore}
+                                    </span>
+                                    <span className="text-[10px] sm:text-xs text-base-content/60 font-medium uppercase tracking-wide">
+                                      score
+                                    </span>
+                                  </div>
+                                </div>
+                                
+                                <button
+                                  className={`btn btn-sm sm:btn-md btn-circle transition-all duration-200 ${
+                                    request.userVote === 'down' 
+                                      ? 'btn-error shadow-xl scale-110 ring-2 ring-error ring-offset-2 ring-offset-base-200' 
+                                      : 'btn-ghost hover:btn-error hover:scale-105'
+                                  }`}
+                                  onClick={() => handleVote(request._id, 'down')}
+                                  title={request.userVote === 'down' ? 'Remove downvote' : 'Downvote this idea'}
+                                >
+                                  <ThumbsUp className={`w-4 h-4 sm:w-5 sm:h-5 rotate-180 ${request.userVote === 'down' ? 'fill-current' : ''}`} />
+                                </button>
                               </div>
-                              <h4 className="font-bold text-base mb-2">{request.title}</h4>
-                              <p className="text-sm text-base-content/80 mb-3">
-                                {request.description}
-                              </p>
-                              <div className="flex items-center gap-4 text-xs text-base-content/60">
-                                <div className="flex items-center gap-1">
-                                  <Users className="w-3 h-3" />
-                                  <span>{request.submittedBy?.fullName || 'Anonymous'}</span>
+
+                              {/* Content Section */}
+                              <div className="flex-1 min-w-0 space-y-3">
+                                {/* Top Row: Rank + Badges */}
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  {index < 3 && (
+                                    <div className={`badge badge-lg gap-1.5 font-bold ${
+                                      index === 0 ? 'badge-warning' : 
+                                      index === 1 ? 'badge-info' : 
+                                      'badge-accent'
+                                    }`}>
+                                      <Star className="w-4 h-4" />
+                                      #{index + 1}
+                                    </div>
+                                  )}
+                                  
+                                  <span className={`badge badge-md font-semibold ${
+                                    request.category === 'bug' ? 'badge-error' :
+                                    request.category === 'feature' ? 'badge-primary' :
+                                    request.category === 'improvement' ? 'badge-secondary' :
+                                    'badge-accent'
+                                  }`}>
+                                    {request.category?.toUpperCase()}
+                                  </span>
+                                  
+                                  <span className={`badge badge-md font-semibold ${
+                                    request.status === 'pending' ? 'badge-neutral' :
+                                    request.status === 'reviewing' ? 'badge-warning' :
+                                    request.status === 'approved' ? 'badge-success' :
+                                    request.status === 'implemented' ? 'badge-info' :
+                                    'badge-error'
+                                  }`}>
+                                    {request.status?.toUpperCase()}
+                                  </span>
                                 </div>
-                                <div className="flex items-center gap-1">
-                                  <Clock className="w-3 h-3" />
-                                  <span>{new Date(request.createdAt).toLocaleDateString()}</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <ThumbsUp className="w-3 h-3" />
-                                  <span>{request.upvotes} up</span>
+
+                                {/* Title */}
+                                <h4 className="font-bold text-lg md:text-xl text-base-content leading-tight">
+                                  {request.title}
+                                </h4>
+
+                                {/* Description */}
+                                <p className="text-sm md:text-base text-base-content/80 leading-relaxed line-clamp-2">
+                                  {request.description}
+                                </p>
+
+                                {/* Meta Information Bar */}
+                                <div className="flex flex-wrap items-center gap-4 pt-2 border-t border-base-300">
+                                  <div className="flex items-center gap-1.5 text-xs md:text-sm">
+                                    <Users className="w-4 h-4 text-primary" />
+                                    <span className="font-medium text-base-content">
+                                      {request.submittedBy?.fullName || 'Anonymous'}
+                                    </span>
+                                  </div>
+                                  
+                                  <div className="flex items-center gap-1.5 text-xs md:text-sm text-base-content/60">
+                                    <Clock className="w-4 h-4" />
+                                    <span>{new Date(request.createdAt).toLocaleDateString('en-US', { 
+                                      month: 'short', 
+                                      day: 'numeric',
+                                      year: 'numeric'
+                                    })}</span>
+                                  </div>
+                                  
+                                  <div className="flex items-center gap-3 ml-auto">
+                                    <div className="flex items-center gap-1.5 bg-success/10 px-2 py-1 rounded-md">
+                                      <ThumbsUp className="w-4 h-4 text-success" />
+                                      <span className="font-bold text-sm text-success">{upvotes}</span>
+                                    </div>
+                                    
+                                    {downvotes > 0 && (
+                                      <div className="flex items-center gap-1.5 bg-error/10 px-2 py-1 rounded-md">
+                                        <ThumbsUp className="w-4 h-4 rotate-180 text-error" />
+                                        <span className="font-bold text-sm text-error">{downvotes}</span>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
-                  <div className="text-center py-16 text-base-content/60">
-                    <Zap className="w-20 h-20 mx-auto mb-4 opacity-20" />
-                    <p className="text-lg font-semibold mb-2">No ideas yet!</p>
-                    <p className="text-sm">Be the first to share your brilliant idea and help shape de_monax!</p>
+                  <div className="text-center py-20">
+                    <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Zap className="w-12 h-12 text-primary/30" />
+                    </div>
+                    <h4 className="text-xl font-bold mb-2">No ideas yet!</h4>
+                    <p className="text-sm text-base-content/60 mb-6 max-w-md mx-auto">
+                      Be the first to share your brilliant idea and help shape the future of de_monax!
+                    </p>
+                    <button
+                      className="btn btn-primary gap-2"
+                      onClick={() => setShowKibubuModal(true)}
+                    >
+                      <Send className="w-4 h-4" />
+                      Submit First Idea
+                    </button>
                   </div>
                 )}
               </div>
