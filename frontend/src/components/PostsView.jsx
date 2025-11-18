@@ -28,6 +28,187 @@ function PostsBackground() {
   );
 }
 
+// Extract YouTube video ID from various URL formats
+function extractYouTubeId(url) {
+  if (!url) return null;
+  
+  // YouTube Shorts: youtube.com/shorts/VIDEO_ID
+  const shortsMatch = url.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]+)/);
+  if (shortsMatch) return shortsMatch[1];
+  
+  // Regular YouTube: youtube.com/watch?v=VIDEO_ID
+  const watchMatch = url.match(/[?&]v=([a-zA-Z0-9_-]+)/);
+  if (watchMatch) return watchMatch[1];
+  
+  // Short URL: youtu.be/VIDEO_ID
+  const shortMatch = url.match(/youtu\.be\/([a-zA-Z0-9_-]+)/);
+  if (shortMatch) return shortMatch[1];
+  
+  // Embed URL: youtube.com/embed/VIDEO_ID
+  const embedMatch = url.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]+)/);
+  if (embedMatch) return embedMatch[1];
+  
+  return null;
+}
+
+// Global mute state - shared across all YouTube embeds
+let globalMuteState = true;
+const muteStateListeners = new Set();
+
+function subscribeToMuteState(callback) {
+  muteStateListeners.add(callback);
+  return () => muteStateListeners.delete(callback);
+}
+
+function setGlobalMuteState(muted) {
+  globalMuteState = muted;
+  muteStateListeners.forEach(callback => callback(muted));
+}
+
+// Instagram-style YouTube Shorts embed with auto-play on scroll
+function YouTubeEmbed({ url }) {
+  const videoId = extractYouTubeId(url);
+  const containerRef = useRef(null);
+  const iframeRef = useRef(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(globalMuteState);
+  const [showOverlay, setShowOverlay] = useState(true);
+  const hideTimeoutRef = useRef(null);
+
+  // Subscribe to global mute state
+  useEffect(() => {
+    return subscribeToMuteState((muted) => {
+      setIsMuted(muted);
+    });
+  }, []);
+
+  // Auto-play on scroll
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
+            setIsPlaying(true);
+          } else {
+            setIsPlaying(false);
+          }
+        });
+      },
+      {
+        threshold: [0, 0.5, 1],
+        rootMargin: '0px'
+      }
+    );
+
+    observer.observe(container);
+
+    return () => {
+      if (container) {
+        observer.unobserve(container);
+      }
+    };
+  }, []);
+
+  // Handle click/tap to reveal controls
+  const handleInteraction = () => {
+    setShowOverlay(false);
+    
+    // Clear any existing timeout
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+    }
+    
+    // Hide overlay after 3 seconds of no interaction
+    hideTimeoutRef.current = setTimeout(() => {
+      setShowOverlay(true);
+    }, 3000);
+  };
+
+  const handleMuteToggle = (e) => {
+    e.stopPropagation(); // Prevent triggering handleInteraction
+    const newMutedState = !isMuted;
+    setGlobalMuteState(newMutedState);
+    
+    // Reload iframe with new mute state for immediate effect
+    if (iframeRef.current) {
+      const currentSrc = iframeRef.current.src;
+      const newSrc = currentSrc.replace(/mute=[01]/, `mute=${newMutedState ? '1' : '0'}`);
+      iframeRef.current.src = newSrc;
+    }
+  };
+
+  if (!videoId) return null;
+
+  const embedUrl = `https://www.youtube.com/embed/${videoId}?${new URLSearchParams({
+    autoplay: isPlaying ? '1' : '0',
+    mute: isMuted ? '1' : '0',
+    loop: '1',
+    playlist: videoId,
+    controls: '1',
+    modestbranding: '1',
+    rel: '0',
+    fs: '1',
+    cc_load_policy: '1',
+    iv_load_policy: '3',
+    playsinline: '1',
+    enablejsapi: '1'
+  }).toString()}`;
+
+  return (
+    <div 
+      ref={containerRef} 
+      className="relative w-full bg-black rounded-lg overflow-hidden" 
+      style={{ aspectRatio: '9/16', maxHeight: '600px' }}
+    >
+      <iframe
+        ref={iframeRef}
+        src={embedUrl}
+        className="absolute inset-0 w-full h-full"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+        allowFullScreen
+        title="YouTube Shorts"
+        style={{ border: 'none' }}
+      />
+      
+      {/* Clickable overlay - tap to reveal native YouTube controls */}
+      {showOverlay && (
+        <div 
+          className="absolute inset-0 cursor-pointer z-10"
+          onClick={handleInteraction}
+          onTouchEnd={handleInteraction}
+          style={{
+            background: 'linear-gradient(to top, rgba(0,0,0,0.15) 0%, transparent 30%, transparent 70%, rgba(0,0,0,0.15) 100%)'
+          }}
+        />
+      )}
+
+      {/* Custom mute button - works on all devices */}
+      <button
+        onClick={handleMuteToggle}
+        onTouchEnd={(e) => {
+          e.stopPropagation();
+          handleMuteToggle(e);
+        }}
+        className="absolute bottom-4 right-4 btn btn-sm btn-circle bg-black/80 hover:bg-black border-none text-white z-20 shadow-lg active:scale-95 transition-transform"
+        title={isMuted ? 'Unmute' : 'Mute'}
+      >
+        {isMuted ? (
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM12.293 7.293a1 1 0 011.414 0L15 8.586l1.293-1.293a1 1 0 111.414 1.414L16.414 10l1.293 1.293a1 1 0 01-1.414 1.414L15 11.414l-1.293 1.293a1 1 0 01-1.414-1.414L13.586 10l-1.293-1.293a1 1 0 010-1.414z" clipRule="evenodd" />
+          </svg>
+        ) : (
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z" clipRule="evenodd" />
+          </svg>
+        )}
+      </button>
+    </div>
+  );
+}
+
 // Delete Confirmation Modal
 function DeleteConfirmModal({ isOpen, onClose, onConfirm, title = "Delete", message = "Are you sure you want to delete this?" }) {
   if (!isOpen) return null;
@@ -107,6 +288,11 @@ function DownloadModal({ isOpen, onClose, post }) {
           <h4 className="font-semibold text-base-content">{post.title || 'Untitled Post'}</h4>
           {post.caption && (
             <p className="text-sm text-base-content/70 mt-1 line-clamp-2">{post.caption}</p>
+          )}
+          {post.youtubeLink && (
+            <div className="mt-3">
+              <YouTubeEmbed url={post.youtubeLink} />
+            </div>
           )}
           <div className="text-xs text-base-content/60 mt-2">
             {post.items?.length || 0} {post.items?.length === 1 ? 'file' : 'files'}
@@ -344,11 +530,16 @@ function PreviewModal({ post, index, onClose, onPrev, onNext }) {
             </div>
           )}
 
-          <div className="mt-4 text-white text-center">
+          <div className="mt-4 text-white text-center max-w-2xl mx-auto">
             <div className="font-medium">{post.title || 'Untitled'}</div>
             <div className="text-sm opacity-70">
               <LinkifiedText text={post.caption} />
             </div>
+            {post.youtubeLink && (
+              <div className="mt-4">
+                <YouTubeEmbed url={post.youtubeLink} />
+              </div>
+            )}
             <div className="text-xs opacity-50 mt-2">
               {index + 1} / {post.items?.length || 0}
             </div>
@@ -810,70 +1001,72 @@ function PostCard({ post, authUser, onPreview, onLike, onComment, onDownload, on
 
   return (
     <div className="bg-base-100 rounded-none border border-base-300 overflow-hidden flex flex-col">
-      {/* Image/File Preview with Carousel */}
-      <div className="relative aspect-square bg-base-200 flex items-center justify-center overflow-hidden group">
-        <button
-          className="w-full h-full flex items-center justify-center"
-          onClick={() => onPreview(post, currentIndex)}
-        >
-          {currentItem?.contentType?.startsWith('image/') ? (
-            <img
-              loading="lazy"
-              src={currentItem.url}
-              alt={post.title || 'Post'}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="text-base-content/60 flex flex-col items-center">
-              <FileIcon className="w-12 h-12" />
-              <div className="text-xs mt-1">{currentItem?.filename || 'Document'}</div>
-            </div>
+      {/* Image/File Preview with Carousel - Only show if there are items */}
+      {post.items && post.items.length > 0 && (
+        <div className="relative aspect-square bg-base-200 flex items-center justify-center overflow-hidden group">
+          <button
+            className="w-full h-full flex items-center justify-center"
+            onClick={() => onPreview(post, currentIndex)}
+          >
+            {currentItem?.contentType?.startsWith('image/') ? (
+              <img
+                loading="lazy"
+                src={currentItem.url}
+                alt={post.title || 'Post'}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="text-base-content/60 flex flex-col items-center">
+                <FileIcon className="w-12 h-12" />
+                <div className="text-xs mt-1">{currentItem?.filename || 'Document'}</div>
+              </div>
+            )}
+          </button>
+
+          {/* Navigation Buttons - Only show if multiple files */}
+          {hasMultipleFiles && (
+            <>
+              <button
+                className="absolute left-2 top-1/2 -translate-y-1/2 btn btn-circle btn-sm bg-base-100/80 hover:bg-base-100 border-none opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={goToPrevious}
+                aria-label="Previous"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                className="absolute right-2 top-1/2 -translate-y-1/2 btn btn-circle btn-sm bg-base-100/80 hover:bg-base-100 border-none opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={goToNext}
+                aria-label="Next"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+
+              {/* Progress Dots */}
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                {post.items.map((_, index) => (
+                  <button
+                    key={index}
+                    className={`w-1.5 h-1.5 rounded-full transition-all ${index === currentIndex
+                      ? 'bg-primary w-2'
+                      : 'bg-base-100/60 hover:bg-base-100/80'
+                      }`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCurrentIndex(index);
+                    }}
+                    aria-label={`Go to file ${index + 1}`}
+                  />
+                ))}
+              </div>
+
+              {/* File Counter */}
+              <div className="absolute top-3 right-3 bg-base-100/80 backdrop-blur-sm px-2 py-1 rounded-full text-xs font-medium">
+                {currentIndex + 1} / {post.items.length}
+              </div>
+            </>
           )}
-        </button>
-
-        {/* Navigation Buttons - Only show if multiple files */}
-        {hasMultipleFiles && (
-          <>
-            <button
-              className="absolute left-2 top-1/2 -translate-y-1/2 btn btn-circle btn-sm bg-base-100/80 hover:bg-base-100 border-none opacity-0 group-hover:opacity-100 transition-opacity"
-              onClick={goToPrevious}
-              aria-label="Previous"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              className="absolute right-2 top-1/2 -translate-y-1/2 btn btn-circle btn-sm bg-base-100/80 hover:bg-base-100 border-none opacity-0 group-hover:opacity-100 transition-opacity"
-              onClick={goToNext}
-              aria-label="Next"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-
-            {/* Progress Dots */}
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
-              {post.items.map((_, index) => (
-                <button
-                  key={index}
-                  className={`w-1.5 h-1.5 rounded-full transition-all ${index === currentIndex
-                    ? 'bg-primary w-2'
-                    : 'bg-base-100/60 hover:bg-base-100/80'
-                    }`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setCurrentIndex(index);
-                  }}
-                  aria-label={`Go to file ${index + 1}`}
-                />
-              ))}
-            </div>
-
-            {/* File Counter */}
-            <div className="absolute top-3 right-3 bg-base-100/80 backdrop-blur-sm px-2 py-1 rounded-full text-xs font-medium">
-              {currentIndex + 1} / {post.items.length}
-            </div>
-          </>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Post Content */}
       <div className="p-3 flex-1 flex flex-col">
@@ -901,6 +1094,11 @@ function PostCard({ post, authUser, onPreview, onLike, onComment, onDownload, on
         <div className="text-sm text-base-content/70 line-clamp-2">
           <LinkifiedText text={post.caption} />
         </div>
+        {post.youtubeLink && (
+          <div className="mt-3">
+            <YouTubeEmbed url={post.youtubeLink} />
+          </div>
+        )}
         <div className="mt-auto pt-2 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <button
@@ -921,24 +1119,28 @@ function PostCard({ post, authUser, onPreview, onLike, onComment, onDownload, on
               <MessageCircle className="w-4 h-4" />
               {typeof post.commentsCount === 'number' && <span className="ml-1 text-xs">{post.commentsCount}</span>}
             </button>
-            <button
-              className="btn btn-sm btn-ghost rounded-none"
-              title="Preview"
-              aria-label="Preview"
-              onClick={() => onPreview(post, 0)}
-            >
-              <Eye className="w-4 h-4" />
-            </button>
+            {post.items && post.items.length > 0 && (
+              <button
+                className="btn btn-sm btn-ghost rounded-none"
+                title="Preview"
+                aria-label="Preview"
+                onClick={() => onPreview(post, 0)}
+              >
+                <Eye className="w-4 h-4" />
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-2">
-            <button
-              className="btn btn-sm btn-ghost rounded-none"
-              title="Download"
-              aria-label="Download"
-              onClick={() => onDownload(post)}
-            >
-              <Download className="w-4 h-4" />
-            </button>
+            {post.items && post.items.length > 0 && (
+              <button
+                className="btn btn-sm btn-ghost rounded-none"
+                title="Download"
+                aria-label="Download"
+                onClick={() => onDownload(post)}
+              >
+                <Download className="w-4 h-4" />
+              </button>
+            )}
             {((post.postedBy?._id || post.postedBy) === authUser?._id || authUser?.role === 'admin') && (
               <>
                 <button
@@ -1117,6 +1319,7 @@ export default function PostsView() {
   const [files, setFiles] = useState([]); // [{file, preview, type, size, ok, err, readDone}]
   const [title, setTitle] = useState("");
   const [caption, setCaption] = useState("");
+  const [youtubeLink, setYoutubeLink] = useState("");
   const [, setPostMentions] = useState([]);
   const [visibility, setVisibility] = useState("public");
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -1566,12 +1769,18 @@ export default function PostsView() {
 
   async function submitPost() {
     const ready = files.filter(f => f.ok && f.readDone);
-    if (!ready.length) return;
+    
+    // Allow posting with either files OR YouTube link
+    if (!ready.length && !youtubeLink.trim()) {
+      alert('Please add files or a YouTube Shorts link');
+      return;
+    }
+    
     setIsUploading(true);
     setUploadProgress(0);
     try {
       const items = ready.map(it => ({ base64: it.preview, filename: it.name }));
-      const res = await axiosInstance.post('/api/posts', { title, caption, visibility, items }, {
+      const res = await axiosInstance.post('/api/posts', { title, caption, youtubeLink, visibility, items }, {
         onUploadProgress: (evt) => {
           if (!evt.total) return;
           setUploadProgress(Math.round((evt.loaded / evt.total) * 100));
@@ -1580,9 +1789,21 @@ export default function PostsView() {
       // Mark seen before inserting to avoid socket double-insert
       try { seenRef.current.add(res.data._id); } catch { /* empty */ }
       setFeed(prev => prev.some(p => p._id === res.data._id) ? prev : [res.data, ...prev]);
-      // reset and close modal
+      
+      // Close modal and clear fields
       setIsModalOpen(false);
-      setFiles([]); setTitle(''); setCaption(''); setVisibility('members'); setUploadProgress(0); setIsUploading(false);
+      setFiles([]);
+      setTitle('');
+      setCaption('');
+      setYoutubeLink('');
+      setVisibility('public');
+      setUploadProgress(0);
+      setIsUploading(false);
+      
+      // Scroll to top to show the new post (only once for the poster)
+      setTimeout(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }, 100);
     } catch (e) {
       alert(e?.response?.data?.message || 'Failed to create post');
       setIsUploading(false);
@@ -1612,16 +1833,21 @@ export default function PostsView() {
       const res = await axiosInstance.put(`/api/posts/${editingPost._id}`, {
         title,
         caption,
+        youtubeLink,
         visibility,
         items: items.length > 0 ? items : undefined
       });
 
       setFeed(prev => prev.map(p => p._id === editingPost._id ? res.data : p));
+      
+      // Close modal and clear all fields
+      setIsModalOpen(false);
       setEditingPost(null);
       setFiles([]);
       setTitle('');
       setCaption('');
-      setVisibility('members');
+      setYoutubeLink('');
+      setVisibility('public');
       setUploadProgress(0);
     } catch (e) {
       alert(e?.response?.data?.message || 'Failed to update post');
@@ -1634,6 +1860,7 @@ export default function PostsView() {
     setEditingPost(post);
     setTitle(post.title || '');
     setCaption(post.caption || '');
+    setYoutubeLink(post.youtubeLink || '');
     setVisibility(post.visibility || 'members');
     setFiles([]);
     setIsModalOpen(true);
@@ -1908,16 +2135,28 @@ export default function PostsView() {
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-base-100">
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Title (optional)</span>
-              </label>
-              <input
-                className="input input-bordered w-full focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="Enter a title..."
-                value={title}
-                onChange={e => setTitle(e.target.value)}
-              />
+            <div className="flex gap-3">
+              <div className="form-control flex-1">
+                <label className="label">
+                  <span className="label-text">Title (optional)</span>
+                </label>
+                <input
+                  className="input input-bordered w-full focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Enter a title..."
+                  value={title}
+                  onChange={e => setTitle(e.target.value)}
+                />
+              </div>
+
+              <div className="form-control">
+                <label className="label">
+                  <span className="label-text">Visibility</span>
+                </label>
+                <select className="select select-bordered focus:outline-none focus:ring-2 focus:ring-primary" value={visibility} onChange={e => setVisibility(e.target.value)}>
+                  <option value="members">Members</option>
+                  <option value="public">Public</option>
+                </select>
+              </div>
             </div>
 
             <div className="form-control">
@@ -1934,23 +2173,24 @@ export default function PostsView() {
               />
             </div>
 
-            <div className="flex items-center gap-3">
-              <div className="form-control">
-                <label className="label">
-                  <span className="label-text">Visibility</span>
-                </label>
-                <select className="select select-bordered select-sm focus:outline-none focus:ring-2 focus:ring-primary" value={visibility} onChange={e => setVisibility(e.target.value)}>
-                  <option value="members">Members</option>
-                  <option value="public">Public</option>
-                </select>
-              </div>
-              {isUploading && (
-                <div className="flex-1">
-                  <div className="text-xs text-base-content/60 mb-1">Uploading... {uploadProgress}%</div>
-                  <progress className="progress progress-primary w-full" value={uploadProgress} max="100" />
-                </div>
-              )}
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text">YouTube Shorts Link (optional)</span>
+              </label>
+              <input
+                className="input input-bordered w-full focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="Paste YouTube Shorts link here..."
+                value={youtubeLink}
+                onChange={e => setYoutubeLink(e.target.value)}
+              />
             </div>
+
+            {isUploading && (
+              <div className="w-full">
+                <div className="text-xs text-base-content/60 mb-1">Uploading... {uploadProgress}%</div>
+                <progress className="progress progress-primary w-full" value={uploadProgress} max="100" />
+              </div>
+            )}
 
             <div className="form-control">
               <label className="label">
@@ -2017,7 +2257,7 @@ export default function PostsView() {
             <button
               className="btn btn-primary"
               onClick={editingPost ? updatePost : submitPost}
-              disabled={isUploading || (!editingPost && files.filter(f => f.ok && f.readDone).length === 0)}
+              disabled={isUploading || (!editingPost && files.filter(f => f.ok && f.readDone).length === 0 && !youtubeLink.trim())}
             >
               {isUploading ? (
                 <>

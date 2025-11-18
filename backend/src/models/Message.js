@@ -57,6 +57,10 @@ const messageSchema = new mongoose.Schema(
       contentType: String,
       durationSec: Number,
     },
+    youtubeLink: {
+      type: String,
+      trim: true,
+    },
     quotedMessage: quotedMessageSchema,
     mentions: [
       {

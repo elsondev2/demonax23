@@ -40,6 +40,7 @@ const postSchema = new mongoose.Schema(
     title: { type: String, trim: true, default: "" },
     caption: { type: String, trim: true, default: "" },
     items: { type: [postItemSchema], default: [] },
+    youtubeLink: { type: String, trim: true, default: "" },
     visibility: { type: String, enum: ["public", "members"], default: "members" },
     expiresAt: { type: Date, required: true },
     likes: { type: [mongoose.Schema.Types.ObjectId], ref: 'User', default: [] },

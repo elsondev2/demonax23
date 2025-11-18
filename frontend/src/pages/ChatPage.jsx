@@ -30,7 +30,9 @@ import BottomNavBar from "../components/BottomNavBar";
 import NotificationsModal from "../components/NotificationsModal";
 import InAppNotificationBanner from "../components/InAppNotificationBanner";
 import GlobalStatusModals from "../components/GlobalStatusModals";
+import UserTutorial from "../components/UserTutorial";
 import { useWelcomeTour } from "../hooks/useWelcomeTour";
+import { useTutorial } from "../hooks/useTutorial";
 import { useCallStore } from "../store/useCallStore";
 import useFriendStore from "../store/useFriendStore";
 import { playSound } from "../lib/soundUtils";
@@ -45,6 +47,7 @@ function ChatPage() {
   const { selectedUser, selectedGroup, getMyChatPartners, setSelectedUser, setSelectedGroup, chats, setNotificationCallback } = useChatStore();
   const { socket, connectSocket, authUser, isConnecting } = useAuthStore();
   const { showTour, completeTour, skipTour } = useWelcomeTour();
+  const { showTutorial, completeTutorial, skipTutorial } = useTutorial();
   const [manualTourOpen, setManualTourOpen] = useState(false);
   
   // Initialize notifications
@@ -445,6 +448,14 @@ function ChatPage() {
             skipTour();
             setManualTourOpen(false);
           }}
+        />
+      )}
+
+      {/* User Tutorial - Step-by-step guide */}
+      {showTutorial && (
+        <UserTutorial
+          onComplete={completeTutorial}
+          onSkip={skipTutorial}
         />
       )}
 

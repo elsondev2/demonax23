@@ -10,7 +10,7 @@ export default function ChatsView({ onShowTour }) {
   const [showNotifications, setShowNotifications] = useState(false);
 
   return (
-    <div className="relative flex flex-col h-full bg-base-200 md:pt-0 pt-safe">
+    <div className="relative flex flex-col h-full bg-base-200 md:pt-0 pt-safe" data-tutorial="sidebar">
       {/* Profile Header - Fixed at top */}
       <div className="flex-shrink-0">
         <ProfileHeader onShowTour={onShowTour} />

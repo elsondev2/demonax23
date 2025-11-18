@@ -500,6 +500,7 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
   return (
     <div 
       className="message-input-container px-4 md:px-6 py-3 bg-base-100 border-t border-base-300 sticky bottom-0 z-20"
+      data-tutorial="message-input"
       style={{
         paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'
       }}
@@ -703,6 +704,7 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
           onClick={() => setShowAttachmentTypeModal(true)}
           disabled={isSending || limitInfo.isLimited}
           title="Attach file"
+          data-tutorial="attach-button"
         >
           <Paperclip className="h-5 w-5" />
         </button>

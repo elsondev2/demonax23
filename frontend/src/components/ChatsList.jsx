@@ -63,6 +63,7 @@ const StatusStoriesStrip = memo(({ authUser, quickAccessChats, handleChatSelect,
           className="flex flex-col items-center gap-1 flex-shrink-0"
           onClick={onCreatePulse}
           title="Create your pulse"
+          data-tutorial="add-status"
         >
           <div className="relative w-14 h-14">
             {/* Gradient ring for "add status" */}
@@ -689,7 +690,7 @@ function ChatsList() {
     <div className="h-full flex flex-col">
       {/* STICKY SEARCH BAR */}
       <div className="sticky top-0 z-20 bg-base-200 pb-3">
-        <div className="relative">
+        <div className="relative" data-tutorial="search">
           <input
             type="text"
             value={searchTerm}
@@ -801,7 +802,7 @@ function ChatsList() {
         {activeTab === 'groups' && (
           <div className="space-y-2">
             {/* Create group placeholder */}
-            <div className="bg-base-300/20 hover:bg-base-300/40 p-3 rounded-xl cursor-pointer transition-colors" onClick={() => setIsCreateGroupModalOpen(true)}>
+            <div className="bg-base-300/20 hover:bg-base-300/40 p-3 rounded-xl cursor-pointer transition-colors" onClick={() => setIsCreateGroupModalOpen(true)} data-tutorial="create-group">
               <div className="flex items-center gap-3">
                 <div className="inline-flex items-center justify-center size-12 rounded-full bg-base-300 text-base-content shrink-0 leading-none">
                   <Plus className="w-6 h-6 block" aria-hidden="true" />

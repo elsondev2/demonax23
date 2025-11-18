@@ -72,7 +72,7 @@ function ProfileHeader({ onShowTour }) {
       <div className="navbar-start">
         <div className="flex items-center gap-3">
           {/* AVATAR */}
-          <div className="relative">
+          <div className="relative" data-tutorial="profile-button">
             <div className="relative rounded-full ring-2 ring-primary/50 ring-offset-2 ring-offset-base-200">
               <Avatar
                 src={selectedImg || authUser.profilePic}
@@ -120,7 +120,9 @@ function ProfileHeader({ onShowTour }) {
           </button>
 
           {/* THEME BTN */}
-          <ThemeButton />
+          <div data-tutorial="theme-button">
+            <ThemeButton />
+          </div>
 
           {/* SOUND SETTINGS BTN */}
           <button

@@ -22,10 +22,11 @@ function isBase64DataURL(str = "") {
 export async function createPost(req, res) {
   try {
     const userId = req.user._id;
-    const { title = "", caption = "", visibility = "members", items = [] } = req.body || {};
+    const { title = "", caption = "", visibility = "members", items = [], youtubeLink = "" } = req.body || {};
 
-    if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ message: "Provide at least one item" });
+    // Allow posts with either items OR YouTube link
+    if ((!Array.isArray(items) || items.length === 0) && !youtubeLink.trim()) {
+      return res.status(400).json({ message: "Provide at least one item or a YouTube link" });
     }
     if (items.length > MAX_ITEMS) {
       return res.status(400).json({ message: `Too many items. Max ${MAX_ITEMS}` });
@@ -58,6 +59,7 @@ export async function createPost(req, res) {
       title: String(title || ''),
       caption: String(caption || ''),
       items: uploadedItems,
+      youtubeLink: String(youtubeLink || ''),
       visibility: visibility === 'public' ? 'public' : 'members',
       expiresAt: new Date(Date.now() + TTL_MS),
     });
@@ -114,6 +116,71 @@ export async function getFeed(req, res) {
   } catch (e) {
     console.log('getFeed error:', e?.message);
     return res.status(500).json({ message: 'Failed to load feed' });
+  }
+}
+
+export async function updatePost(req, res) {
+  try {
+    const { id } = req.params;
+    const user = req.user;
+    const { title, caption, youtubeLink, visibility, items } = req.body || {};
+
+    const post = await Post.findById(id);
+    if (!post) return res.status(404).json({ message: 'Post not found' });
+
+    const isOwner = post.postedBy.toString() === user._id.toString();
+    const isAdmin = (user.role === 'admin');
+    if (!isOwner && !isAdmin) return res.status(403).json({ message: 'Forbidden' });
+
+    // Update basic fields
+    if (title !== undefined) post.title = String(title || '');
+    if (caption !== undefined) post.caption = String(caption || '');
+    if (youtubeLink !== undefined) post.youtubeLink = String(youtubeLink || '');
+    if (visibility !== undefined) post.visibility = visibility === 'public' ? 'public' : 'members';
+
+    // Update items if provided
+    if (Array.isArray(items) && items.length > 0) {
+      if (items.length > MAX_ITEMS) {
+        return res.status(400).json({ message: `Too many items. Max ${MAX_ITEMS}` });
+      }
+
+      const uploadedItems = [];
+      for (const it of items) {
+        if (typeof it === 'string' && isBase64DataURL(it)) {
+          const size = approxBase64Size(it);
+          if (size > MAX_ITEM_SIZE) return res.status(413).json({ message: 'Item exceeds 5MB limit' });
+          const uploaded = await uploadBase64ImageToSupabase({ base64: it, folder: 'posts', cacheSeconds: 604800 });
+          const contentType = /data:(.*?);base64/.exec(it)?.[1] || uploaded.contentType || 'application/octet-stream';
+          uploadedItems.push({ url: uploaded.url, storageKey: uploaded.key, contentType, filename: '', size });
+        } else if (it && typeof it === 'object' && isBase64DataURL(it.base64)) {
+          const size = approxBase64Size(it.base64);
+          if (size > MAX_ITEM_SIZE) return res.status(413).json({ message: 'Item exceeds 5MB limit' });
+          const uploaded = await uploadBase64ImageToSupabase({ base64: it.base64, folder: 'posts', cacheSeconds: 604800 });
+          const contentType = /data:(.*?);base64/.exec(it.base64)?.[1] || uploaded.contentType || 'application/octet-stream';
+          uploadedItems.push({ url: uploaded.url, storageKey: uploaded.key, contentType, filename: it.filename || '', size });
+        } else if (it && typeof it === 'object' && it.url) {
+          uploadedItems.push({ url: it.url, storageKey: '', contentType: it.contentType || 'application/octet-stream', filename: it.filename || '', size: Number(it.size)||0 });
+        }
+      }
+
+      // Delete old items from storage
+      try {
+        for (const it of post.items || []) {
+          if (it?.storageKey) { try { await removeFromSupabase(it.storageKey); } catch {} }
+        }
+      } catch {}
+
+      post.items = uploadedItems;
+    }
+
+    await post.save();
+    await post.populate('postedBy', 'fullName profilePic role');
+    
+    try { io.emit('postUpdated', post); } catch {}
+    return res.status(200).json(post);
+  } catch (e) {
+    console.log('updatePost error:', e?.message);
+    return res.status(500).json({ message: 'Failed to update post' });
   }
 }
 

@@ -7,7 +7,7 @@ import { Bold, Italic, Underline, Strikethrough, MoreVertical } from 'lucide-rea
  */
 const FormattingToolbar = ({ isExpanded, onToggle, activeFormats, onFormatToggle, disabled = false }) => {
   return (
-    <div className="relative flex items-center gap-1">
+    <div className="relative flex items-center gap-1" data-tutorial="formatting-toolbar">
       {/* Expanded formatting buttons - positioned above on mobile, inline on desktop */}
       {isExpanded && (
         <div className="absolute md:relative bottom-full md:bottom-auto right-0 md:right-auto mb-2 md:mb-0 flex items-center gap-1 bg-base-200 md:bg-transparent p-2 md:p-0 rounded-lg md:rounded-none shadow-lg md:shadow-none border md:border-0 border-base-300">
