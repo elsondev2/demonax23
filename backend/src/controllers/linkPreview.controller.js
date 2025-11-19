@@ -1,4 +1,5 @@
 import axios from 'axios';
+import https from 'https';
 
 export const getLinkPreview = async (req, res) => {
   try {
@@ -16,14 +17,49 @@ export const getLinkPreview = async (req, res) => {
       return res.status(400).json({ error: 'Invalid URL format' });
     }
 
-    // Fetch the webpage
+    // Security: Only allow http and https protocols
+    if (!['http:', 'https:'].includes(validUrl.protocol)) {
+      return res.status(400).json({ error: 'Invalid URL protocol' });
+    }
+
+    console.log('Fetching link preview for:', url);
+
+    // Fetch the webpage with better error handling
     const response = await axios.get(url, {
-      timeout: 5000,
+      timeout: 10000, // Increased to 10 seconds
       maxRedirects: 5,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; LinkPreviewBot/1.0)',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'DNT': '1',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
       },
+      // Allow self-signed certificates in development
+      httpsAgent: new https.Agent({
+        rejectUnauthorized: process.env.NODE_ENV === 'production'
+      }),
+      validateStatus: (status) => {
+        // Accept any status code less than 500
+        return status < 500;
+      }
     });
+
+    // Check if we got HTML content
+    const contentType = response.headers['content-type'] || '';
+    if (!contentType.includes('text/html') && !contentType.includes('application/xhtml')) {
+      console.log('Non-HTML content type:', contentType);
+      // Return basic info for non-HTML content
+      return res.json({
+        url: url,
+        title: validUrl.hostname,
+        description: 'Link preview not available',
+        image: '',
+        siteName: validUrl.hostname,
+      });
+    }
 
     const html = response.data;
 
@@ -32,14 +68,47 @@ export const getLinkPreview = async (req, res) => {
       url: url,
       title: extractMetaTag(html, 'og:title') || extractTitle(html) || validUrl.hostname,
       description: extractMetaTag(html, 'og:description') || extractMetaTag(html, 'description') || '',
-      image: extractMetaTag(html, 'og:image') || '',
+      image: extractMetaTag(html, 'og:image') || extractMetaTag(html, 'twitter:image') || '',
       siteName: extractMetaTag(html, 'og:site_name') || validUrl.hostname,
     };
 
+    // Make image URL absolute if it's relative
+    if (preview.image && !preview.image.startsWith('http')) {
+      try {
+        preview.image = new URL(preview.image, url).href;
+      } catch (e) {
+        console.log('Failed to resolve image URL:', e.message);
+        preview.image = '';
+      }
+    }
+
+    console.log('Link preview extracted:', {
+      url: preview.url,
+      title: preview.title?.substring(0, 50),
+      hasImage: !!preview.image
+    });
+
     res.json(preview);
   } catch (error) {
-    console.error('Link preview error:', error.message);
-    res.status(500).json({ error: 'Failed to fetch link preview' });
+    console.error('Link preview error:', {
+      message: error.message,
+      code: error.code,
+      url: req.query.url
+    });
+
+    // Return a basic fallback preview instead of error
+    try {
+      const validUrl = new URL(req.query.url);
+      return res.json({
+        url: req.query.url,
+        title: validUrl.hostname,
+        description: '',
+        image: '',
+        siteName: validUrl.hostname,
+      });
+    } catch {
+      return res.status(500).json({ error: 'Failed to fetch link preview' });
+    }
   }
 };
 

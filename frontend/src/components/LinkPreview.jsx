@@ -124,16 +124,24 @@ const LinkPreview = ({ url, isOwnMessage }) => {
         const response = await fetch(`/api/link/preview?url=${encodeURIComponent(url)}`);
         
         if (!response.ok) {
+          console.warn('Link preview fetch failed:', response.status, response.statusText);
           throw new Error('Failed to fetch preview');
         }
 
         const data = await response.json();
         
         if (!cancelled) {
-          setPreview(data);
+          // Only set preview if we got useful data
+          if (data.title || data.description || data.image) {
+            setPreview(data);
+          } else {
+            // No useful data, show simple link
+            setError(true);
+          }
           setLoading(false);
         }
-      } catch {
+      } catch (err) {
+        console.warn('Link preview error:', err.message);
         if (!cancelled) {
           setError(true);
           setLoading(false);
@@ -234,9 +242,43 @@ const LinkPreview = ({ url, isOwnMessage }) => {
     );
   }
 
-  // Don't show anything while loading or if error
-  if (loading || error || !preview) {
+  // Don't show anything while loading
+  if (loading) {
     return null;
+  }
+
+  // If error or no preview, show simple link card
+  if (error || !preview) {
+    try {
+      const urlObj = new URL(url);
+      return (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`block mt-2 rounded-lg border overflow-hidden hover:shadow-lg transition-all max-w-md p-3 ${
+            isOwnMessage 
+              ? 'bg-primary-content/10 border-primary-content/20 hover:border-primary-content/40' 
+              : 'bg-base-200 border-base-300 hover:border-base-content/30'
+          }`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className={`flex items-center gap-2 text-xs ${
+            isOwnMessage ? 'text-primary-content/70' : 'text-blue-500'
+          }`}>
+            <ExternalLink className="w-4 h-4 flex-shrink-0" />
+            <span className="truncate font-medium">{urlObj.hostname}</span>
+          </div>
+          <div className={`text-xs mt-1 truncate ${
+            isOwnMessage ? 'text-primary-content/50' : 'text-base-content/50'
+          }`}>
+            {url}
+          </div>
+        </a>
+      );
+    } catch {
+      return null;
+    }
   }
 
   // Don't show if no useful data
