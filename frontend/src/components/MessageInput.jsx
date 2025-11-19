@@ -14,12 +14,12 @@ import useFriendStore from "../store/useFriendStore";
 import { generateCaptionImage } from "../utils/captionImageGenerator";
 import MentionDropdown from "./mentions/MentionDropdown";
 import { hapticSuccess } from "../utils/haptic";
-import { 
-  getVoiceRecordingConstraints, 
-  getBestAudioMimeType, 
-  processAudioBlob, 
+import {
+  getVoiceRecordingConstraints,
+  getBestAudioMimeType,
+  processAudioBlob,
   getMicrophoneErrorMessage,
-  supportsAdvancedAudioProcessing 
+  supportsAdvancedAudioProcessing
 } from "../utils/audioProcessor";
 
 const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
@@ -58,7 +58,7 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
 
   // Formatting State
   const [isFormattingExpanded, setIsFormattingExpanded] = useState(false);
-  
+
   // WYSIWYG Editor
   const {
     commandsRef,
@@ -112,32 +112,43 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
     return () => clearInterval(interval);
   }, [isRecording, recordStartTs]);
 
-  // Cleanup audio stream and typing indicator on unmount
+  // Cleanup audio stream, typing, and recording indicators on unmount
   useEffect(() => {
     return () => {
       if (audioStream) {
         audioStream.getTracks().forEach(track => track.stop());
       }
-      
-      // Clear typing timeout and emit stop typing on unmount
+
+      // Clear typing timeout
       if (typingTimeout) {
         clearTimeout(typingTimeout);
       }
-      
+
       const { socket } = useAuthStore.getState();
-      if (socket && socket.connected && isTyping) {
+      if (socket && socket.connected) {
         const conversationId = selectedUser?._id || selectedGroup?._id;
         const isGroup = !!selectedGroup;
-        
+
         if (conversationId) {
-          socket.emit('stopTyping', {
-            conversationId,
-            isGroup
-          });
+          // Stop typing indicator if active
+          if (isTyping) {
+            socket.emit('stopTyping', {
+              conversationId,
+              isGroup
+            });
+          }
+
+          // Stop recording indicator if active
+          if (isRecording) {
+            socket.emit('stopRecording', {
+              conversationId,
+              isGroup
+            });
+          }
         }
       }
     };
-  }, [audioStream, typingTimeout, isTyping, selectedUser, selectedGroup]);
+  }, [audioStream, typingTimeout, isTyping, isRecording, selectedUser, selectedGroup]);
 
   // Close emoji picker on mount and when switching chats
   useEffect(() => { setIsEmojiOpen(false); }, []);
@@ -228,7 +239,7 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
       if (socket && socket.connected) {
         const conversationId = selectedUser?._id || selectedGroup?._id;
         const isGroup = !!selectedGroup;
-        
+
         if (conversationId) {
           // Always emit typing event to keep indicator alive on receiver's side
           socket.emit('typing', {
@@ -236,7 +247,7 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
             isGroup,
             userName: authUser?.fullName
           });
-          
+
           // Set typing state if not already set
           if (!isTyping) {
             setIsTyping(true);
@@ -274,7 +285,7 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
   };
 
   // Handle text formatting with keyboard shortcuts
-  
+
 
   // Handle mention selection
   const handleMentionSelect = (item) => {
@@ -296,7 +307,7 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
     setMentions(prev => {
       // Remove any existing mention at this position
       const filtered = prev.filter(m => m.position !== mentionStartIndex);
-      
+
       return [...filtered, {
         type: mentionTriggerType,
         id: item._id || item.id,
@@ -387,7 +398,7 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
     if (socket && socket.connected && isTyping) {
       const conversationId = selectedUser?._id || selectedGroup?._id;
       const isGroup = !!selectedGroup;
-      
+
       if (conversationId) {
         socket.emit('stopTyping', {
           conversationId,
@@ -402,7 +413,7 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
     try {
       // Validate mentions before sending
       const validatedMentions = await validateMentionsBeforeSend(text, mentions);
-      
+
       let imageData = null;
       if (image) {
         // Silently compress and convert image to base64
@@ -412,14 +423,14 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
 
       // Get HTML for formatted text
       const htmlContent = getHtml();
-      
-      await sendMessage({ 
-        text, 
+
+      await sendMessage({
+        text,
         html: htmlContent, // Add HTML for rich formatting
-        image: imageData, 
-        attachments, 
-        audio, 
-        mentions: validatedMentions 
+        image: imageData,
+        attachments,
+        audio,
+        mentions: validatedMentions
       });
       setText("");
       clearEditor();
@@ -429,7 +440,7 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
       setAudio(null);
       setMentions([]);
       clearQuotedMessage(); // Clear quote after sending
-      
+
       // Keep input focused after sending so user can continue typing
       setTimeout(() => {
         if (commandsRef.current) {
@@ -473,8 +484,8 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
 
       // Validate each mention against the tracked mentions list
       const validMentions = mentionsList.filter(mention => {
-        return foundMentions.some(found => 
-          found.type === mention.type && 
+        return foundMentions.some(found =>
+          found.type === mention.type &&
           (found.name === mention.name || found.name === mention.username)
         );
       });
@@ -500,7 +511,7 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
   };
 
   return (
-    <div 
+    <div
       className="message-input-container px-4 md:px-6 py-3 bg-base-100 border-t border-base-300 sticky bottom-0 z-20"
       data-tutorial="message-input"
       style={{
@@ -660,11 +671,11 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
           onChange={async (e) => {
             const files = Array.from(e.target.files || []);
             const { compressImageToBase64 } = await import('../utils/imageCompression');
-            
+
             // File size limits (in bytes)
             const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB for images
             const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB for other files
-            
+
             for (const f of files) {
               // Check file size
               const maxSize = f.type.startsWith('image/') ? MAX_IMAGE_SIZE : MAX_FILE_SIZE;
@@ -673,7 +684,7 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
                 alert(`File "${f.name}" is too large. Maximum size is ${sizeMB}MB.`);
                 continue;
               }
-              
+
               // Check if it's an image
               if (f.type.startsWith('image/')) {
                 // Handle as image
@@ -744,7 +755,7 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
                 if (socket && socket.connected) {
                   const conversationId = selectedUser?._id || selectedGroup?._id;
                   const isGroup = !!selectedGroup;
-                  
+
                   if (conversationId) {
                     socket.emit('stopTyping', {
                       conversationId,
@@ -755,7 +766,7 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
                     onLocalTypingChange?.([]);
                   }
                 }
-                
+
                 // Clear timeout
                 if (typingTimeout) {
                   clearTimeout(typingTimeout);
@@ -773,7 +784,7 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
               if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete') {
                 playKeystrokeSound();
               }
-              
+
               // Close mention dropdown on Escape
               if (e.key === 'Escape' && showMentionDropdown) {
                 e.preventDefault();
@@ -781,7 +792,7 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
               }
             }}
           />
-          
+
           {/* AUDIO RECORD BUTTON INSIDE TEXTAREA */}
           <button
             type="button"
@@ -794,136 +805,165 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
                 setIsProcessingAudio(true);
                 recorder?.stop();
                 setIsRecording(false);
-              } else {
-              // Start recording with optimized settings for poor microphones
-              try {
-                const constraints = getVoiceRecordingConstraints();
-                const stream = await navigator.mediaDevices.getUserMedia(constraints);
 
-                setAudioStream(stream);
+                // Emit stop recording event
+                const { socket } = useAuthStore.getState();
+                if (socket && socket.connected) {
+                  const conversationId = selectedUser?._id || selectedGroup?._id;
+                  const isGroup = !!selectedGroup;
 
-                // Create MediaRecorder with optimized settings for voice messages
-                const { mimeType, audioBitsPerSecond } = getBestAudioMimeType();
-                const mr = new MediaRecorder(stream, {
-                  mimeType,
-                  audioBitsPerSecond
-                });
-
-                const chunks = [];
-                mr.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-                mr.onstop = async () => {
-                  setIsProcessingAudio(true);
-                  try {
-                    let blob = new Blob(chunks, { type: mimeType });
-                    const durationSec = Math.round((Date.now() - recordStartTs) / 1000);
-                    
-                    // Apply additional audio processing if supported
-                    if (supportsAdvancedAudioProcessing() && durationSec > 1) {
-                      try {
-                        blob = await processAudioBlob(blob);
-                        console.log('✅ Audio processing applied for better quality');
-                      } catch (processingError) {
-                        console.warn('Audio processing failed, using original:', processingError);
-                      }
-                    }
-                    
-                    const reader = new FileReader();
-                    reader.readAsDataURL(blob);
-                    await new Promise((r) => (reader.onloadend = r));
-                    const base64 = reader.result?.toString();
-
-                    const res = await axiosInstance.post('/api/messages/upload-audio', { base64, durationSec });
-                    setAudio(res.data);
-                  } catch (error) {
-                    console.error('Failed to process audio:', error);
-                    alert('Failed to process audio recording. Please try again.');
-                  } finally {
-                    setIsProcessingAudio(false);
-                    // Stop all tracks to release microphone
-                    stream.getTracks().forEach(track => track.stop());
-                    setAudioStream(null);
-                  }
-                };
-
-                mr.start();
-                setRecorder(mr);
-                setRecordStartTs(Date.now());
-                setIsRecording(true);
-              } catch (error) {
-                console.error('Failed to start recording:', error);
-                const userMessage = getMicrophoneErrorMessage(error);
-                alert(userMessage);
-                
-                // Try with basic constraints if advanced ones fail
-                if (error.name === 'OverconstrainedError') {
-                  try {
-                    const basicStream = await navigator.mediaDevices.getUserMedia({
-                      audio: {
-                        echoCancellation: true,
-                        noiseSuppression: true,
-                        autoGainControl: true
-                      }
+                  if (conversationId) {
+                    socket.emit('stopRecording', {
+                      conversationId,
+                      isGroup
                     });
-                    
-                    setAudioStream(basicStream);
-                    const { mimeType, audioBitsPerSecond } = getBestAudioMimeType();
-                    const mr = new MediaRecorder(basicStream, { mimeType, audioBitsPerSecond });
-                    
-                    const chunks = [];
-                    mr.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-                    mr.onstop = async () => {
-                      setIsProcessingAudio(true);
-                      try {
-                        const blob = new Blob(chunks, { type: mimeType });
-                        const durationSec = Math.round((Date.now() - recordStartTs) / 1000);
-                        const reader = new FileReader();
-                        reader.readAsDataURL(blob);
-                        await new Promise((r) => (reader.onloadend = r));
-                        const base64 = reader.result?.toString();
+                  }
+                }
+              } else {
+                // Start recording with optimized settings for poor microphones
+                try {
+                  const constraints = getVoiceRecordingConstraints();
+                  const stream = await navigator.mediaDevices.getUserMedia(constraints);
 
-                        const res = await axiosInstance.post('/api/messages/upload-audio', { base64, durationSec });
-                        setAudio(res.data);
-                      } catch (error) {
-                        console.error('Failed to process audio:', error);
-                        alert('Failed to process audio recording. Please try again.');
-                      } finally {
-                        setIsProcessingAudio(false);
-                        basicStream.getTracks().forEach(track => track.stop());
-                        setAudioStream(null);
+                  setAudioStream(stream);
+
+                  // Create MediaRecorder with optimized settings for voice messages
+                  const { mimeType, audioBitsPerSecond } = getBestAudioMimeType();
+                  const mr = new MediaRecorder(stream, {
+                    mimeType,
+                    audioBitsPerSecond
+                  });
+
+                  const chunks = [];
+                  mr.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+                  mr.onstop = async () => {
+                    setIsProcessingAudio(true);
+                    try {
+                      let blob = new Blob(chunks, { type: mimeType });
+                      const durationSec = Math.round((Date.now() - recordStartTs) / 1000);
+
+                      // Apply additional audio processing if supported
+                      if (supportsAdvancedAudioProcessing() && durationSec > 1) {
+                        try {
+                          blob = await processAudioBlob(blob);
+                          console.log('✅ Audio processing applied for better quality');
+                        } catch (processingError) {
+                          console.warn('Audio processing failed, using original:', processingError);
+                        }
                       }
-                    };
 
-                    mr.start();
-                    setRecorder(mr);
-                    setRecordStartTs(Date.now());
-                    setIsRecording(true);
-                    console.log('✅ Recording started with basic constraints');
-                  } catch (basicError) {
-                    console.error('Failed with basic constraints too:', basicError);
+                      const reader = new FileReader();
+                      reader.readAsDataURL(blob);
+                      await new Promise((r) => (reader.onloadend = r));
+                      const base64 = reader.result?.toString();
+
+                      const res = await axiosInstance.post('/api/messages/upload-audio', { base64, durationSec });
+                      setAudio(res.data);
+                    } catch (error) {
+                      console.error('Failed to process audio:', error);
+                      alert('Failed to process audio recording. Please try again.');
+                    } finally {
+                      setIsProcessingAudio(false);
+                      // Stop all tracks to release microphone
+                      stream.getTracks().forEach(track => track.stop());
+                      setAudioStream(null);
+                    }
+                  };
+
+                  mr.start();
+                  setRecorder(mr);
+                  setRecordStartTs(Date.now());
+                  setIsRecording(true);
+
+                  // Emit recording event
+                  const { socket } = useAuthStore.getState();
+                  if (socket && socket.connected) {
+                    const conversationId = selectedUser?._id || selectedGroup?._id;
+                    const isGroup = !!selectedGroup;
+
+                    if (conversationId) {
+                      socket.emit('recording', {
+                        conversationId,
+                        isGroup,
+                        userName: authUser?.fullName
+                      });
+                    }
+                  }
+                } catch (error) {
+                  console.error('Failed to start recording:', error);
+                  const userMessage = getMicrophoneErrorMessage(error);
+                  alert(userMessage);
+
+                  // Try with basic constraints if advanced ones fail
+                  if (error.name === 'OverconstrainedError') {
+                    try {
+                      const basicStream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                          echoCancellation: true,
+                          noiseSuppression: true,
+                          autoGainControl: true
+                        }
+                      });
+
+                      setAudioStream(basicStream);
+                      const { mimeType, audioBitsPerSecond } = getBestAudioMimeType();
+                      const mr = new MediaRecorder(basicStream, { mimeType, audioBitsPerSecond });
+
+                      const chunks = [];
+                      mr.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+                      mr.onstop = async () => {
+                        setIsProcessingAudio(true);
+                        try {
+                          const blob = new Blob(chunks, { type: mimeType });
+                          const durationSec = Math.round((Date.now() - recordStartTs) / 1000);
+                          const reader = new FileReader();
+                          reader.readAsDataURL(blob);
+                          await new Promise((r) => (reader.onloadend = r));
+                          const base64 = reader.result?.toString();
+
+                          const res = await axiosInstance.post('/api/messages/upload-audio', { base64, durationSec });
+                          setAudio(res.data);
+                        } catch (error) {
+                          console.error('Failed to process audio:', error);
+                          alert('Failed to process audio recording. Please try again.');
+                        } finally {
+                          setIsProcessingAudio(false);
+                          basicStream.getTracks().forEach(track => track.stop());
+                          setAudioStream(null);
+                        }
+                      };
+
+                      mr.start();
+                      setRecorder(mr);
+                      setRecordStartTs(Date.now());
+                      setIsRecording(true);
+                      console.log('✅ Recording started with basic constraints');
+                    } catch (basicError) {
+                      console.error('Failed with basic constraints too:', basicError);
+                    }
                   }
                 }
               }
-            }
-          }}
-        >
-          {isProcessingAudio ? (
-            <span className="loading loading-spinner loading-sm"></span>
-          ) : isRecording ? (
-            <>
-              <StopCircle className="h-5 w-5" />
-              <span className="absolute -top-1 -right-1 flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-error"></span>
-              </span>
-            </>
-          ) : (
-            <Mic className="h-5 w-5" />
-          )}
+            }}
+          >
+            {isProcessingAudio ? (
+              <span className="loading loading-spinner loading-sm"></span>
+            ) : isRecording ? (
+              <>
+                <StopCircle className="h-5 w-5" />
+                <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-error"></span>
+                </span>
+              </>
+            ) : (
+              <Mic className="h-5 w-5" />
+            )}
           </button>
-          
+
           {/* Formatting Toolbar - Inside textarea, much closer to microphone */}
           <div className="absolute right-10 top-1/2 -translate-y-1/2">
-            <FormattingToolbar 
+            <FormattingToolbar
               isExpanded={isFormattingExpanded}
               onToggle={() => setIsFormattingExpanded(!isFormattingExpanded)}
               activeFormats={activeFormats}
@@ -931,7 +971,7 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
               disabled={isSending || limitInfo.isLimited}
             />
           </div>
-          
+
           {/* Character count */}
           {text.length > 1800 && (
             <div className="absolute -top-6 right-0 text-xs text-base-content/60 bg-base-100 px-2 py-0.5 rounded">
@@ -941,11 +981,11 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
         </div>
 
         {/* EMOJI PICKER */}
-        <button 
-          type="button" 
-          ref={emojiBtnRef} 
-          onClick={() => setIsEmojiOpen(v => !v)} 
-          disabled={limitInfo.isLimited} 
+        <button
+          type="button"
+          ref={emojiBtnRef}
+          onClick={() => setIsEmojiOpen(v => !v)}
+          disabled={limitInfo.isLimited}
           className={`transition-colors ${isSending || limitInfo.isLimited ? 'text-base-content/50' : 'text-base-content/70 hover:text-primary'}`}
           title="Add emoji"
         >

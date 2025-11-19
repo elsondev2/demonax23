@@ -94,62 +94,133 @@ export const useChatStore = create((set, get) => ({
       return {};
     }
   })(),
-  
-  // Typing indicator state
-  typingUsers: {}, // { conversationId: { userId: { name, timestamp } } }
-  typingCleanupInterval: null,
 
-  // Set typing status for a user in a conversation
+  // Typing and recording indicator state - REBUILT FROM SCRATCH
+  typingUsers: {}, // { conversationId: [{ userId, name, timestamp }] }
+  recordingUsers: {}, // { conversationId: [{ userId, name, timestamp }] }
+
+  // Set typing status - simple object-based approach (prevents array flickering)
   setUserTyping: (conversationId, userId, userName) => {
     const { typingUsers } = get();
-    const conversationTyping = typingUsers[conversationId] || {};
+    const currentConversation = typingUsers[conversationId] || {};
+
+    // Only update if user doesn't exist or timestamp is old (prevents rapid updates)
+    const existingUser = currentConversation[userId];
+    const now = Date.now();
     
-    // Always update timestamp - this is important for keeping indicator alive
+    // Skip update if user was just updated within last 2 seconds (debounce)
+    if (existingUser && (now - existingUser.timestamp) < 2000) {
+      return;
+    }
+
     set({
       typingUsers: {
         ...typingUsers,
         [conversationId]: {
-          ...conversationTyping,
-          [userId]: {
-            name: userName,
-            timestamp: Date.now()
-          }
+          ...currentConversation,
+          [userId]: { userId, name: userName, timestamp: now }
         }
       }
     });
   },
 
-  // Clear typing status for a user
+  // Clear typing status
   clearUserTyping: (conversationId, userId) => {
     const { typingUsers } = get();
-    const conversationTyping = { ...(typingUsers[conversationId] || {}) };
-    delete conversationTyping[userId];
+    const currentConversation = typingUsers[conversationId] || {};
 
-    const newState = {
-      typingUsers: {
-        ...typingUsers,
-        [conversationId]: conversationTyping
-      }
-    };
-    
-    set(newState);
+    // Only update if user actually exists
+    if (!currentConversation[userId]) {
+      return;
+    }
+
+    // Remove user from conversation
+    const { [userId]: _removed, ...remaining } = currentConversation;
+
+    // If no users left, remove the conversation entirely
+    if (Object.keys(remaining).length === 0) {
+      const { [conversationId]: _removedConv, ...remainingConvs } = typingUsers;
+      set({ typingUsers: remainingConvs });
+    } else {
+      set({
+        typingUsers: {
+          ...typingUsers,
+          [conversationId]: remaining
+        }
+      });
+    }
   },
-  
-  // Clean up stale typing indicators (older than 5 seconds)
-  cleanupStaleTyping: () => {
-    const { typingUsers } = get();
+
+  // Set recording status
+  setUserRecording: (conversationId, userId, userName) => {
+    const { recordingUsers } = get();
+    const currentConversation = recordingUsers[conversationId] || {};
+
+    // Only update if user doesn't exist or timestamp is old (prevents rapid updates)
+    const existingUser = currentConversation[userId];
     const now = Date.now();
-    const cleaned = {};
-    let hasChanges = false;
     
-    Object.keys(typingUsers).forEach(conversationId => {
-      const conversationTyping = typingUsers[conversationId];
+    // Skip update if user was just updated within last 2 seconds (debounce)
+    if (existingUser && (now - existingUser.timestamp) < 2000) {
+      return;
+    }
+
+    set({
+      recordingUsers: {
+        ...recordingUsers,
+        [conversationId]: {
+          ...currentConversation,
+          [userId]: { userId, name: userName, timestamp: now }
+        }
+      }
+    });
+  },
+
+  // Clear recording status
+  clearUserRecording: (conversationId, userId) => {
+    const { recordingUsers } = get();
+    const currentConversation = recordingUsers[conversationId] || {};
+
+    // Only update if user actually exists
+    if (!currentConversation[userId]) {
+      return;
+    }
+
+    // Remove user from conversation
+    const { [userId]: _removed, ...remaining } = currentConversation;
+
+    // If no users left, remove the conversation entirely
+    if (Object.keys(remaining).length === 0) {
+      const { [conversationId]: _removedConv, ...remainingConvs } = recordingUsers;
+      set({ recordingUsers: remainingConvs });
+    } else {
+      set({
+        recordingUsers: {
+          ...recordingUsers,
+          [conversationId]: remaining
+        }
+      });
+    }
+  },
+
+  // Clean up stale indicators (older than 8 seconds)
+  // Runs every 5 seconds to remove indicators from users who stopped typing/recording
+  // but whose stopTyping/stopRecording events may have been missed due to network issues
+  cleanupStaleIndicators: () => {
+    const { typingUsers, recordingUsers } = get();
+    const now = Date.now();
+    const maxAge = 8000; // 8 seconds - increased from 6s for better network latency tolerance
+
+    let hasChanges = false;
+
+    // Clean typing users (now using object structure)
+    const cleanedTyping = {};
+    Object.keys(typingUsers).forEach(convId => {
+      const conversationUsers = typingUsers[convId];
       const activeUsers = {};
       
-      Object.keys(conversationTyping).forEach(userId => {
-        const data = conversationTyping[userId];
-        // Keep only users who typed in the last 5 seconds
-        if ((now - data.timestamp) < 5000) {
+      Object.entries(conversationUsers).forEach(([userId, data]) => {
+        if ((now - data.timestamp) < maxAge) {
           activeUsers[userId] = data;
         } else {
           hasChanges = true;
@@ -157,12 +228,39 @@ export const useChatStore = create((set, get) => ({
       });
       
       if (Object.keys(activeUsers).length > 0) {
-        cleaned[conversationId] = activeUsers;
+        cleanedTyping[convId] = activeUsers;
+      } else if (Object.keys(conversationUsers).length > 0) {
+        hasChanges = true; // Conversation was removed
       }
     });
-    
+
+    // Clean recording users (now using object structure)
+    const cleanedRecording = {};
+    Object.keys(recordingUsers).forEach(convId => {
+      const conversationUsers = recordingUsers[convId];
+      const activeUsers = {};
+      
+      Object.entries(conversationUsers).forEach(([userId, data]) => {
+        if ((now - data.timestamp) < maxAge) {
+          activeUsers[userId] = data;
+        } else {
+          hasChanges = true;
+        }
+      });
+      
+      if (Object.keys(activeUsers).length > 0) {
+        cleanedRecording[convId] = activeUsers;
+      } else if (Object.keys(conversationUsers).length > 0) {
+        hasChanges = true; // Conversation was removed
+      }
+    });
+
+    // Only update state if something actually changed (prevents unnecessary re-renders)
     if (hasChanges) {
-      set({ typingUsers: cleaned });
+      set({
+        typingUsers: cleanedTyping,
+        recordingUsers: cleanedRecording
+      });
     }
   },
 
@@ -1194,9 +1292,8 @@ export const useChatStore = create((set, get) => ({
       }, 500);
     });
 
-    // Handle typing indicators
+    // Handle typing and recording indicators
     socket.on("userTyping", ({ conversationId, userId, userName }) => {
-      // Don't process your own typing events
       const { authUser } = useAuthStore.getState();
       if (userId !== authUser?._id) {
         get().setUserTyping(conversationId, userId, userName);
@@ -1204,20 +1301,32 @@ export const useChatStore = create((set, get) => ({
     });
 
     socket.on("userStoppedTyping", ({ conversationId, userId }) => {
-      // Don't process your own typing events
       const { authUser } = useAuthStore.getState();
       if (userId !== authUser?._id) {
         get().clearUserTyping(conversationId, userId);
       }
     });
-    
-    // Auto-cleanup stale typing indicators every 2 seconds
-    const typingCleanupInterval = setInterval(() => {
-      get().cleanupStaleTyping();
-    }, 2000);
-    
-    // Store interval ID for cleanup
-    set({ typingCleanupInterval });
+
+    socket.on("userRecording", ({ conversationId, userId, userName }) => {
+      const { authUser } = useAuthStore.getState();
+      if (userId !== authUser?._id) {
+        get().setUserRecording(conversationId, userId, userName);
+      }
+    });
+
+    socket.on("userStoppedRecording", ({ conversationId, userId }) => {
+      const { authUser } = useAuthStore.getState();
+      if (userId !== authUser?._id) {
+        get().clearUserRecording(conversationId, userId);
+      }
+    });
+
+    // Auto-cleanup stale indicators every 5 seconds (reduced frequency to prevent flickering)
+    const cleanupInterval = setInterval(() => {
+      get().cleanupStaleIndicators();
+    }, 5000); // Increased from 2000ms to reduce flickering
+
+    set({ typingCleanupInterval: cleanupInterval });
 
     // Handle individual messages
     socket.on("newMessage", (newMessage) => {
@@ -1275,7 +1384,7 @@ export const useChatStore = create((set, get) => ({
       // Play notification sound and show notification for incoming messages
       if (isMessageSentToMe && senderId !== selectedUser?._id) {
         get().playNotificationSound();
-        
+
         // Show browser notification if user is not actively viewing
         const notificationCallback = get().notificationCallback;
         if (notificationCallback && !isUserActive()) {
@@ -1390,7 +1499,7 @@ export const useChatStore = create((set, get) => ({
       // Play notification sound and show notification for group messages not in current view (and not from me)
       if (groupId !== selectedGroup?._id && senderId !== authUser._id) {
         get().playNotificationSound();
-        
+
         // Show browser notification if user is not actively viewing
         const notificationCallback = get().notificationCallback;
         if (notificationCallback && !isUserActive()) {
@@ -1468,7 +1577,7 @@ export const useChatStore = create((set, get) => ({
         // Play sound and show notification for messages from others in current group view
         if (senderId !== authUser._id) {
           get().playNotificationSound();
-          
+
           // Show browser notification if user is not actively viewing (even if in the conversation)
           const notificationCallback = get().notificationCallback;
           if (notificationCallback && !isUserActive()) {
@@ -1843,16 +1952,18 @@ export const useChatStore = create((set, get) => ({
       socket.off("userUpdated");
       socket.off("userTyping");
       socket.off("userStoppedTyping");
-      
-      // Clear typing cleanup interval
+      socket.off("userRecording");
+      socket.off("userStoppedRecording");
+
+      // Clear cleanup interval
       const { typingCleanupInterval } = get();
       if (typingCleanupInterval) {
         clearInterval(typingCleanupInterval);
         set({ typingCleanupInterval: null });
       }
-      
-      // Clear all typing indicators
-      set({ typingUsers: {} });
+
+      // Clear all indicators
+      set({ typingUsers: {}, recordingUsers: {} });
 
       // Call events are cleaned up in useCallStore.cleanupCallSystem()
     }

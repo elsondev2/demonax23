@@ -386,20 +386,23 @@ function ChatContainer() {
   const firstMessageDate = messages[0]?.createdAt;
 
   // Get current typing users - simple and stable
-  const typingUsers = useChatStore(state => state.typingUsers);
   const conversationId = selectedUser?._id || selectedGroup?._id;
   
-  // Calculate current typing users
+  // Only subscribe to typing users for the current conversation (prevents unnecessary re-renders)
+  const conversationTypingUsers = useChatStore(
+    state => conversationId ? state.typingUsers[conversationId] : undefined
+  );
+  
+  // Calculate current typing users with stable memoization
   const currentTypingUsers = useMemo(() => {
     if (!conversationId) return localTypingUsers;
     
     const remoteUsers = [];
     
-    if (typingUsers[conversationId]) {
-      const conversationTyping = typingUsers[conversationId];
+    if (conversationTypingUsers) {
       const now = Date.now();
       
-      Object.values(conversationTyping).forEach((data) => {
+      Object.values(conversationTypingUsers).forEach((data) => {
         // 5 second timeout for typing indicator (generous buffer)
         if ((now - data.timestamp) < 5000) {
           remoteUsers.push(data.name);
@@ -410,7 +413,7 @@ function ChatContainer() {
     // Combine and deduplicate
     const combined = [...localTypingUsers, ...remoteUsers];
     return [...new Set(combined)];
-  }, [localTypingUsers, conversationId, typingUsers]);
+  }, [localTypingUsers, conversationId, conversationTypingUsers]);
 
   return (
     <div className="bg-base-100 text-base-content flex-1 flex flex-col h-full md:max-h-full relative overflow-hidden">
