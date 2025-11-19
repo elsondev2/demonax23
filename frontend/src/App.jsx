@@ -14,6 +14,7 @@ import { useAuthStore } from "./store/useAuthStore";
 import { useEffect } from "react";
 import PageLoader from "./components/PageLoader";
 import "./styles/formatted-message.css";
+import "./styles/link-embeds.css";
 import ThemeProvider from "./components/ThemeProvider";
 import AppearanceModal from "./components/AppearanceModal";
 import ProtectedRoute from "./components/ProtectedRoute";

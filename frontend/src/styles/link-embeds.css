@@ -1,0 +1,147 @@
+/* Link Embed Styles */
+
+/* Ensure iframes are responsive and maintain aspect ratio */
+.link-embed-container {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 0.5rem;
+}
+
+/* Video embed aspect ratio (16:9) */
+.link-embed-video {
+  position: relative;
+  width: 100%;
+  padding-bottom: 56.25%; /* 16:9 aspect ratio */
+  background-color: #000;
+}
+
+.link-embed-video iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0.5rem 0.5rem 0 0;
+}
+
+/* Spotify embed styles */
+.link-embed-spotify {
+  position: relative;
+  width: 100%;
+}
+
+.link-embed-spotify iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0.5rem 0.5rem 0 0;
+}
+
+/* SoundCloud embed styles */
+.link-embed-soundcloud {
+  position: relative;
+  width: 100%;
+  height: 166px;
+}
+
+.link-embed-soundcloud iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0.5rem 0.5rem 0 0;
+}
+
+/* Link preview card styles */
+.link-preview-card {
+  display: block;
+  margin-top: 0.5rem;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  transition: all 0.2s ease;
+  max-width: 28rem;
+}
+
+.link-preview-card:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.link-preview-image {
+  width: 100%;
+  height: 12rem;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.link-preview-card:hover .link-preview-image {
+  transform: scale(1.05);
+}
+
+/* Ensure embeds work well in message bubbles */
+.message-bubble .link-embed-container,
+.message-bubble .link-preview-card {
+  margin-top: 0.5rem;
+}
+
+/* Loading state for embeds */
+.link-embed-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 0.5rem;
+}
+
+/* Error state for embeds */
+.link-embed-error {
+  padding: 1rem;
+  text-align: center;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .link-preview-card {
+    max-width: 100%;
+  }
+  
+  .link-preview-image {
+    height: 10rem;
+  }
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  .link-embed-loading {
+    background: rgba(255, 255, 255, 0.05);
+  }
+}
+
+/* Accessibility improvements */
+.link-embed-container iframe:focus,
+.link-preview-card:focus {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+/* Smooth loading animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.link-embed-container,
+.link-preview-card {
+  animation: fadeIn 0.3s ease-out;
+}

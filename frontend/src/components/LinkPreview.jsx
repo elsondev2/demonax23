@@ -30,9 +30,11 @@ const LinkPreview = ({ url, isOwnMessage }) => {
         }
 
         if (videoId) {
+          // Clean video ID (remove any remaining query params)
+          videoId = videoId.split('&')[0];
           return {
             type: 'youtube',
-            embedUrl: `https://www.youtube.com/embed/${videoId}`,
+            embedUrl: `https://www.youtube.com/embed/${videoId}?rel=0`,
           };
         }
       }
@@ -50,13 +52,36 @@ const LinkPreview = ({ url, isOwnMessage }) => {
 
       // Twitch
       if (hostname.includes('twitch.tv')) {
-        const match = urlObj.pathname.match(/\/videos\/(\d+)/);
-        if (match) {
+        const videoMatch = urlObj.pathname.match(/\/videos\/(\d+)/);
+        if (videoMatch) {
           return {
             type: 'twitch',
-            embedUrl: `https://player.twitch.tv/?video=${match[1]}&parent=${window.location.hostname}`,
+            embedUrl: `https://player.twitch.tv/?video=${videoMatch[1]}&parent=${window.location.hostname}`,
           };
         }
+        
+        // Twitch clips
+        const clipMatch = urlObj.pathname.match(/\/[^/]+\/clip\/([a-zA-Z0-9_-]+)/);
+        if (clipMatch) {
+          return {
+            type: 'twitch',
+            embedUrl: `https://clips.twitch.tv/embed?clip=${clipMatch[1]}&parent=${window.location.hostname}`,
+          };
+        }
+      }
+
+      // SoundCloud
+      if (hostname.includes('soundcloud.com')) {
+        return {
+          type: 'soundcloud',
+          embedUrl: `https://w.soundcloud.com/player/?url=${encodeURIComponent(url)}&color=%23ff5500&auto_play=false&hide_related=true&show_comments=false&show_user=true&show_reposts=false&show_teaser=false`,
+        };
+      }
+
+      // Twitter/X
+      if (hostname.includes('twitter.com') || hostname.includes('x.com')) {
+        // For Twitter, we'll just show a regular preview since embedding requires their widget
+        return null;
       }
 
       // Spotify
@@ -64,12 +89,12 @@ const LinkPreview = ({ url, isOwnMessage }) => {
         // Match patterns like:
         // /track/xxx, /album/xxx, /playlist/xxx, /artist/xxx
         // /intl-xx/track/xxx (international URLs)
-        const match = urlObj.pathname.match(/\/(track|album|playlist|artist)\/([a-zA-Z0-9]+)/);
+        const match = urlObj.pathname.match(/\/(track|album|playlist|artist|episode|show)\/([a-zA-Z0-9]+)/);
         if (match) {
           const [, type, id] = match;
           return {
             type: 'spotify',
-            embedUrl: `https://open.spotify.com/embed/${type}/${id}`,
+            embedUrl: `https://open.spotify.com/embed/${type}/${id}?utm_source=generator`,
             spotifyType: type,
           };
         }
@@ -127,13 +152,15 @@ const LinkPreview = ({ url, isOwnMessage }) => {
   if (embedInfo) {
     // Spotify embeds have different heights based on type
     const isSpotify = embedInfo.type === 'spotify';
+    const isSoundCloud = embedInfo.type === 'soundcloud';
+    
     // Responsive heights: mobile (80px/232px) and desktop (152px/352px)
-    const spotifyHeight = embedInfo.spotifyType === 'track' 
+    const spotifyHeight = embedInfo.spotifyType === 'track' || embedInfo.spotifyType === 'episode'
       ? { mobile: '80px', desktop: '152px' }
       : { mobile: '232px', desktop: '352px' };
     
     return (
-      <div className={`mt-2 rounded-lg overflow-hidden w-full max-w-sm ${
+      <div className={`mt-2 rounded-lg overflow-hidden w-full max-w-md ${
         isOwnMessage 
           ? 'bg-primary-content/10 border border-primary-content/20' 
           : 'bg-base-200 border border-base-300'
@@ -145,38 +172,61 @@ const LinkPreview = ({ url, isOwnMessage }) => {
             <div className="relative w-full md:hidden" style={{ height: spotifyHeight.mobile }}>
               <iframe
                 src={embedInfo.embedUrl}
-                className="w-full h-full border-0"
+                className="w-full h-full border-0 rounded-t-lg"
                 allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
                 loading="lazy"
                 title="Spotify embed"
+                sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
               />
             </div>
             {/* Desktop view */}
             <div className="relative w-full hidden md:block" style={{ height: spotifyHeight.desktop }}>
               <iframe
                 src={embedInfo.embedUrl}
-                className="w-full h-full border-0"
+                className="w-full h-full border-0 rounded-t-lg"
                 allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
                 loading="lazy"
                 title="Spotify embed"
+                sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
               />
             </div>
           </>
-        ) : (
-          // Video embed with 16:9 aspect ratio
-          <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+        ) : isSoundCloud ? (
+          // SoundCloud embed with fixed height
+          <div className="relative w-full" style={{ height: '166px' }}>
             <iframe
               src={embedInfo.embedUrl}
-              className="absolute top-0 left-0 w-full h-full border-0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              className="w-full h-full border-0 rounded-t-lg"
+              allow="autoplay"
+              loading="lazy"
+              title="SoundCloud embed"
+              sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+            />
+          </div>
+        ) : (
+          // Video embed with 16:9 aspect ratio
+          <div className="relative w-full bg-black" style={{ paddingBottom: '56.25%' }}>
+            <iframe
+              src={embedInfo.embedUrl}
+              className="absolute top-0 left-0 w-full h-full border-0 rounded-t-lg"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               allowFullScreen
-              title="Embedded video"
+              title={`${embedInfo.type} video embed`}
+              sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-presentation"
             />
           </div>
         )}
-        <div className="p-2 text-xs flex items-center gap-1 text-blue-500">
+        <div className={`p-2 text-xs flex items-center gap-1 ${
+          isOwnMessage ? 'text-primary-content/70' : 'text-blue-500'
+        }`}>
           <ExternalLink className="w-3 h-3" />
-          <a href={url} target="_blank" rel="noopener noreferrer" className="truncate hover:underline">
+          <a 
+            href={url} 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="truncate hover:underline"
+            onClick={(e) => e.stopPropagation()}
+          >
             {new URL(url).hostname}
           </a>
         </div>
@@ -199,7 +249,7 @@ const LinkPreview = ({ url, isOwnMessage }) => {
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className={`block mt-2 rounded-lg border overflow-hidden hover:shadow-lg transition-all ${
+      className={`block mt-2 rounded-lg border overflow-hidden hover:shadow-lg transition-all max-w-md ${
         isOwnMessage 
           ? 'bg-primary-content/10 border-primary-content/20 hover:border-primary-content/40' 
           : 'bg-base-200 border-base-300 hover:border-base-content/30'
@@ -212,7 +262,7 @@ const LinkPreview = ({ url, isOwnMessage }) => {
           <img
             src={preview.image}
             alt={preview.title || 'Preview'}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
             loading="lazy"
             onError={(e) => {
               e.target.style.display = 'none';
@@ -234,7 +284,7 @@ const LinkPreview = ({ url, isOwnMessage }) => {
 
         {/* Description */}
         {preview.description && (
-          <div className={`text-xs mb-2 line-clamp-2 ${
+          <div className={`text-xs mb-2 line-clamp-3 ${
             isOwnMessage ? 'text-primary-content/70' : 'text-base-content/60'
           }`}>
             {preview.description}
@@ -242,8 +292,10 @@ const LinkPreview = ({ url, isOwnMessage }) => {
         )}
 
         {/* URL */}
-        <div className="flex items-center gap-1 text-xs text-blue-500">
-          <ExternalLink className="w-3 h-3" />
+        <div className={`flex items-center gap-1 text-xs ${
+          isOwnMessage ? 'text-primary-content/70' : 'text-blue-500'
+        }`}>
+          <ExternalLink className="w-3 h-3 flex-shrink-0" />
           <span className="truncate">{new URL(url).hostname}</span>
         </div>
       </div>
