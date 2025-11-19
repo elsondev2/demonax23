@@ -104,6 +104,8 @@ function ChatContainer() {
         if (selectedUserId) {
           console.log('Loading messages for user:', selectedUserId);
           await getMessagesByUserId(selectedUserId, 1, 40);  // Load 40 messages (default cache size)
+          // Mark conversation as read when opening
+          markConversationRead(selectedUserId);
           // Scroll to latest message instantly after loading
           requestAnimationFrame(() => {
             messageEndRef.current?.scrollIntoView({ behavior: "instant", block: "end" });
@@ -111,6 +113,8 @@ function ChatContainer() {
         } else if (selectedGroupId) {
           console.log('Loading messages for group:', selectedGroupId);
           await getGroupMessages(selectedGroupId, 1, 40);  // Load 40 messages (default cache size)
+          // Mark group as read when opening
+          markGroupRead(selectedGroupId);
           // Scroll to latest message instantly after loading
           requestAnimationFrame(() => {
             messageEndRef.current?.scrollIntoView({ behavior: "instant", block: "end" });
@@ -125,7 +129,7 @@ function ChatContainer() {
       loadMessages();
     }
     // Note: subscribeToMessages is now handled globally in ChatPage
-  }, [selectedUserId, selectedGroupId, getMessagesByUserId, getGroupMessages]);
+  }, [selectedUserId, selectedGroupId, getMessagesByUserId, getGroupMessages, markConversationRead, markGroupRead]);
 
   // Enhanced loading states for better UX
   // Show messages if we have any, even while loading more
@@ -390,7 +394,22 @@ function ChatContainer() {
   
   // Only subscribe to typing users for the current conversation (prevents unnecessary re-renders)
   const conversationTypingUsers = useChatStore(
-    state => conversationId ? state.typingUsers[conversationId] : undefined
+    state => conversationId ? state.typingUsers[conversationId] : undefined,
+    (a, b) => {
+      // Custom equality check to prevent re-renders when only timestamps change
+      if (!a && !b) return true;
+      if (!a || !b) return false;
+      
+      const keysA = Object.keys(a);
+      const keysB = Object.keys(b);
+      
+      if (keysA.length !== keysB.length) return false;
+      
+      // Only re-render if users actually changed, not just timestamps
+      return keysA.every(key => {
+        return a[key]?.userId === b[key]?.userId && a[key]?.name === b[key]?.name;
+      });
+    }
   );
   
   // Calculate current typing users with stable memoization

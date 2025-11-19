@@ -108,20 +108,26 @@ export const useChatStore = create((set, get) => ({
     const existingUser = currentConversation[userId];
     const now = Date.now();
     
-    // Skip update if user was just updated within last 2 seconds (debounce)
-    if (existingUser && (now - existingUser.timestamp) < 2000) {
+    // Skip update if user was just updated within last 1 second (debounce)
+    // This prevents flickering from rapid typing events
+    if (existingUser && (now - existingUser.timestamp) < 1000) {
       return;
     }
 
-    set({
-      typingUsers: {
-        ...typingUsers,
-        [conversationId]: {
-          ...currentConversation,
-          [userId]: { userId, name: userName, timestamp: now }
+    // Only update state if something actually changed
+    const needsUpdate = !existingUser || existingUser.name !== userName;
+    
+    if (needsUpdate) {
+      set({
+        typingUsers: {
+          ...typingUsers,
+          [conversationId]: {
+            ...currentConversation,
+            [userId]: { userId, name: userName, timestamp: now }
+          }
         }
-      }
-    });
+      });
+    }
   },
 
   // Clear typing status
@@ -160,20 +166,25 @@ export const useChatStore = create((set, get) => ({
     const existingUser = currentConversation[userId];
     const now = Date.now();
     
-    // Skip update if user was just updated within last 2 seconds (debounce)
-    if (existingUser && (now - existingUser.timestamp) < 2000) {
+    // Skip update if user was just updated within last 1 second (debounce)
+    if (existingUser && (now - existingUser.timestamp) < 1000) {
       return;
     }
 
-    set({
-      recordingUsers: {
-        ...recordingUsers,
-        [conversationId]: {
-          ...currentConversation,
-          [userId]: { userId, name: userName, timestamp: now }
+    // Only update state if something actually changed
+    const needsUpdate = !existingUser || existingUser.name !== userName;
+    
+    if (needsUpdate) {
+      set({
+        recordingUsers: {
+          ...recordingUsers,
+          [conversationId]: {
+            ...currentConversation,
+            [userId]: { userId, name: userName, timestamp: now }
+          }
         }
-      }
-    });
+      });
+    }
   },
 
   // Clear recording status
@@ -203,13 +214,13 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
-  // Clean up stale indicators (older than 8 seconds)
-  // Runs every 5 seconds to remove indicators from users who stopped typing/recording
+  // Clean up stale indicators (older than 5 seconds)
+  // Runs every 3 seconds to remove indicators from users who stopped typing/recording
   // but whose stopTyping/stopRecording events may have been missed due to network issues
   cleanupStaleIndicators: () => {
     const { typingUsers, recordingUsers } = get();
     const now = Date.now();
-    const maxAge = 8000; // 8 seconds - increased from 6s for better network latency tolerance
+    const maxAge = 5000; // 5 seconds - more aggressive cleanup to prevent stale indicators
 
     let hasChanges = false;
 
@@ -1321,10 +1332,10 @@ export const useChatStore = create((set, get) => ({
       }
     });
 
-    // Auto-cleanup stale indicators every 5 seconds (reduced frequency to prevent flickering)
+    // Auto-cleanup stale indicators every 3 seconds
     const cleanupInterval = setInterval(() => {
       get().cleanupStaleIndicators();
-    }, 5000); // Increased from 2000ms to reduce flickering
+    }, 3000);
 
     set({ typingCleanupInterval: cleanupInterval });
 
@@ -1360,12 +1371,14 @@ export const useChatStore = create((set, get) => ({
           }
           // For receiver: update chat with sender
           if (chat._id === senderId && isMessageSentToMe) {
+            // Only increment unread count if not currently viewing this conversation
+            const isViewingThisChat = selectedUser?._id === senderId;
             return {
               ...chat,
               lastMessage: preview,
               lastMessageTime: newMessage.createdAt,
               lastMessageSenderId: senderId,
-              unreadCount: (chat.unreadCount || 0) + 1,
+              unreadCount: isViewingThisChat ? 0 : (chat.unreadCount || 0) + 1,
             };
           }
         }
@@ -1488,7 +1501,8 @@ export const useChatStore = create((set, get) => ({
             lastMessage: preview,
             lastMessageTime: newMessage.createdAt,
             lastMessageSenderId: senderId,
-            unreadCount: !isMessageInSelectedGroup ? (chat.unreadCount || 0) + 1 : chat.unreadCount,
+            // Don't increment unread if viewing this group OR if message is from me
+            unreadCount: (isMessageInSelectedGroup || senderId === authUser._id) ? 0 : (chat.unreadCount || 0) + 1,
           };
         }
         return chat;
