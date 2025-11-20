@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useChatStore } from "../store/useChatStore";
-import { SendIcon, XIcon, Smile, Paperclip, Mic, StopCircle, Sparkles } from "lucide-react";
+import { SendIcon, XIcon, Smile, Paperclip, Mic, StopCircle, Sparkles, FileText } from "lucide-react";
 import AttachmentTypeModal from "./AttachmentTypeModal";
 import EmojiPickerModal from "./EmojiPickerModal";
 import CaptionImageModal from "./CaptionImageModal";
