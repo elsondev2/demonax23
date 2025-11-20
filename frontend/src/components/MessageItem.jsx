@@ -11,6 +11,32 @@ import ImagePreviewModal from "./ImagePreviewModal";
 import MessageWithLinkPreviews from "./MessageWithLinkPreviews";
 import FormattedMessageText from "./FormattedMessageText";
 
+// Utility function to detect if text contains only emojis (1-3)
+const isEmojiOnly = (text) => {
+  if (!text || typeof text !== 'string') return { isEmoji: false, count: 0 };
+  
+  // Remove whitespace
+  const trimmed = text.trim();
+  if (!trimmed) return { isEmoji: false, count: 0 };
+  
+  // Emoji regex pattern - matches most emojis including skin tones and ZWJ sequences
+  const emojiRegex = /(\p{Emoji_Presentation}|\p{Emoji}\uFE0F)/gu;
+  
+  // Extract all emojis
+  const emojis = trimmed.match(emojiRegex);
+  if (!emojis) return { isEmoji: false, count: 0 };
+  
+  // Remove all emojis and check if anything else remains
+  const withoutEmojis = trimmed.replace(emojiRegex, '').replace(/\s/g, '');
+  
+  // If there's text remaining, it's not emoji-only
+  if (withoutEmojis.length > 0) return { isEmoji: false, count: 0 };
+  
+  // Count emojis (1-3 only)
+  const count = emojis.length;
+  return { isEmoji: count >= 1 && count <= 3, count };
+};
+
 const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selectedGroup, groupPosition, isUnread }) => {
   const { authUser } = useAuthStore();
   const { sendMessage } = useChatStore();
@@ -491,33 +517,47 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
             })()}
 
             {/* Message text */}
-            {message.text && (
-              <div className={`whitespace-pre-wrap break-words text-sm leading-relaxed ${isOwnMessage ? 'text-primary-content' : 'text-base-content'
+            {message.text && (() => {
+              // Check if message is emoji-only (1-3 emojis)
+              const emojiCheck = isEmojiOnly(message.text);
+              
+              return (
+                <div className={`whitespace-pre-wrap break-words ${
+                  emojiCheck.isEmoji 
+                    ? 'text-6xl leading-none' // Large emojis for 1-3 emoji messages
+                    : `text-sm leading-relaxed ${isOwnMessage ? 'text-primary-content' : 'text-base-content'}`
                 }`}>
-                {(() => {
-                  // Replace [CALL_ICON] with actual icon
-                  if (message.text.includes('[CALL_ICON]')) {
-                    const isVideo = message.text.toLowerCase().includes('video');
-                    const isDeclined = message.text.toLowerCase().includes('declined');
-                    const textWithoutIcon = message.text.replace('[CALL_ICON]', '').trim();
+                  {(() => {
+                    // Replace [CALL_ICON] with actual icon
+                    if (message.text.includes('[CALL_ICON]')) {
+                      const isVideo = message.text.toLowerCase().includes('video');
+                      const isDeclined = message.text.toLowerCase().includes('declined');
+                      const textWithoutIcon = message.text.replace('[CALL_ICON]', '').trim();
 
-                    return (
-                      <div className={`flex items-center gap-2 ${isDeclined ? 'opacity-70' : ''}`}>
-                        <div className={`p-2 rounded-full ${isOwnMessage ? 'bg-primary-content/20' : 'bg-primary/20'}`}>
-                          {isVideo ? (
-                            <Video className={`w-4 h-4 ${isOwnMessage ? 'text-primary-content' : 'text-primary'}`} />
-                          ) : (
-                            <Phone className={`w-4 h-4 ${isOwnMessage ? 'text-primary-content' : 'text-primary'}`} />
-                          )}
+                      return (
+                        <div className={`flex items-center gap-2 ${isDeclined ? 'opacity-70' : ''}`}>
+                          <div className={`p-2 rounded-full ${isOwnMessage ? 'bg-primary-content/20' : 'bg-primary/20'}`}>
+                            {isVideo ? (
+                              <Video className={`w-4 h-4 ${isOwnMessage ? 'text-primary-content' : 'text-primary'}`} />
+                            ) : (
+                              <Phone className={`w-4 h-4 ${isOwnMessage ? 'text-primary-content' : 'text-primary'}`} />
+                            )}
+                          </div>
+                          <MessageWithLinkPreviews text={textWithoutIcon} mentions={message.mentions} isOwnMessage={isOwnMessage} />
                         </div>
-                        <MessageWithLinkPreviews text={textWithoutIcon} mentions={message.mentions} isOwnMessage={isOwnMessage} />
-                      </div>
-                    );
-                  }
-                  return <FormattedMessageText message={message} isOwnMessage={isOwnMessage} />;
-                })()}
-              </div>
-            )}
+                      );
+                    }
+                    
+                    // For emoji-only messages, render plain text (no formatting needed)
+                    if (emojiCheck.isEmoji) {
+                      return <span>{message.text}</span>;
+                    }
+                    
+                    return <FormattedMessageText message={message} isOwnMessage={isOwnMessage} />;
+                  })()}
+                </div>
+              );
+            })()}
 
             {/* Message image */}
             {message.image && (
