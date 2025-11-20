@@ -348,43 +348,114 @@ export const editMessage = async (req, res) => {
 export const uploadAttachment = async (req, res) => {
   try {
     const { base64, filename } = req.body;
-    if (!base64 || typeof base64 !== 'string' || !base64.includes(',')) {
-      return res.status(400).json({ message: 'Invalid base64' });
+    
+    // Validate input
+    if (!base64 || typeof base64 !== 'string') {
+      return res.status(400).json({ message: 'Invalid file data' });
     }
-    const data = base64.split(',')[1] || '';
-    const approx = Math.floor((data.length * 3) / 4);
-    if (approx > 5 * 1024 * 1024) {
-      return res.status(413).json({ message: 'File exceeds 5MB limit' });
+    
+    if (!base64.includes(',')) {
+      return res.status(400).json({ message: 'Invalid base64 format' });
     }
-    const uploaded = await uploadBase64ImageToSupabase({ base64, folder: 'attachments', cacheSeconds: 604800 });
-    // Guess size from base64 length approx
-    const size = Math.floor((base64.length * 3) / 4);
+    
+    // Extract content type and data
     const contentType = /data:(.*?);base64/.exec(base64)?.[1] || 'application/octet-stream';
-    res.status(201).json({ url: uploaded.url, storageKey: uploaded.key, contentType, filename: filename || '', size });
+    const data = base64.split(',')[1] || '';
+    
+    // Calculate approximate file size
+    const approx = Math.floor((data.length * 3) / 4);
+    
+    // File size limit: 25MB for all files
+    const MAX_SIZE = 25 * 1024 * 1024;
+    if (approx > MAX_SIZE) {
+      return res.status(413).json({ 
+        message: `File exceeds 25MB limit (size: ${(approx / 1024 / 1024).toFixed(2)}MB)` 
+      });
+    }
+    
+    console.log('Uploading attachment:', {
+      filename: filename || 'unknown',
+      contentType,
+      sizeMB: (approx / 1024 / 1024).toFixed(2)
+    });
+    
+    // Upload to storage
+    const uploaded = await uploadBase64ImageToSupabase({ 
+      base64, 
+      folder: 'attachments', 
+      cacheSeconds: 604800 // 7 days cache
+    });
+    
+    // Calculate actual size from base64 length
+    const size = Math.floor((base64.length * 3) / 4);
+    
+    res.status(201).json({ 
+      url: uploaded.url, 
+      storageKey: uploaded.key, 
+      contentType, 
+      filename: filename || 'attachment', 
+      size 
+    });
   } catch (e) {
-    console.log('uploadAttachment error:', e.message);
-    res.status(500).json({ message: 'Upload failed' });
+    console.error('uploadAttachment error:', e.message, e.stack);
+    res.status(500).json({ 
+      message: e.message || 'Upload failed. Please try again.' 
+    });
   }
 };
 
 export const uploadAudio = async (req, res) => {
   try {
     const { base64, durationSec = 0 } = req.body;
-    if (!base64 || typeof base64 !== 'string' || !base64.includes(',')) {
-      return res.status(400).json({ message: 'Invalid base64' });
+    
+    // Validate input
+    if (!base64 || typeof base64 !== 'string') {
+      return res.status(400).json({ message: 'Invalid audio data' });
     }
-    // We do not transcode here; upload as-is. Optionally enable ffmpeg later.
-    const data = base64.split(',')[1] || '';
-    const approx = Math.floor((data.length * 3) / 4);
-    if (approx > 5 * 1024 * 1024) {
-      return res.status(413).json({ message: 'Audio exceeds 5MB limit' });
+    
+    if (!base64.includes(',')) {
+      return res.status(400).json({ message: 'Invalid base64 format' });
     }
-    const uploaded = await uploadBase64ImageToSupabase({ base64, folder: 'audio', cacheSeconds: 31536000 });
+    
+    // Extract content type and data
     const contentType = /data:(.*?);base64/.exec(base64)?.[1] || 'audio/webm';
-    res.status(201).json({ url: uploaded.url, storageKey: uploaded.key, contentType, durationSec: Number(durationSec) || 0 });
+    const data = base64.split(',')[1] || '';
+    
+    // Calculate approximate file size
+    const approx = Math.floor((data.length * 3) / 4);
+    
+    // Audio size limit: 10MB
+    const MAX_SIZE = 10 * 1024 * 1024;
+    if (approx > MAX_SIZE) {
+      return res.status(413).json({ 
+        message: `Audio exceeds 10MB limit (size: ${(approx / 1024 / 1024).toFixed(2)}MB)` 
+      });
+    }
+    
+    console.log('Uploading audio:', {
+      contentType,
+      sizeMB: (approx / 1024 / 1024).toFixed(2),
+      durationSec
+    });
+    
+    // Upload to storage
+    const uploaded = await uploadBase64ImageToSupabase({ 
+      base64, 
+      folder: 'audio', 
+      cacheSeconds: 31536000 // 1 year cache
+    });
+    
+    res.status(201).json({ 
+      url: uploaded.url, 
+      storageKey: uploaded.key, 
+      contentType, 
+      durationSec: Number(durationSec) || 0 
+    });
   } catch (e) {
-    console.log('uploadAudio error:', e.message);
-    res.status(500).json({ message: 'Upload failed' });
+    console.error('uploadAudio error:', e.message, e.stack);
+    res.status(500).json({ 
+      message: e.message || 'Upload failed. Please try again.' 
+    });
   }
 };
 

@@ -416,9 +416,16 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
 
       let imageData = null;
       if (image) {
-        // Silently compress and convert image to base64
-        const { compressImageToBase64 } = await import('../utils/imageCompression');
-        imageData = await compressImageToBase64(image);
+        try {
+          // Silently compress and convert image to base64
+          const { compressImageToBase64 } = await import('../utils/imageCompression');
+          imageData = await compressImageToBase64(image);
+        } catch (imgError) {
+          console.error('Failed to process image:', imgError);
+          alert('Failed to process image. Please try again.');
+          setIsSending(false);
+          return;
+        }
       }
 
       // Get HTML for formatted text
@@ -432,6 +439,8 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
         audio,
         mentions: validatedMentions
       });
+      
+      // Clear form on success
       setText("");
       clearEditor();
       setImage(null);
@@ -449,6 +458,8 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
       }, 0);
     } catch (error) {
       console.error("Failed to send message:", error);
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to send message';
+      alert(`Error: ${errorMsg}`);
     } finally {
       setIsSending(false);
     }
@@ -670,40 +681,60 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
           disabled={isSending || limitInfo.isLimited}
           onChange={async (e) => {
             const files = Array.from(e.target.files || []);
-            const { compressImageToBase64 } = await import('../utils/imageCompression');
-
+            
             // File size limits (in bytes)
             const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB for images
             const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB for other files
 
             for (const f of files) {
-              // Check file size
-              const maxSize = f.type.startsWith('image/') ? MAX_IMAGE_SIZE : MAX_FILE_SIZE;
-              if (f.size > maxSize) {
-                const sizeMB = (maxSize / 1024 / 1024).toFixed(0);
-                alert(`File "${f.name}" is too large. Maximum size is ${sizeMB}MB.`);
-                continue;
-              }
-
-              // Check if it's an image
-              if (f.type.startsWith('image/')) {
-                // Handle as image
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                  setPreviewImage(reader.result);
-                  setImage(f);
-                };
-                reader.readAsDataURL(f);
-              } else {
-                // Handle as attachment
-                const base64 = await compressImageToBase64(f);
-                try {
-                  const res = await axiosInstance.post('/api/messages/upload-attachment', { base64, filename: f.name });
-                  setAttachments(prev => [...prev, res.data]);
-                } catch (err) {
-                  console.error('Failed to upload attachment:', err);
-                  alert(`Failed to upload "${f.name}". Please try again.`);
+              try {
+                // Check file size
+                const maxSize = f.type.startsWith('image/') ? MAX_IMAGE_SIZE : MAX_FILE_SIZE;
+                if (f.size > maxSize) {
+                  const sizeMB = (maxSize / 1024 / 1024).toFixed(0);
+                  alert(`File "${f.name}" is too large. Maximum size is ${sizeMB}MB.`);
+                  continue;
                 }
+
+                // Check if it's an image
+                if (f.type.startsWith('image/')) {
+                  // Handle as image
+                  const reader = new FileReader();
+                  reader.onloadend = () => {
+                    setPreviewImage(reader.result);
+                    setImage(f);
+                  };
+                  reader.onerror = () => {
+                    console.error('Failed to read image file:', f.name);
+                    alert(`Failed to read "${f.name}". Please try again.`);
+                  };
+                  reader.readAsDataURL(f);
+                } else {
+                  // Handle as attachment - convert to base64
+                  const reader = new FileReader();
+                  reader.onloadend = async () => {
+                    try {
+                      const base64 = reader.result;
+                      const res = await axiosInstance.post('/api/messages/upload-attachment', { 
+                        base64, 
+                        filename: f.name 
+                      });
+                      setAttachments(prev => [...prev, res.data]);
+                    } catch (err) {
+                      console.error('Failed to upload attachment:', err);
+                      const errorMsg = err.response?.data?.message || 'Upload failed';
+                      alert(`Failed to upload "${f.name}": ${errorMsg}`);
+                    }
+                  };
+                  reader.onerror = () => {
+                    console.error('Failed to read file:', f.name);
+                    alert(`Failed to read "${f.name}". Please try again.`);
+                  };
+                  reader.readAsDataURL(f);
+                }
+              } catch (error) {
+                console.error('Error processing file:', f.name, error);
+                alert(`Error processing "${f.name}". Please try again.`);
               }
             }
             e.target.value = '';
