@@ -1332,10 +1332,11 @@ export const useChatStore = create((set, get) => ({
       }
     });
 
-    // Auto-cleanup stale indicators every 3 seconds
+    // Auto-cleanup stale indicators every 2 seconds
+    // This removes stale typing indicators that weren't properly cleared
     const cleanupInterval = setInterval(() => {
       get().cleanupStaleIndicators();
-    }, 3000);
+    }, 2000);
 
     set({ typingCleanupInterval: cleanupInterval });
 

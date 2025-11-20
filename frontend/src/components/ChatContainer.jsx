@@ -413,25 +413,26 @@ function ChatContainer() {
   );
   
   // Calculate current typing users with stable memoization
+  // Extract just the names to prevent flickering from timestamp changes
   const currentTypingUsers = useMemo(() => {
     if (!conversationId) return localTypingUsers;
     
     const remoteUsers = [];
     
     if (conversationTypingUsers) {
-      const now = Date.now();
-      
+      // Just get the names, don't check timestamps here
+      // The cleanup function in the store handles stale removal
       Object.values(conversationTypingUsers).forEach((data) => {
-        // 5 second timeout for typing indicator (generous buffer)
-        if ((now - data.timestamp) < 5000) {
-          remoteUsers.push(data.name);
-        }
+        remoteUsers.push(data.name);
       });
     }
     
     // Combine and deduplicate
     const combined = [...localTypingUsers, ...remoteUsers];
-    return [...new Set(combined)];
+    const uniqueUsers = [...new Set(combined)];
+    
+    // Return stable reference if content is the same
+    return uniqueUsers;
   }, [localTypingUsers, conversationId, conversationTypingUsers]);
 
   return (

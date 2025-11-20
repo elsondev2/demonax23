@@ -1,19 +1,37 @@
-import { memo } from 'react';
+import { memo, useState, useEffect, useRef } from 'react';
 
 /**
- * Simple, stable typing indicator component
- * Shows who is currently typing with animated dots
+ * Ultra-stable typing indicator component with zero flickering
+ * Uses internal state to prevent re-renders from parent
  */
-const TypingIndicator = memo(({ typingUsers = [], isInline = false }) => {
+const TypingIndicator = ({ typingUsers = [], isInline = false }) => {
+  const [displayUsers, setDisplayUsers] = useState([]);
+  const prevUsersRef = useRef([]);
+  
+  // Only update display when users actually change (not on every render)
+  useEffect(() => {
+    const prevUsers = prevUsersRef.current;
+    
+    // Check if users actually changed
+    const hasChanged = 
+      typingUsers.length !== prevUsers.length ||
+      typingUsers.some((user, idx) => user !== prevUsers[idx]);
+    
+    if (hasChanged) {
+      setDisplayUsers(typingUsers);
+      prevUsersRef.current = typingUsers;
+    }
+  }, [typingUsers]);
+
   // Don't render anything if no one is typing
-  if (typingUsers.length === 0) return null;
+  if (displayUsers.length === 0) return null;
 
   // Generate display text based on number of users
-  const displayText = typingUsers.length === 1
-    ? `${typingUsers[0]} is typing`
-    : typingUsers.length === 2
-    ? `${typingUsers[0]} and ${typingUsers[1]} are typing`
-    : `${typingUsers[0]} and ${typingUsers.length - 1} others are typing`;
+  const displayText = displayUsers.length === 1
+    ? `${displayUsers[0]} is typing`
+    : displayUsers.length === 2
+    ? `${displayUsers[0]} and ${displayUsers[1]} are typing`
+    : `${displayUsers[0]} and ${displayUsers.length - 1} others are typing`;
 
   // Inline version for sidebar (compact)
   if (isInline) {
@@ -40,8 +58,38 @@ const TypingIndicator = memo(({ typingUsers = [], isInline = false }) => {
       <span className="text-sm text-base-content/70">{displayText}</span>
     </div>
   );
-});
+};
 
 TypingIndicator.displayName = 'TypingIndicator';
 
-export default TypingIndicator;
+// Custom comparison function to prevent re-renders when array content is the same
+const areEqual = (prevProps, nextProps) => {
+  // If lengths are different, re-render
+  if (prevProps.typingUsers.length !== nextProps.typingUsers.length) {
+    return false;
+  }
+  
+  // If inline prop changed, re-render
+  if (prevProps.isInline !== nextProps.isInline) {
+    return false;
+  }
+  
+  // Check if all users are the same (order doesn't matter)
+  const prevSet = new Set(prevProps.typingUsers);
+  const nextSet = new Set(nextProps.typingUsers);
+  
+  if (prevSet.size !== nextSet.size) {
+    return false;
+  }
+  
+  for (const user of prevSet) {
+    if (!nextSet.has(user)) {
+      return false;
+    }
+  }
+  
+  // Arrays have same content, don't re-render
+  return true;
+};
+
+export default memo(TypingIndicator, areEqual);
