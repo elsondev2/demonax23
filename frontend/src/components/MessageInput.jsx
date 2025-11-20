@@ -22,7 +22,7 @@ import {
   supportsAdvancedAudioProcessing
 } from "../utils/audioProcessor";
 
-const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
+const MessageInput = ({ onInputFocus }) => {
   const [text, setText] = useState("");
   const [image, setImage] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
@@ -36,7 +36,7 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
   const [audioStream, setAudioStream] = useState(null);
   const [typingTimeout, setTypingTimeout] = useState(null);
   const [isTyping, setIsTyping] = useState(false);
-  const [localTypingUsers, setLocalTypingUsers] = useState([]); // eslint-disable-line no-unused-vars
+
   const { sendMessage, selectedUser, selectedGroup, messageInputText, setMessageInputText, quotedMessage, clearQuotedMessage, messages, playKeystrokeSound } = useChatStore();
   const [isEmojiOpen, setIsEmojiOpen] = useState(false);
   const [showCaptionImageModal, setShowCaptionImageModal] = useState(false);
@@ -250,10 +250,7 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
           // Set typing state if not already set
           if (!isTyping) {
             setIsTyping(true);
-            // Add yourself to local typing users for immediate feedback
-            const newLocalUsers = [authUser?.fullName || 'You'];
-            setLocalTypingUsers(newLocalUsers);
-            onLocalTypingChange?.(newLocalUsers);
+            // Don't add yourself to local typing users - only show others typing
           }
 
           // Clear previous inactivity timeout
@@ -268,8 +265,6 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
               isGroup
             });
             setIsTyping(false);
-            setLocalTypingUsers([]);
-            onLocalTypingChange?.([]);
           }, 3000);
 
           setTypingTimeout(timeout);
@@ -402,8 +397,6 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
           isGroup
         });
         setIsTyping(false);
-        setLocalTypingUsers([]);
-        onLocalTypingChange?.([]);
       }
     }
 
@@ -794,8 +787,6 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
                       isGroup
                     });
                     setIsTyping(false);
-                    setLocalTypingUsers([]);
-                    onLocalTypingChange?.([]);
                   }
                 }
 

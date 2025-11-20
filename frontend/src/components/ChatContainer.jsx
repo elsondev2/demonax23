@@ -57,8 +57,6 @@ function ChatContainer() {
   const [showNewMessageIndicator, setShowNewMessageIndicator] = useState(false);
   const [newMessageCount, setNewMessageCount] = useState(0);
   const [showBackToBottom, setShowBackToBottom] = useState(false);
-  
-  const [localTypingUsers, setLocalTypingUsers] = useState([]);
 
   // Message rendering diagnostics
   const { forceCheck } = useMessageRenderingDiagnostics(messagesContainerRef);
@@ -415,25 +413,19 @@ function ChatContainer() {
   // Calculate current typing users with stable memoization
   // Extract just the names to prevent flickering from timestamp changes
   const currentTypingUsers = useMemo(() => {
-    if (!conversationId) return localTypingUsers;
+    if (!conversationId || !conversationTypingUsers) return [];
     
     const remoteUsers = [];
     
-    if (conversationTypingUsers) {
-      // Just get the names, don't check timestamps here
-      // The cleanup function in the store handles stale removal
-      Object.values(conversationTypingUsers).forEach((data) => {
-        remoteUsers.push(data.name);
-      });
-    }
+    // Just get the names, don't check timestamps here
+    // The cleanup function in the store handles stale removal
+    Object.values(conversationTypingUsers).forEach((data) => {
+      remoteUsers.push(data.name);
+    });
     
-    // Combine and deduplicate
-    const combined = [...localTypingUsers, ...remoteUsers];
-    const uniqueUsers = [...new Set(combined)];
-    
-    // Return stable reference if content is the same
-    return uniqueUsers;
-  }, [localTypingUsers, conversationId, conversationTypingUsers]);
+    // Return unique users
+    return [...new Set(remoteUsers)];
+  }, [conversationId, conversationTypingUsers]);
 
   return (
     <div className="bg-base-100 text-base-content flex-1 flex flex-col h-full md:max-h-full relative overflow-hidden">
@@ -527,10 +519,7 @@ function ChatContainer() {
               )
             ))}
             
-            {/* Typing Indicator */}
-            <TypingIndicator typingUsers={currentTypingUsers} />
-            
-            {/* 👇 scroll target with minimal padding for typing indicator */}
+            {/* 👇 scroll target */}
             <div 
               ref={messageEndRef} 
               className="pb-2"
@@ -599,6 +588,9 @@ function ChatContainer() {
         </div>
       )}
 
+      {/* Typing Indicator - Above message input */}
+      <TypingIndicator typingUsers={currentTypingUsers} />
+
       <MessageInput 
         onInputFocus={() => {
           if (!hasInteractedWithInput) {
@@ -610,10 +602,6 @@ function ChatContainer() {
               markGroupRead(selectedGroup._id);
             }
           }
-        }}
-        onLocalTypingChange={(localUsers) => {
-          // Update typing indicator with local typing users
-          setLocalTypingUsers(localUsers);
         }}
       />
 
