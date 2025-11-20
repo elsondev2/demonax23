@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useSwipeable } from "react-swipeable";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
-import { AlertCircle, RotateCcw, Edit, Trash2, Quote, FileText, MoreVertical, Phone, Video, Download, Maximize2 } from "lucide-react";
+import { AlertCircle, RotateCcw, Edit, Trash2, Quote, FileText, MoreVertical, Phone, Video, Download, Maximize2, FileArchive, FileCode, FileSpreadsheet, FileVideo, FileAudio, File } from "lucide-react";
 import useLongPress from "../hooks/useLongPress";
 import { hapticMedium, hapticLight } from "../utils/haptic";
 import Avatar from "./Avatar";
@@ -215,6 +215,67 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
 
 
   const [docPreview, setDocPreview] = useState(null); // {url, filename}
+
+  // Helper function to get file type info
+  const getFileTypeInfo = (contentType, filename) => {
+    const ext = filename?.split('.').pop()?.toLowerCase() || '';
+    
+    // Video files
+    if (contentType?.startsWith('video/') || ['mp4', 'webm', 'mov', 'avi', 'mkv'].includes(ext)) {
+      return { icon: FileVideo, label: 'Video', color: 'text-purple-500', canPreview: true };
+    }
+    
+    // Audio files
+    if (contentType?.startsWith('audio/') || ['mp3', 'wav', 'ogg', 'm4a', 'flac'].includes(ext)) {
+      return { icon: FileAudio, label: 'Audio', color: 'text-blue-500', canPreview: true };
+    }
+    
+    // PDF
+    if (contentType === 'application/pdf' || ext === 'pdf') {
+      return { icon: FileText, label: 'PDF', color: 'text-red-500', canPreview: true };
+    }
+    
+    // Documents
+    if (['doc', 'docx', 'odt', 'rtf'].includes(ext) || contentType?.includes('word')) {
+      return { icon: FileText, label: 'Document', color: 'text-blue-600', canPreview: false };
+    }
+    
+    // Spreadsheets
+    if (['xls', 'xlsx', 'csv', 'ods'].includes(ext) || contentType?.includes('spreadsheet') || contentType?.includes('excel')) {
+      return { icon: FileSpreadsheet, label: 'Spreadsheet', color: 'text-green-600', canPreview: false };
+    }
+    
+    // Presentations
+    if (['ppt', 'pptx', 'odp'].includes(ext) || contentType?.includes('presentation') || contentType?.includes('powerpoint')) {
+      return { icon: FileText, label: 'Presentation', color: 'text-orange-600', canPreview: false };
+    }
+    
+    // Archives
+    if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2'].includes(ext) || contentType?.includes('zip') || contentType?.includes('compressed')) {
+      return { icon: FileArchive, label: 'Archive', color: 'text-yellow-600', canPreview: false };
+    }
+    
+    // Code files
+    if (['js', 'ts', 'jsx', 'tsx', 'py', 'java', 'cpp', 'c', 'h', 'css', 'html', 'json', 'xml', 'yaml', 'yml', 'sh', 'php', 'rb', 'go', 'rs'].includes(ext)) {
+      return { icon: FileCode, label: 'Code', color: 'text-indigo-600', canPreview: false };
+    }
+    
+    // Text files
+    if (contentType?.startsWith('text/') || ['txt', 'md', 'log'].includes(ext)) {
+      return { icon: FileText, label: 'Text', color: 'text-gray-600', canPreview: false };
+    }
+    
+    // Default
+    return { icon: File, label: 'File', color: 'text-base-content/60', canPreview: false };
+  };
+
+  // Helper to format file size
+  const formatFileSize = (bytes) => {
+    if (!bytes) return '';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
 
   return (
     <div
@@ -667,54 +728,152 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
                         </div>
                       )}
                     </div>
-                  ) : a.contentType === 'application/pdf' ? (
-                    <div key={idx} className={`rounded-lg p-2 md:p-3 flex items-center justify-between max-w-[200px] md:max-w-sm border ${
-                      isOwnMessage 
-                        ? 'bg-primary-content/20 border-primary-content/40' 
-                        : 'bg-base-200/50 border-base-300/50'
-                    }`}>
-                      <div className="flex items-center gap-1.5 md:gap-2 text-xs md:text-sm min-w-0 flex-1">
-                        <FileText className={`w-4 h-4 md:w-5 md:h-5 flex-shrink-0 ${isOwnMessage ? 'text-primary-content' : 'text-base-content/60'}`} />
-                        <span className={`truncate font-medium ${isOwnMessage ? 'text-primary-content' : 'text-base-content/80'}`}>{a.filename || 'PDF'}</span>
+                  ) : (() => {
+                    // Get file type info
+                    const fileInfo = getFileTypeInfo(a.contentType, a.filename);
+                    const FileIcon = fileInfo.icon;
+                    
+                    // Video files - show video player
+                    if (a.contentType?.startsWith('video/')) {
+                      return (
+                        <div key={idx} className="rounded-lg overflow-hidden max-w-sm">
+                          <video
+                            src={a.url}
+                            controls
+                            className="w-full max-h-64 bg-black"
+                            preload="metadata"
+                          >
+                            Your browser does not support video playback.
+                          </video>
+                          <div className={`p-2 flex items-center justify-between text-xs ${
+                            isOwnMessage ? 'bg-primary-content/20' : 'bg-base-200'
+                          }`}>
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <FileIcon className={`w-4 h-4 flex-shrink-0 ${fileInfo.color}`} />
+                              <span className="truncate">{a.filename || 'Video'}</span>
+                              {a.size && <span className="text-xs opacity-60">{formatFileSize(a.size)}</span>}
+                            </div>
+                            <a
+                              href={a.url}
+                              download={a.filename || 'video'}
+                              className="btn btn-xs btn-ghost ml-2"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Download className="w-3 h-3" />
+                            </a>
+                          </div>
+                        </div>
+                      );
+                    }
+                    
+                    // Audio files - show audio player
+                    if (a.contentType?.startsWith('audio/')) {
+                      return (
+                        <div key={idx} className={`rounded-lg overflow-hidden max-w-sm ${
+                          isOwnMessage ? 'bg-primary-content/20' : 'bg-base-200'
+                        }`}>
+                          <div className="p-3">
+                            <div className="flex items-center gap-2 mb-2">
+                              <FileIcon className={`w-5 h-5 flex-shrink-0 ${fileInfo.color}`} />
+                              <div className="min-w-0 flex-1">
+                                <div className={`text-sm font-medium truncate ${
+                                  isOwnMessage ? 'text-primary-content' : 'text-base-content'
+                                }`}>
+                                  {a.filename || 'Audio'}
+                                </div>
+                                {a.size && (
+                                  <div className={`text-xs ${
+                                    isOwnMessage ? 'text-primary-content/60' : 'text-base-content/60'
+                                  }`}>
+                                    {formatFileSize(a.size)}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <audio
+                              src={a.url}
+                              controls
+                              className="w-full"
+                              preload="metadata"
+                            >
+                              Your browser does not support audio playback.
+                            </audio>
+                          </div>
+                          <div className={`px-3 pb-2 flex justify-end ${
+                            isOwnMessage ? 'bg-primary-content/10' : 'bg-base-300/30'
+                          }`}>
+                            <a
+                              href={a.url}
+                              download={a.filename || 'audio'}
+                              className="btn btn-xs btn-ghost"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Download className="w-3 h-3 mr-1" />
+                              Download
+                            </a>
+                          </div>
+                        </div>
+                      );
+                    }
+                    
+                    // PDF and other documents
+                    return (
+                      <div key={idx} className={`rounded-lg p-3 max-w-sm border ${
+                        isOwnMessage 
+                          ? 'bg-primary-content/20 border-primary-content/40' 
+                          : 'bg-base-200/50 border-base-300/50'
+                      }`}>
+                        <div className="flex items-start gap-3">
+                          <div className={`p-2 rounded-lg ${
+                            isOwnMessage ? 'bg-primary-content/30' : 'bg-base-300/50'
+                          }`}>
+                            <FileIcon className={`w-6 h-6 ${fileInfo.color}`} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className={`text-sm font-medium truncate mb-1 ${
+                              isOwnMessage ? 'text-primary-content' : 'text-base-content'
+                            }`}>
+                              {a.filename || fileInfo.label}
+                            </div>
+                            <div className={`text-xs mb-2 ${
+                              isOwnMessage ? 'text-primary-content/60' : 'text-base-content/60'
+                            }`}>
+                              <span className="font-medium">{fileInfo.label}</span>
+                              {a.size && <span className="ml-2">{formatFileSize(a.size)}</span>}
+                            </div>
+                            <div className="flex gap-2">
+                              {fileInfo.canPreview && (
+                                <button
+                                  className={`btn btn-xs ${
+                                    isOwnMessage 
+                                      ? 'bg-primary-content/30 hover:bg-primary-content/40 text-primary-content border-primary-content/40' 
+                                      : 'btn-ghost'
+                                  }`}
+                                  onClick={() => window.open(a.url, '_blank')}
+                                >
+                                  <Maximize2 className="w-3 h-3 mr-1" />
+                                  View
+                                </button>
+                              )}
+                              <a
+                                href={a.url}
+                                download={a.filename || 'file'}
+                                className={`btn btn-xs ${
+                                  isOwnMessage 
+                                    ? 'bg-primary-content/30 hover:bg-primary-content/40 text-primary-content border-primary-content/40' 
+                                    : 'btn-ghost'
+                                }`}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Download className="w-3 h-3 mr-1" />
+                                Download
+                              </a>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex gap-0.5 md:gap-1 ml-1 md:ml-2 flex-shrink-0">
-                        <button
-                          className={`btn btn-xs ${isOwnMessage ? 'bg-primary-content/30 hover:bg-primary-content/40 text-primary-content border-primary-content/40' : 'btn-ghost'} hidden md:inline-flex`}
-                          onClick={() => setDocPreview({ url: a.url, filename: a.filename || 'Document' })}
-                        >
-                          View
-                        </button>
-                        <a
-                          href={a.url}
-                          download={a.filename || 'document.pdf'}
-                          className={`btn btn-xs ${isOwnMessage ? 'bg-primary-content/30 hover:bg-primary-content/40 text-primary-content border-primary-content/40' : 'btn-ghost'}`}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Download className="w-3 h-3" />
-                        </a>
-                      </div>
-                    </div>
-                  ) : (
-                    <div key={idx} className={`rounded-lg p-2 md:p-3 flex items-center justify-between max-w-[200px] md:max-w-sm border ${
-                      isOwnMessage 
-                        ? 'bg-primary-content/20 border-primary-content/40' 
-                        : 'bg-base-200/50 border-base-300/50'
-                    }`}>
-                      <div className="flex items-center gap-1.5 md:gap-2 text-xs md:text-sm min-w-0 flex-1">
-                        <FileText className={`w-4 h-4 md:w-5 md:h-5 flex-shrink-0 ${isOwnMessage ? 'text-primary-content' : 'text-base-content/60'}`} />
-                        <span className={`truncate font-medium ${isOwnMessage ? 'text-primary-content' : 'text-base-content/80'}`}>{a.filename || a.contentType || 'File'}</span>
-                      </div>
-                      <a
-                        href={a.url}
-                        download={a.filename || 'file'}
-                        className={`btn btn-xs ${isOwnMessage ? 'bg-primary-content/30 hover:bg-primary-content/40 text-primary-content border-primary-content/40' : 'btn-ghost'} ml-1 md:ml-2 flex-shrink-0`}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Download className="w-3 h-3 md:mr-1" />
-                        <span className="hidden md:inline">Download</span>
-                      </a>
-                    </div>
-                  )
+                    );
+                  })()
                 ))}
               </div>
             )}

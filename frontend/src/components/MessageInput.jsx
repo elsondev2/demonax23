@@ -34,7 +34,6 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
   const [recordStartTs, setRecordStartTs] = useState(0);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [audioStream, setAudioStream] = useState(null);
-  const [isSending, setIsSending] = useState(false);
   const [typingTimeout, setTypingTimeout] = useState(null);
   const [isTyping, setIsTyping] = useState(false);
   const [localTypingUsers, setLocalTypingUsers] = useState([]); // eslint-disable-line no-unused-vars
@@ -381,9 +380,7 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if ((!text.trim() && !image && attachments.length === 0 && !audio) || isSending) return;
-
-    setIsSending(true);
+    if (!text.trim() && !image && attachments.length === 0 && !audio) return;
 
     // Haptic feedback on send
     hapticSuccess();
@@ -410,59 +407,64 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
       }
     }
 
+    // ✅ FIX 1: CLEAR INPUT IMMEDIATELY (before sending)
+    // Store values before clearing
+    const messageText = text;
+    const messageImage = image;
+    const messageAttachments = attachments;
+    const messageAudio = audio;
+    const messageMentions = mentions;
+    const messageHtml = getHtml();
+    
+    // Clear UI immediately for instant feedback
+    setText("");
+    clearEditor();
+    setImage(null);
+    setPreviewImage(null);
+    setAttachments([]);
+    setAudio(null);
+    setMentions([]);
+    clearQuotedMessage();
+
+    // Keep input focused so user can continue typing
+    setTimeout(() => {
+      if (commandsRef.current) {
+        commandsRef.current.focus();
+      }
+    }, 0);
+
+    // Now send in background (non-blocking)
     try {
       // Validate mentions before sending
-      const validatedMentions = await validateMentionsBeforeSend(text, mentions);
+      const validatedMentions = await validateMentionsBeforeSend(messageText, messageMentions);
 
       let imageData = null;
-      if (image) {
+      if (messageImage) {
         try {
           // Silently compress and convert image to base64
           const { compressImageToBase64 } = await import('../utils/imageCompression');
-          imageData = await compressImageToBase64(image);
+          imageData = await compressImageToBase64(messageImage);
         } catch (imgError) {
           console.error('Failed to process image:', imgError);
           alert('Failed to process image. Please try again.');
-          setIsSending(false);
           return;
         }
       }
 
-      // Get HTML for formatted text
-      const htmlContent = getHtml();
-
       await sendMessage({
-        text,
-        html: htmlContent, // Add HTML for rich formatting
+        text: messageText,
+        html: messageHtml,
         image: imageData,
-        attachments,
-        audio,
+        attachments: messageAttachments,
+        audio: messageAudio,
         mentions: validatedMentions
       });
-      
-      // Clear form on success
-      setText("");
-      clearEditor();
-      setImage(null);
-      setPreviewImage(null);
-      setAttachments([]);
-      setAudio(null);
-      setMentions([]);
-      clearQuotedMessage(); // Clear quote after sending
-
-      // Keep input focused after sending so user can continue typing
-      setTimeout(() => {
-        if (commandsRef.current) {
-          commandsRef.current.focus();
-        }
-      }, 0);
     } catch (error) {
       console.error("Failed to send message:", error);
       const errorMsg = error.response?.data?.message || error.message || 'Failed to send message';
       alert(`Error: ${errorMsg}`);
-    } finally {
-      setIsSending(false);
     }
+    // ✅ FIX 2: NO FINALLY BLOCK - Don't block button
   };
 
   // Validate mentions before sending
@@ -539,7 +541,6 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
               setImage(null);
             }}
             className="btn btn-xs btn-error btn-circle absolute -top-2 -right-2"
-            disabled={isSending}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -678,7 +679,7 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
           type="file"
           multiple
           className="hidden"
-          disabled={isSending || limitInfo.isLimited}
+          disabled={limitInfo.isLimited}
           onChange={async (e) => {
             const files = Array.from(e.target.files || []);
             
@@ -744,9 +745,9 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
         {/* ATTACHMENT BUTTON */}
         <button
           type="button"
-          className={`transition-colors ${isSending || limitInfo.isLimited ? 'text-base-content/50' : 'text-base-content/70 hover:text-primary'}`}
+          className={`transition-colors ${limitInfo.isLimited ? 'text-base-content/50' : 'text-base-content/70 hover:text-primary'}`}
           onClick={() => setShowAttachmentTypeModal(true)}
-          disabled={isSending || limitInfo.isLimited}
+          disabled={limitInfo.isLimited}
           title="Attach file"
           data-tutorial="attach-button"
         >
@@ -756,9 +757,9 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
         {/* CAPTION IMAGE */}
         <button
           type="button"
-          className={`transition-colors ${isSending || limitInfo.isLimited ? 'text-base-content/50' : 'text-base-content/70 hover:text-primary'}`}
+          className={`transition-colors ${limitInfo.isLimited ? 'text-base-content/50' : 'text-base-content/70 hover:text-primary'}`}
           onClick={() => setShowCaptionImageModal(true)}
-          disabled={isSending || limitInfo.isLimited}
+          disabled={limitInfo.isLimited}
           title="Create Caption Image"
         >
           <Sparkles className="h-5 w-5" />
@@ -806,7 +807,7 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
               }
             }}
             placeholder={getPlaceholder()}
-            disabled={isSending || limitInfo.isLimited}
+            disabled={limitInfo.isLimited}
             maxLength={2000}
             commandsRef={commandsRef}
             onPaste={handlePaste}
@@ -827,7 +828,7 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
           {/* AUDIO RECORD BUTTON INSIDE TEXTAREA */}
           <button
             type="button"
-            className={`absolute right-2 top-1/2 -translate-y-1/2 transition-colors ${isSending || limitInfo.isLimited ? 'text-base-content/50' : isRecording ? 'text-error' : 'text-base-content/70 hover:text-primary'}`}
+            className={`absolute right-2 top-1/2 -translate-y-1/2 transition-colors ${limitInfo.isLimited ? 'text-base-content/50' : isRecording ? 'text-error' : 'text-base-content/70 hover:text-primary'}`}
             disabled={limitInfo.isLimited || isProcessingAudio}
             title={isRecording ? "Stop recording" : "Record audio"}
             onClick={async () => {
@@ -999,7 +1000,7 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
               onToggle={() => setIsFormattingExpanded(!isFormattingExpanded)}
               activeFormats={activeFormats}
               onFormatToggle={handleFormatToggle}
-              disabled={isSending || limitInfo.isLimited}
+              disabled={limitInfo.isLimited}
             />
           </div>
 
@@ -1017,7 +1018,7 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
           ref={emojiBtnRef}
           onClick={() => setIsEmojiOpen(v => !v)}
           disabled={limitInfo.isLimited}
-          className={`transition-colors ${isSending || limitInfo.isLimited ? 'text-base-content/50' : 'text-base-content/70 hover:text-primary'}`}
+          className={`transition-colors ${limitInfo.isLimited ? 'text-base-content/50' : 'text-base-content/70 hover:text-primary'}`}
           title="Add emoji"
         >
           <Smile className="h-5 w-5" />
@@ -1026,18 +1027,13 @@ const MessageInput = ({ onInputFocus, onLocalTypingChange }) => {
         {/* SEND BUTTON */}
         <button
           type="submit"
-          disabled={(!text.trim() && !image && attachments.length === 0 && !audio) || isSending || limitInfo.isLimited}
-          className={`btn btn-circle ${(!text.trim() && !image && attachments.length === 0 && !audio) || isSending || limitInfo.isLimited
+          disabled={(!text.trim() && !image && attachments.length === 0 && !audio) || limitInfo.isLimited}
+          className={`btn btn-circle ${(!text.trim() && !image && attachments.length === 0 && !audio) || limitInfo.isLimited
             ? "btn-disabled"
             : "btn-primary"
             }`}
         >
-          {isSending ? (
-            // Show loading spinner when sending
-            <span className="loading loading-spinner loading-sm"></span>
-          ) : (
-            <SendIcon className="h-5 w-5" />
-          )}
+          <SendIcon className="h-5 w-5" />
         </button>
       </form>
 

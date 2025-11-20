@@ -252,19 +252,8 @@ function ChatsList() {
   const scrollContainerRef = useRef(null);
   const [, forceUpdate] = useState({});
 
-  // Force re-render when typing state changes
-  useEffect(() => {
-    const interval = setInterval(() => {
-      // Check if any typing indicators need updating
-      const hasActiveTyping = Object.values(typingUsers).some(chatTyping =>
-        Object.values(chatTyping).some(data => (Date.now() - data.timestamp) < 3000)
-      );
-      if (hasActiveTyping) {
-        forceUpdate({});
-      }
-    }, 500);
-    return () => clearInterval(interval);
-  }, [typingUsers]);
+  // Removed interval-based force updates to prevent flickering
+  // Natural state updates from Zustand will handle typing indicator changes
 
   useEffect(() => {
     getMyChatPartners();
