@@ -1,0 +1,103 @@
+═══════════════════════════════════════════════════════════════════════════════
+                    TYPING INDICATOR - QUICK TEST CHECKLIST
+═══════════════════════════════════════════════════════════════════════════════
+
+🚀 QUICK START
+═══════════════════════════════════════════════════════════════════════════════
+
+WINDOW 1 (User A):
+□ Open browser
+□ Login as User A
+□ Open chat with User B
+□ Press F12 (open console)
+□ Press Ctrl+Shift+D (open debugger)
+
+WINDOW 2 (User B):
+□ Open incognito/another browser
+□ Login as User B  
+□ Open chat with User A
+□ Press F12 (open console)
+□ Press Ctrl+Shift+D (open debugger)
+
+BACKEND:
+□ Check terminal/console is visible
+
+
+═══════════════════════════════════════════════════════════════════════════════
+✅ TEST SEQUENCE
+═══════════════════════════════════════════════════════════════════════════════
+
+ACTION: User A clicks message input
+
+WINDOW 1 CONSOLE:
+□ See: 🔵 TYPING: Emitting typing event
+
+WINDOW 1 DEBUGGER:
+□ "Your Typing Status" shows: ⌨️ TYPING
+□ "Socket" shows: 🟢 Connected
+
+BACKEND CONSOLE:
+□ See: 🔵 BACKEND: Received typing event
+□ See: 📤 BACKEND: Sending to user
+□ See: ✅ BACKEND: userTyping event sent
+□ NOT: ❌ BACKEND: Target user not connected
+
+WINDOW 2 CONSOLE:
+□ See: 📥 RECEIVED: userTyping
+□ See: 📥 STORE: Received userTyping event
+□ See: ✅ STORE: Setting user typing in store
+□ See: ✅ STORE: Updating state
+
+WINDOW 2 DEBUGGER:
+□ "Others Typing" shows: User A
+□ "Socket Events" shows: userTyping event
+
+WINDOW 2 UI:
+□ See typing indicator above message input
+□ See: "User A is typing" with animated dots
+
+
+═══════════════════════════════════════════════════════════════════════════════
+❌ IF SOMETHING FAILS
+═══════════════════════════════════════════════════════════════════════════════
+
+NO LOGS IN WINDOW 1:
+→ Check if input is actually focused
+→ Check socket connection in debugger
+→ Refresh page
+
+NO LOGS IN BACKEND:
+→ Check backend is running
+→ Check WebSocket connection
+→ Check network tab
+
+BACKEND SAYS "Target user not connected":
+→ User B needs to refresh
+→ Check User B socket connection
+→ Check userSocketMap in backend
+
+NO LOGS IN WINDOW 2:
+→ Check User B socket connection
+→ Check if in same conversation
+→ Verify socket listeners are registered
+
+LOGS OK BUT NO UI:
+→ Check TypingIndicator component
+→ Check currentTypingUsers calculation
+→ Inspect component props
+
+
+═══════════════════════════════════════════════════════════════════════════════
+📋 REPORT FORMAT
+═══════════════════════════════════════════════════════════════════════════════
+
+When reporting issues, provide:
+
+1. Which logs appear? (copy/paste)
+2. Which logs are missing?
+3. Any error messages?
+4. Screenshots of debugger
+5. Backend console output
+
+
+═══════════════════════════════════════════════════════════════════════════════

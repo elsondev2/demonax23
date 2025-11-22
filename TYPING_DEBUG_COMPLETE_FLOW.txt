@@ -1,0 +1,355 @@
+═══════════════════════════════════════════════════════════════════════════════
+              TYPING INDICATOR - COMPLETE DEBUG FLOW WITH LOGS
+═══════════════════════════════════════════════════════════════════════════════
+
+🎯 TESTING SETUP
+═══════════════════════════════════════════════════════════════════════════════
+
+WINDOW 1 (User A - Sender):
+1. Open browser window
+2. Login as User A
+3. Open chat with User B
+4. Open console (F12)
+5. Open debugger (Ctrl+Shift+D)
+
+WINDOW 2 (User B - Receiver):
+1. Open ANOTHER browser window (or incognito)
+2. Login as User B
+3. Open chat with User A
+4. Open console (F12)
+5. Open debugger (Ctrl+Shift+D)
+
+BACKEND:
+1. Check backend terminal/console for logs
+
+
+═══════════════════════════════════════════════════════════════════════════════
+📊 EXPECTED LOG FLOW - USER A STARTS TYPING
+═══════════════════════════════════════════════════════════════════════════════
+
+STEP 1: User A clicks message input
+───────────────────────────────────────────────────────────────────────────────
+
+WINDOW 1 (User A) - Frontend Console:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 🔵 TYPING: Emitting typing event {                                          │
+│   conversationId: "USER_B_ID",                                              │
+│   isGroup: false,                                                           │
+│   userName: "User A",                                                       │
+│   socketConnected: true                                                     │
+│ }                                                                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+WINDOW 1 (User A) - Debugger:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Your Typing Status: ⌨️ TYPING                                               │
+│ Input is focused                                                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+STEP 2: Backend receives typing event
+───────────────────────────────────────────────────────────────────────────────
+
+BACKEND Console:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 🔵 BACKEND: Received typing event {                                         │
+│   from: "USER_A_ID",                                                        │
+│   userName: "User A",                                                       │
+│   conversationId: "USER_B_ID",                                              │
+│   isGroup: false                                                            │
+│ }                                                                           │
+│                                                                              │
+│ 📤 BACKEND: Sending to user {                                               │
+│   targetUserId: "USER_B_ID",                                                │
+│   targetSocketId: "SOCKET_ID_OF_USER_B",                                    │
+│   senderUserId: "USER_A_ID"                                                 │
+│ }                                                                           │
+│                                                                              │
+│ ✅ BACKEND: userTyping event sent                                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+⚠️ IF YOU SEE:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ ❌ BACKEND: Target user not connected                                       │
+└─────────────────────────────────────────────────────────────────────────────┘
+PROBLEM: User B is not connected or socket mapping is broken
+SOLUTION: Check if User B is logged in and socket is connected
+
+
+STEP 3: User B receives typing event
+───────────────────────────────────────────────────────────────────────────────
+
+WINDOW 2 (User B) - Frontend Console:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 📥 RECEIVED: userTyping {                                                   │
+│   conversationId: "USER_A_ID",                                              │
+│   userId: "USER_A_ID",                                                      │
+│   userName: "User A"                                                        │
+│ }                                                                           │
+│                                                                              │
+│ 📥 STORE: Received userTyping event {                                       │
+│   conversationId: "USER_A_ID",                                              │
+│   userId: "USER_A_ID",                                                      │
+│   userName: "User A"                                                        │
+│ }                                                                           │
+│                                                                              │
+│ 📥 STORE: Current authUser._id: "USER_B_ID"                                 │
+│ 📥 STORE: Filtering own event? false                                        │
+│ ✅ STORE: Setting user typing in store                                      │
+│                                                                              │
+│ 🔧 STORE: setUserTyping called {                                            │
+│   conversationId: "USER_A_ID",                                              │
+│   userId: "USER_A_ID",                                                      │
+│   userName: "User A"                                                        │
+│ }                                                                           │
+│                                                                              │
+│ 🔧 STORE: Existing user? No                                                 │
+│ 🔧 STORE: Needs update? true                                                │
+│ ✅ STORE: Updating state { typingUsers: { ... } }                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+WINDOW 2 (User B) - Debugger:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Others Typing:                                                              │
+│   User A                                                                    │
+│   ID: USER_A_I...                                                           │
+│   Time: 10:30:45 AM                                                         │
+│                                                                              │
+│ Socket Events (Last 10):                                                    │
+│   10:30:45 AM - userTyping                                                  │
+│   User A (USER_A...)                                                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+WINDOW 2 (User B) - UI:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ [Above message input]                                                       │
+│ ● ● ● User A is typing                                                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════
+📊 EXPECTED LOG FLOW - USER A TYPES A CHARACTER
+═══════════════════════════════════════════════════════════════════════════════
+
+WINDOW 1 (User A) - Frontend Console:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ ⌨️ TYPING: Keystroke - resetting timer                                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+(No backend or User B logs - timer just resets locally)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+📊 EXPECTED LOG FLOW - USER A STOPS TYPING (2 SECOND TIMEOUT)
+═══════════════════════════════════════════════════════════════════════════════
+
+STEP 1: User A stops typing for 2 seconds
+───────────────────────────────────────────────────────────────────────────────
+
+WINDOW 1 (User A) - Frontend Console:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ ⏱️ TYPING: Inactivity timeout - stopping typing                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+WINDOW 1 (User A) - Debugger:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Your Typing Status: 💤 Idle                                                 │
+│ Input not focused                                                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+STEP 2: Backend receives stopTyping event
+───────────────────────────────────────────────────────────────────────────────
+
+BACKEND Console:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 🔴 BACKEND: Received stopTyping event {                                     │
+│   from: "USER_A_ID",                                                        │
+│   conversationId: "USER_B_ID",                                              │
+│   isGroup: false                                                            │
+│ }                                                                           │
+│                                                                              │
+│ 📤 BACKEND: Sending stopTyping to user {                                    │
+│   targetUserId: "USER_B_ID",                                                │
+│   targetSocketId: "SOCKET_ID_OF_USER_B"                                     │
+│ }                                                                           │
+│                                                                              │
+│ ✅ BACKEND: userStoppedTyping event sent                                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+STEP 3: User B receives stopTyping event
+───────────────────────────────────────────────────────────────────────────────
+
+WINDOW 2 (User B) - Frontend Console:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 📥 RECEIVED: userStoppedTyping {                                            │
+│   conversationId: "USER_A_ID",                                              │
+│   userId: "USER_A_ID"                                                       │
+│ }                                                                           │
+│                                                                              │
+│ 📥 STORE: Received userStoppedTyping event {                                │
+│   conversationId: "USER_A_ID",                                              │
+│   userId: "USER_A_ID"                                                       │
+│ }                                                                           │
+│                                                                              │
+│ ✅ STORE: Clearing user typing from store                                   │
+│                                                                              │
+│ 🔧 STORE: clearUserTyping called {                                          │
+│   conversationId: "USER_A_ID",                                              │
+│   userId: "USER_A_ID"                                                       │
+│ }                                                                           │
+│                                                                              │
+│ ✅ STORE: Removing user from typing list                                    │
+│ 🗑️ STORE: No users left, removing conversation from typingUsers            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+WINDOW 2 (User B) - Debugger:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Others Typing:                                                              │
+│   No one else typing                                                        │
+│                                                                              │
+│ Socket Events (Last 10):                                                    │
+│   10:30:47 AM - userStoppedTyping                                           │
+│   User A (USER_A...)                                                        │
+│   10:30:45 AM - userTyping                                                  │
+│   User A (USER_A...)                                                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+WINDOW 2 (User B) - UI:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ [Above message input]                                                       │
+│ (Typing indicator disappears)                                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🐛 TROUBLESHOOTING GUIDE
+═══════════════════════════════════════════════════════════════════════════════
+
+PROBLEM 1: No logs in User A console when clicking input
+───────────────────────────────────────────────────────────────────────────────
+SYMPTOMS:
+- No "🔵 TYPING: Emitting typing event" log
+
+CHECKS:
+1. Is the input actually focused? (Check debugger "Your Typing Status")
+2. Is socket connected? (Check debugger "Socket: 🟢 Connected")
+3. Is conversationId valid? (Check debugger "Conversation ID")
+4. Any JavaScript errors in console?
+
+SOLUTIONS:
+- Refresh the page
+- Check if WYSIWYGMessageInput onFocus is being called
+- Verify socket is initialized in useAuthStore
+
+
+PROBLEM 2: Backend doesn't receive typing event
+───────────────────────────────────────────────────────────────────────────────
+SYMPTOMS:
+- User A sees "🔵 TYPING: Emitting typing event"
+- But no "🔵 BACKEND: Received typing event" in backend
+
+CHECKS:
+1. Is backend running?
+2. Is WebSocket connection established?
+3. Check network tab for WebSocket frames
+
+SOLUTIONS:
+- Restart backend server
+- Check backend console for connection errors
+- Verify socket.io is properly configured
+
+
+PROBLEM 3: Backend can't find target user
+───────────────────────────────────────────────────────────────────────────────
+SYMPTOMS:
+- Backend shows "❌ BACKEND: Target user not connected"
+
+CHECKS:
+1. Is User B logged in?
+2. Is User B's socket connected?
+3. Check getReceiverSocketId() function
+
+SOLUTIONS:
+- Have User B refresh the page
+- Check userSocketMap in backend
+- Verify User B's socket.userId is set correctly
+
+
+PROBLEM 4: User B doesn't receive event
+───────────────────────────────────────────────────────────────────────────────
+SYMPTOMS:
+- Backend shows "✅ BACKEND: userTyping event sent"
+- But no "📥 RECEIVED: userTyping" in User B console
+
+CHECKS:
+1. Is User B's socket connected?
+2. Is User B listening to "userTyping" event?
+3. Check if event is being filtered
+
+SOLUTIONS:
+- Check User B's console for socket connection status
+- Verify socket.on("userTyping") is registered in useChatStore
+- Check if subscribeToMessages() was called
+
+
+PROBLEM 5: Event received but not shown in UI
+───────────────────────────────────────────────────────────────────────────────
+SYMPTOMS:
+- User B sees "📥 RECEIVED: userTyping"
+- User B sees "✅ STORE: Updating state"
+- But typing indicator doesn't appear
+
+CHECKS:
+1. Is User B in the same conversation?
+2. Check debugger "Others Typing" section
+3. Check if TypingIndicator component is rendered
+
+SOLUTIONS:
+- Verify conversationId matches in both windows
+- Check ChatContainer's currentTypingUsers calculation
+- Inspect TypingIndicator component props
+
+
+PROBLEM 6: Typing indicator flickers
+───────────────────────────────────────────────────────────────────────────────
+SYMPTOMS:
+- Indicator appears and disappears rapidly
+
+CHECKS:
+1. Check for rapid "userTyping" / "userStoppedTyping" events
+2. Check debounce logic in setUserTyping
+
+SOLUTIONS:
+- Verify 1-second debounce is working
+- Check if multiple typing events are being sent
+- Verify TypingIndicator memo is working
+
+
+═══════════════════════════════════════════════════════════════════════════════
+✅ CHECKLIST FOR SUCCESSFUL TYPING INDICATOR
+═══════════════════════════════════════════════════════════════════════════════
+
+USER A (Sender):
+☐ Socket connected (🟢)
+☐ Conversation selected
+☐ Input focused
+☐ "🔵 TYPING: Emitting typing event" appears
+☐ Debugger shows "⌨️ TYPING"
+
+BACKEND:
+☐ "🔵 BACKEND: Received typing event" appears
+☐ Target socket ID found
+☐ "✅ BACKEND: userTyping event sent" appears
+
+USER B (Receiver):
+☐ Socket connected (🟢)
+☐ Same conversation open
+☐ "📥 RECEIVED: userTyping" appears
+☐ "✅ STORE: Updating state" appears
+☐ Debugger shows user in "Others Typing"
+☐ Typing indicator visible above input
+
+
+═══════════════════════════════════════════════════════════════════════════════

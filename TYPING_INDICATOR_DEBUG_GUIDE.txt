@@ -1,0 +1,235 @@
+═══════════════════════════════════════════════════════════════════════════════
+                    TYPING INDICATOR - DEBUGGING GUIDE
+═══════════════════════════════════════════════════════════════════════════════
+
+🔧 HOW TO USE THE DEBUGGER
+═══════════════════════════════════════════════════════════════════════════════
+
+1. Press Ctrl+Shift+D to open the typing debugger
+2. The debugger shows:
+   ✓ Your user info and socket connection status
+   ✓ YOUR typing status (whether you're typing or not)
+   ✓ Current conversation details
+   ✓ Others typing in this conversation
+   ✓ Last 10 socket events received
+   ✓ All typing activity across all conversations
+
+3. Open browser console (F12) to see detailed logs:
+   🔵 TYPING: Emitting typing event - When you focus input
+   ⌨️ TYPING: Keystroke - resetting timer - On each keystroke
+   ⏱️ TYPING: Timeout - stopping typing - After 2 seconds of inactivity
+   🔴 TYPING: Blur - stopping typing - When you leave input
+   📥 RECEIVED: userTyping - When someone else starts typing
+   📥 RECEIVED: userStoppedTyping - When someone else stops typing
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🧪 TESTING SCENARIOS
+═══════════════════════════════════════════════════════════════════════════════
+
+SCENARIO 1: Test Your Own Typing Status
+───────────────────────────────────────────────────────────────────────────────
+1. Open debugger (Ctrl+Shift+D)
+2. Click on message input
+3. Check debugger:
+   ✓ "Your Typing Status" should show "⌨️ TYPING"
+   ✓ "Input is focused" message
+   ✓ Green border around status box
+4. Check console:
+   ✓ Should see: "🔵 TYPING: Emitting typing event"
+5. Type some text
+6. Check console:
+   ✓ Should see: "⌨️ TYPING: Keystroke - resetting timer" on each key
+7. Stop typing for 2 seconds
+8. Check console:
+   ✓ Should see: "⏱️ TYPING: Timeout - stopping typing"
+9. Check debugger:
+   ✓ "Your Typing Status" should show "💤 Idle"
+
+
+SCENARIO 2: Test Socket Connection
+───────────────────────────────────────────────────────────────────────────────
+1. Open debugger (Ctrl+Shift+D)
+2. Check "Current User" section:
+   ✓ Socket should show "🟢 Connected"
+3. If showing "🔴 Disconnected":
+   - Refresh the page
+   - Check backend is running
+   - Check network tab for WebSocket connection
+
+
+SCENARIO 3: Test Receiving Typing Events (Two Browser Windows)
+───────────────────────────────────────────────────────────────────────────────
+WINDOW 1 (Sender):
+1. Login as User A
+2. Open chat with User B
+3. Open debugger (Ctrl+Shift+D)
+4. Click message input and start typing
+
+WINDOW 2 (Receiver):
+1. Login as User B
+2. Open chat with User A
+3. Open debugger (Ctrl+Shift+D)
+4. Watch "Others Typing" section:
+   ✓ Should show "User A" typing
+5. Watch "Socket Events" section:
+   ✓ Should see "userTyping" event with User A's name
+6. Watch typing indicator above message input:
+   ✓ Should show "User A is typing" with animated dots
+7. Check console:
+   ✓ Should see: "📥 RECEIVED: userTyping"
+
+When User A stops typing:
+8. Watch "Others Typing" section:
+   ✓ Should clear after 2 seconds
+9. Watch "Socket Events" section:
+   ✓ Should see "userStoppedTyping" event
+10. Watch typing indicator:
+    ✓ Should disappear
+11. Check console:
+    ✓ Should see: "📥 RECEIVED: userStoppedTyping"
+
+
+SCENARIO 4: Test Group Chat Typing
+───────────────────────────────────────────────────────────────────────────────
+1. Create a group with 3+ members
+2. Open group chat in multiple windows (different users)
+3. Have User A start typing
+4. Other users should see:
+   ✓ "User A is typing" indicator
+   ✓ "userTyping" event in debugger
+5. Have User B also start typing
+6. Other users should see:
+   ✓ "User A and User B are typing"
+7. Have User C also start typing
+8. Other users should see:
+   ✓ "User A and 2 others are typing"
+
+
+SCENARIO 5: Test Inactivity Timeout
+───────────────────────────────────────────────────────────────────────────────
+1. Open debugger (Ctrl+Shift+D)
+2. Click message input
+3. Type a few characters
+4. Stop typing (don't click away)
+5. Wait exactly 2 seconds
+6. Check console:
+   ✓ Should see: "⏱️ TYPING: Inactivity timeout - stopping typing"
+7. Check debugger:
+   ✓ "Your Typing Status" should change to "💤 Idle"
+8. In other user's window:
+   ✓ Typing indicator should disappear
+   ✓ Should see "userStoppedTyping" event
+
+
+SCENARIO 6: Test Blur Event
+───────────────────────────────────────────────────────────────────────────────
+1. Open debugger (Ctrl+Shift+D)
+2. Click message input
+3. Type some text
+4. Click outside the input (anywhere else)
+5. Check console:
+   ✓ Should see: "🔴 TYPING: Blur - stopping typing"
+6. Check debugger:
+   ✓ "Your Typing Status" should show "💤 Idle"
+7. In other user's window:
+   ✓ Typing indicator should disappear immediately
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🐛 TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════════════════════
+
+PROBLEM: Debugger shows "🔴 Disconnected"
+SOLUTION:
+- Check backend server is running
+- Check browser console for WebSocket errors
+- Refresh the page
+- Check network tab for failed WebSocket connection
+
+PROBLEM: "Your Typing Status" doesn't change when clicking input
+SOLUTION:
+- Check console for errors
+- Make sure you're clicking the actual message input (contenteditable area)
+- Try refreshing the page
+
+PROBLEM: No socket events appearing in debugger
+SOLUTION:
+- Make sure you have TWO browser windows open (sender and receiver)
+- You won't see your own typing events in "Others Typing"
+- Check "Socket Events" section for incoming events
+- Verify socket is connected (🟢 Connected)
+
+PROBLEM: Typing indicator flickers
+SOLUTION:
+- This should be fixed now with the new focus/blur system
+- If still flickering, check console logs for rapid emit events
+- Make sure only ONE typing event is sent on focus
+
+PROBLEM: Typing indicator doesn't disappear
+SOLUTION:
+- Check if "stopTyping" event is being sent (console logs)
+- Verify 2-second timeout is working
+- Check if blur event is firing when clicking away
+- Look for JavaScript errors in console
+
+PROBLEM: Other user's typing status not showing
+SOLUTION:
+- Verify both users are in the same conversation
+- Check "Socket Events" section for incoming events
+- Verify socket connection on both ends
+- Check backend logs for typing event routing
+- Make sure you're not filtering out your own events
+
+
+═══════════════════════════════════════════════════════════════════════════════
+📊 WHAT TO LOOK FOR IN CONSOLE
+═══════════════════════════════════════════════════════════════════════════════
+
+NORMAL FLOW (Your Side):
+1. 🔵 TYPING: Emitting typing event { conversationId, isGroup, userName, socketConnected }
+2. ⌨️ TYPING: Keystroke - resetting timer (multiple times)
+3. ⏱️ TYPING: Timeout - stopping typing (after 2 seconds)
+   OR
+3. 🔴 TYPING: Blur - stopping typing (if you click away)
+
+NORMAL FLOW (Other User's Side):
+1. 📥 RECEIVED: userTyping { conversationId, userId, userName }
+2. (Wait 2 seconds or until they stop)
+3. 📥 RECEIVED: userStoppedTyping { conversationId, userId }
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🔍 BACKEND VERIFICATION
+═══════════════════════════════════════════════════════════════════════════════
+
+Check backend/src/lib/socket.js for:
+
+1. "typing" event handler (line ~206)
+   - Should emit "userTyping" to other user/group members
+   - Should NOT emit back to sender
+
+2. "stopTyping" event handler (line ~232)
+   - Should emit "userStoppedTyping" to other user/group members
+   - Should NOT emit back to sender
+
+3. Verify room joining:
+   - DM: Users should be in each other's rooms
+   - Group: All members should be in "group_{groupId}" room
+
+
+═══════════════════════════════════════════════════════════════════════════════
+✅ EXPECTED BEHAVIOR SUMMARY
+═══════════════════════════════════════════════════════════════════════════════
+
+1. Click input → Typing starts immediately
+2. Type text → Timer resets on each keystroke
+3. Stop typing → Indicator disappears after 2 seconds
+4. Click away → Indicator disappears immediately
+5. Other users see your typing status (you don't see your own)
+6. Typing indicator positioned above message input
+7. No flickering or rapid on/off behavior
+8. Socket events logged in console for debugging
+
+
+═══════════════════════════════════════════════════════════════════════════════

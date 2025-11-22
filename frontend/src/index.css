@@ -870,6 +870,12 @@ hin scrollbar styles - nearly invisible */
     border-top: 1px solid hsl(var(--bc) / 0.1);
     box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
   }
+
+  /* Mobile swipe page transitions */
+  .mobile-page-transition {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform;
+  }
 }
 
 /* Bottom Nav Bar fade-in animation for text labels */

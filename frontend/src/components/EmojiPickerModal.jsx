@@ -139,12 +139,7 @@ const EmojiPickerModal = ({ isOpen, onClose, onSelectEmoji, triggerRef, keepMoun
 
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside)
-      // Focus search input when modal opens
-      setTimeout(() => {
-        if (searchInputRef.current) {
-          searchInputRef.current.focus()
-        }
-      }, 100)
+      // Don't auto-focus search input to keep message input active
     }
 
     return () => {

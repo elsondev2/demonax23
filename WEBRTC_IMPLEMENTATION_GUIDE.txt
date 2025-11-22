@@ -1,0 +1,380 @@
+═══════════════════════════════════════════════════════════════════════════════
+                    WEBRTC IMPLEMENTATION - COMPLETE GUIDE
+═══════════════════════════════════════════════════════════════════════════════
+
+🎯 WHAT WAS IMPLEMENTED
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ Complete WebRTC service (frontend/src/lib/webrtcService.js)
+   - Peer connection management
+   - Local/remote stream handling
+   - ICE candidate exchange
+   - Offer/Answer signaling
+   - Audio/Video toggle
+   - Connection state monitoring
+
+✅ WebRTC signaling (backend/src/lib/socket.js)
+   - webrtc:offer - Forward SDP offers
+   - webrtc:answer - Forward SDP answers
+   - webrtc:iceCandidate - Exchange ICE candidates
+   - webrtc:joinChannel - Join call rooms
+   - webrtc:leaveChannel - Leave call rooms
+
+✅ WebRTC Call Store (frontend/src/store/useCallStore.webrtc.js)
+   - Complete call state management
+   - Initiate/Answer/Reject/End calls
+   - Mute/Unmute audio
+   - Enable/Disable video
+   - Call timer
+   - Ringtones
+
+═══════════════════════════════════════════════════════════════════════════════
+📦 HOW TO SWITCH FROM AGORA TO WEBRTC
+═══════════════════════════════════════════════════════════════════════════════
+
+STEP 1: Replace the import in your components
+───────────────────────────────────────────────────────────────────────────────
+
+OLD (Agora):
+import { useCallStore } from './store/useCallStore';
+
+NEW (WebRTC):
+import { useCallStore } from './store/useCallStore.webrtc';
+
+
+STEP 2: Update CallScreen component
+───────────────────────────────────────────────────────────────────────────────
+
+The WebRTC version uses MediaStream objects instead of Agora tracks.
+
+OLD (Agora):
+const { localAudioTrack, localVideoTrack } = useCallStore();
+
+// Play local video
+if (localVideoTrack) {
+  localVideoTrack.play('local-video');
+}
+
+NEW (WebRTC):
+const { localStream, remoteStream } = useCallStore();
+
+// Play local video
+if (localStream && localVideoRef.current) {
+  localVideoRef.current.srcObject = localStream;
+}
+
+// Play remote video
+if (remoteStream && remoteVideoRef.current) {
+  remoteVideoRef.current.srcObject = remoteStream;
+}
+
+
+STEP 3: Remove Agora dependencies
+───────────────────────────────────────────────────────────────────────────────
+
+1. Remove from package.json:
+   - "agora-rtc-sdk-ng"
+
+2. Remove files:
+   - frontend/src/lib/agoraService.js
+   - backend/src/routes/agora.route.js
+   - backend/src/controllers/agora.controller.js
+
+3. Remove from backend/src/server.js:
+   - import agoraRoutes
+   - app.use("/api/agora", agoraRoutes)
+
+4. Remove environment variables:
+   - VITE_AGORA_APP_ID
+   - AGORA_APP_ID
+   - AGORA_APP_CERTIFICATE
+
+
+STEP 4: Rename the new store
+───────────────────────────────────────────────────────────────────────────────
+
+mv frontend/src/store/useCallStore.webrtc.js frontend/src/store/useCallStore.js
+
+(This will replace the old Agora-based store)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🔧 WEBRTC ARCHITECTURE
+═══════════════════════════════════════════════════════════════════════════════
+
+CALLER FLOW:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 1. User A clicks call button                                                │
+│    └─ initiateCall(userB._id, 'voice')                                      │
+│                                                                              │
+│ 2. Initialize WebRTC                                                        │
+│    └─ webrtcService.initialize('voice', socket)                             │
+│    └─ Get local media (microphone/camera)                                   │
+│                                                                              │
+│ 3. Create peer connection                                                   │
+│    └─ webrtcService.createPeerConnection(channelName)                       │
+│    └─ Add local tracks to peer connection                                   │
+│                                                                              │
+│ 4. Join channel                                                             │
+│    └─ socket.emit('webrtc:joinChannel', { channelName })                    │
+│                                                                              │
+│ 5. Send call request                                                        │
+│    └─ socket.emit('call-request', { to, callType, channelName })            │
+│                                                                              │
+│ 6. Create WebRTC offer                                                      │
+│    └─ webrtcService.createOffer(channelName)                                │
+│    └─ socket.emit('webrtc:offer', { channelName, offer })                   │
+│                                                                              │
+│ 7. Wait for answer                                                          │
+│    └─ socket.on('webrtc:answer', handleWebRTCAnswer)                        │
+│                                                                              │
+│ 8. Exchange ICE candidates                                                  │
+│    └─ socket.on('webrtc:iceCandidate', handleICECandidate)                  │
+│                                                                              │
+│ 9. Connection established                                                   │
+│    └─ onRemoteStreamAdded callback fires                                    │
+│    └─ Call status: 'connected'                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+CALLEE FLOW:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 1. Receive call request                                                     │
+│    └─ socket.on('call-request', handleIncomingCall)                         │
+│    └─ Show incoming call UI                                                 │
+│    └─ Play ringtone                                                         │
+│                                                                              │
+│ 2. User B clicks answer                                                     │
+│    └─ answerCall()                                                          │
+│                                                                              │
+│ 3. Initialize WebRTC                                                        │
+│    └─ webrtcService.initialize('voice', socket)                             │
+│    └─ Get local media                                                       │
+│                                                                              │
+│ 4. Join channel                                                             │
+│    └─ socket.emit('webrtc:joinChannel', { channelName })                    │
+│                                                                              │
+│ 5. Send answer to caller                                                    │
+│    └─ socket.emit('call-answer', { to: caller })                            │
+│                                                                              │
+│ 6. Receive WebRTC offer                                                     │
+│    └─ socket.on('webrtc:offer', handleWebRTCOffer)                          │
+│    └─ webrtcService.handleOffer(channelName, offer)                         │
+│    └─ Create and send answer                                                │
+│    └─ socket.emit('webrtc:answer', { channelName, answer })                 │
+│                                                                              │
+│ 7. Exchange ICE candidates                                                  │
+│    └─ socket.on('webrtc:iceCandidate', handleICECandidate)                  │
+│                                                                              │
+│ 8. Connection established                                                   │
+│    └─ onRemoteStreamAdded callback fires                                    │
+│    └─ Call status: 'connected'                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🎮 API REFERENCE
+═══════════════════════════════════════════════════════════════════════════════
+
+WEBRTC SERVICE:
+───────────────────────────────────────────────────────────────────────────────
+
+webrtcService.initialize(callType, socket)
+  - Initialize WebRTC with local media
+  - Returns: { localStream, audioTrack, videoTrack }
+
+webrtcService.createPeerConnection(channelName)
+  - Create RTCPeerConnection
+  - Setup event handlers
+
+webrtcService.createOffer(channelName)
+  - Create SDP offer (caller side)
+  - Automatically sends via socket
+
+webrtcService.handleOffer(channelName, offer)
+  - Handle incoming offer (callee side)
+  - Creates and sends answer
+
+webrtcService.handleAnswer(answer)
+  - Handle incoming answer (caller side)
+
+webrtcService.handleIceCandidate(candidate)
+  - Add ICE candidate to peer connection
+
+webrtcService.toggleAudio(muted)
+  - Mute/unmute microphone
+
+webrtcService.toggleVideo(enabled)
+  - Enable/disable camera
+
+webrtcService.cleanup()
+  - Stop all tracks and close connection
+
+
+CALL STORE:
+───────────────────────────────────────────────────────────────────────────────
+
+initiateCall(calleeId, callType)
+  - Start outgoing call
+  - callType: 'voice' or 'video'
+
+answerCall()
+  - Answer incoming call
+
+rejectCall()
+  - Reject incoming call
+
+endCall(reason)
+  - End active call
+  - reason: 'ended', 'rejected', 'timeout', etc.
+
+toggleMute()
+  - Toggle microphone mute
+
+toggleVideo()
+  - Toggle camera on/off
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🔌 SOCKET EVENTS
+═══════════════════════════════════════════════════════════════════════════════
+
+CLIENT → SERVER:
+───────────────────────────────────────────────────────────────────────────────
+
+call-request
+  { to, callType, channelName, callerInfo }
+  - Initiate call
+
+call-answer
+  { to, accepted }
+  - Answer call
+
+call-reject
+  { to }
+  - Reject call
+
+call-end
+  { to, reason, duration, wasConnected }
+  - End call
+
+webrtc:joinChannel
+  { channelName }
+  - Join WebRTC room
+
+webrtc:leaveChannel
+  { channelName }
+  - Leave WebRTC room
+
+webrtc:offer
+  { channelName, offer }
+  - Send SDP offer
+
+webrtc:answer
+  { channelName, answer }
+  - Send SDP answer
+
+webrtc:iceCandidate
+  { channelName, candidate }
+  - Send ICE candidate
+
+
+SERVER → CLIENT:
+───────────────────────────────────────────────────────────────────────────────
+
+call-request
+  { from, callType, channelName, callerInfo }
+  - Incoming call
+
+call-answer
+  { from, accepted }
+  - Call answered
+
+call-reject
+  { from, reason }
+  - Call rejected
+
+call-end
+  { from, reason, duration, wasConnected }
+  - Call ended
+
+webrtc:offer
+  { from, offer }
+  - Received SDP offer
+
+webrtc:answer
+  { from, answer }
+  - Received SDP answer
+
+webrtc:iceCandidate
+  { from, candidate }
+  - Received ICE candidate
+
+webrtc:userJoined
+  { userId }
+  - User joined channel
+
+webrtc:userLeft
+  { userId }
+  - User left channel
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🧪 TESTING
+═══════════════════════════════════════════════════════════════════════════════
+
+1. Open two browser windows (different users)
+2. User A initiates call to User B
+3. Check console logs:
+   - User A: "📤 Creating offer..."
+   - Backend: "📤 BACKEND - WebRTC offer received"
+   - User B: "📥 Received WebRTC offer"
+   - User B: "📤 Creating answer..."
+   - User A: "📥 Received WebRTC answer"
+   - Both: "🧊 ICE candidates exchanged"
+   - Both: "🌐 Connection state: connected"
+
+4. Test features:
+   - Mute/unmute
+   - Video on/off (for video calls)
+   - End call
+   - Reject call
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🚀 ADVANTAGES OVER AGORA
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ No third-party dependencies
+✅ No API keys or tokens needed
+✅ No usage limits or costs
+✅ Full control over signaling
+✅ Better privacy (peer-to-peer)
+✅ Works offline (local network)
+✅ Easier to debug
+✅ Standard WebRTC API
+
+
+═══════════════════════════════════════════════════════════════════════════════
+⚠️ LIMITATIONS & CONSIDERATIONS
+═══════════════════════════════════════════════════════════════════════════════
+
+1. NAT Traversal
+   - May need TURN servers for some networks
+   - Currently using only STUN servers
+   - Add TURN servers in webrtcService.js iceServers config
+
+2. Browser Compatibility
+   - Works in all modern browsers
+   - May need polyfills for older browsers
+
+3. Scalability
+   - Peer-to-peer works well for 1:1 calls
+   - For group calls, consider SFU architecture
+
+4. Network Quality
+   - Quality depends on user's network
+   - No automatic quality adjustment (can be added)
+
+
+═══════════════════════════════════════════════════════════════════════════════

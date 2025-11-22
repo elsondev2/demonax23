@@ -14,6 +14,7 @@ import ChatIntroHeader from "./ChatIntroHeader";
 import DateSeparator from "./DateSeparator";
 import UnreadSeparator from "./UnreadSeparator";
 import TypingIndicator from "./TypingIndicator";
+import TypingDebugger from "./TypingDebugger";
 import useFriendStore from "../store/useFriendStore";
 import useMessageRenderingDiagnostics from "../hooks/useMessageRenderingDiagnostics";
 
@@ -634,6 +635,9 @@ function ChatContainer() {
         isOpen={isGroupDetailsModalOpen}
         onClose={() => setIsGroupDetailsModalOpen(false)}
       />
+
+      {/* Typing Debugger - Toggle with Ctrl+Shift+D */}
+      <TypingDebugger />
 
     </div>
   );

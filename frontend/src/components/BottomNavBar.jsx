@@ -10,7 +10,7 @@ const BottomNavBar = ({
   const allNotifications = totalNotifications + totalUnreadMessages;
   const navigate = useNavigate();
   const location = useLocation();
-  const { selectedUser, selectedGroup } = useChatStore();
+  const { selectedUser, selectedGroup, setSelectedUser, setSelectedGroup } = useChatStore();
 
   // Determine if we're viewing the chat interface (a chat is selected)
   const isInChat = !!(selectedUser || selectedGroup);
@@ -23,7 +23,7 @@ const BottomNavBar = ({
   const isDonate = location.pathname.startsWith('/donate');
   
   // On desktop, treat chat view as part of Home, but NOT if we're on another route
-  const isHome = (location.pathname === '/chat' || location.pathname === '/' || (isInChat && !isMobile)) 
+  const isHome = (location.pathname.startsWith('/chats') || location.pathname === '/' || (isInChat && !isMobile)) 
     && !isCassisiacum && !isNotices && !isApps && !isDonate;
 
   // Calculate transform based on chat state (slide down on mobile when in chat)
@@ -37,7 +37,11 @@ const BottomNavBar = ({
       <div className="bg-base-200/95 backdrop-blur-lg rounded-full shadow-2xl border border-base-300 px-3.5 py-2 flex items-center gap-2 transition-all duration-300 ease-in-out">
         {/* Home (Sidebar) */}
         <button
-          onClick={() => navigate('/chat', { replace: true })}
+          onClick={() => {
+            setSelectedUser(null);
+            setSelectedGroup(null);
+            navigate('/chats', { replace: true });
+          }}
           className={`btn btn-sm transition-all duration-300 ${isHome ? 'btn-primary' : 'btn-ghost'} ${isHome ? 'gap-2 px-3.5' : 'btn-circle'} h-8 min-h-8`}
           title="Home"
         >
@@ -47,7 +51,11 @@ const BottomNavBar = ({
 
         {/* Cassisiacum */}
         <button
-          onClick={() => navigate('/posts', { replace: true })}
+          onClick={() => {
+            setSelectedUser(null);
+            setSelectedGroup(null);
+            navigate('/posts', { replace: true });
+          }}
           className={`btn btn-sm transition-all duration-300 ${isCassisiacum ? 'btn-primary' : 'btn-ghost'} ${isCassisiacum ? 'gap-2 px-3.5' : 'btn-circle'} h-8 min-h-8`}
           title="Cassisiacum"
         >
@@ -57,7 +65,11 @@ const BottomNavBar = ({
 
         {/* Notices */}
         <button
-          onClick={() => navigate('/notices', { replace: true })}
+          onClick={() => {
+            setSelectedUser(null);
+            setSelectedGroup(null);
+            navigate('/notices', { replace: true });
+          }}
           className={`btn btn-sm transition-all duration-300 ${isNotices ? 'btn-primary' : 'btn-ghost'} ${isNotices ? 'gap-2 px-3.5' : 'btn-circle'} h-8 min-h-8`}
           title="Notices"
         >
@@ -67,7 +79,11 @@ const BottomNavBar = ({
 
         {/* Apps */}
         <button
-          onClick={() => navigate('/apps', { replace: true })}
+          onClick={() => {
+            setSelectedUser(null);
+            setSelectedGroup(null);
+            navigate('/apps', { replace: true });
+          }}
           className={`btn btn-sm transition-all duration-300 ${isApps ? 'btn-primary' : 'btn-ghost'} ${isApps ? 'gap-2 px-3.5' : 'btn-circle'} h-8 min-h-8`}
           title="Apps"
         >
@@ -77,7 +93,11 @@ const BottomNavBar = ({
 
         {/* Donate */}
         <button
-          onClick={() => navigate('/donate', { replace: true })}
+          onClick={() => {
+            setSelectedUser(null);
+            setSelectedGroup(null);
+            navigate('/donate', { replace: true });
+          }}
           className={`btn btn-sm transition-all duration-300 ${isDonate ? 'btn-primary' : 'btn-ghost'} ${isDonate ? 'gap-2 px-3.5' : 'btn-circle'} h-8 min-h-8`}
           title="Donate"
         >

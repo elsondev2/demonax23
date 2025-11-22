@@ -1,8 +1,7 @@
 import React, { useEffect, useRef } from 'react';
-import { PhoneOffIcon, MicIcon, MicOffIcon, VideoIcon, VideoOffIcon, Volume2Icon, VolumeXIcon } from 'lucide-react';
+import { PhoneOffIcon, MicIcon, MicOffIcon, VideoIcon, VideoOffIcon } from 'lucide-react';
 import { useCallStore } from '../store/useCallStore';
 import Avatar from './Avatar';
-import { agoraService } from '../lib/agoraService';
 
 const CallScreen = () => {
   const {
@@ -10,92 +9,60 @@ const CallScreen = () => {
     callType,
     callerInfo,
     calleeInfo,
-    localVideoTrack,
-    remoteUserId,
-    hasRemoteAudio,
-    hasRemoteVideo,
+    localStream,
+    remoteStream,
     isMuted,
     isVideoEnabled,
-    isSpeakerEnabled,
     showCallScreen,
     endCall,
     toggleMute,
     toggleVideo,
-    toggleSpeaker,
-    formatDuration,
-    callDuration,
-    updateCallDuration
+    callDuration
   } = useCallStore();
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
-  const callDurationInterval = useRef(null);
-  const [audioLevel, setAudioLevel] = React.useState(0);
+  const remoteAudioRef = useRef(null);
 
-  // Update call duration every second
+  // Play local stream
   useEffect(() => {
-    if (callStatus === 'connected') {
-      callDurationInterval.current = setInterval(() => {
-        updateCallDuration();
-      }, 1000);
-    } else {
-      if (callDurationInterval.current) {
-        clearInterval(callDurationInterval.current);
-        callDurationInterval.current = null;
+    if (localVideoRef.current && localStream) {
+      localVideoRef.current.srcObject = localStream;
+      console.log('📹 Playing local stream');
+    }
+  }, [localStream]);
+
+  // Play remote stream
+  useEffect(() => {
+    if (remoteStream) {
+      // Video
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = remoteStream;
+        console.log('📹 Playing remote video stream');
+      }
+      
+      // Audio
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = remoteStream;
+        remoteAudioRef.current.play().catch(err => {
+          console.error('Failed to play remote audio:', err);
+        });
+        console.log('🔊 Playing remote audio stream');
       }
     }
+  }, [remoteStream]);
 
-    return () => {
-      if (callDurationInterval.current) {
-        clearInterval(callDurationInterval.current);
-      }
-    };
-  }, [callStatus, updateCallDuration]);
-
-  // Play local video when track is available
-  useEffect(() => {
-    if (localVideoRef.current && localVideoTrack) {
-      agoraService.playLocalVideo(localVideoRef.current);
-      console.log('📹 Playing local video');
-    }
-  }, [localVideoTrack]);
-
-  // Play remote video and audio when remote user joins
-  useEffect(() => {
-    if (!remoteUserId) {
-      console.log('🔊 No remote user available');
-      return;
-    }
-    
-    console.log('🔊 Setting up remote user:', remoteUserId);
-    
-    // Play remote audio automatically
-    if (hasRemoteAudio) {
-      agoraService.playRemoteAudio(remoteUserId);
-      console.log('🔊 Playing remote audio for user:', remoteUserId);
-    }
-    
-    // Play remote video if available
-    if (hasRemoteVideo && remoteVideoRef.current) {
-      agoraService.playRemoteVideo(remoteUserId, remoteVideoRef.current);
-      console.log('📹 Playing remote video for user:', remoteUserId);
-    }
-
-    // Monitor audio level for visualization
-    const audioLevelInterval = setInterval(() => {
-      const level = agoraService.getAudioLevel();
-      setAudioLevel(level * 100); // Convert to 0-100 scale
-    }, 100);
-
-    return () => {
-      clearInterval(audioLevelInterval);
-    };
-  }, [remoteUserId, hasRemoteAudio, hasRemoteVideo]);
-
-  // Don't render if not connected or showCallScreen is false
-  if (callStatus !== 'connected' || !showCallScreen) {
+  // Don't render if not in call or showCallScreen is false
+  if (!showCallScreen || (callStatus !== 'connected' && callStatus !== 'connecting')) {
     return null;
   }
+
+  // Format call duration
+  const formatDuration = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   // Get display information
   const getDisplayInfo = () => {
@@ -153,76 +120,43 @@ const CallScreen = () => {
       {/* Main video area */}
       <div className="flex-1 relative bg-black">
         {/* Remote video (main) */}
-        {callType === 'video' && hasRemoteVideo ? (
-          <div
+        {callType === 'video' && remoteStream ? (
+          <video
             ref={remoteVideoRef}
-            className="w-full h-full"
-            style={{ width: '100%', height: '100%' }}
+            autoPlay
+            playsInline
+            className="w-full h-full object-cover"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-base-300">
             <div className="text-center">
-              {/* Avatar with sound-responsive rings */}
-              <div className="relative inline-block">
-                <Avatar
-                  src={displayInfo.avatar}
-                  name={displayInfo.name}
-                  alt={displayInfo.name}
-                  size="w-32 h-32"
-                />
-                {/* Multiple sound-responsive rings */}
-                {audioLevel > 5 && (
-                  <>
-                    <div 
-                      className="absolute inset-0 rounded-full border-4 border-primary"
-                      style={{
-                        transform: `scale(${1 + (audioLevel / 150)})`,
-                        opacity: audioLevel / 150,
-                        transition: 'all 0.1s ease-out'
-                      }}
-                    />
-                    <div 
-                      className="absolute inset-0 rounded-full border-4 border-secondary"
-                      style={{
-                        transform: `scale(${1 + (audioLevel / 100)})`,
-                        opacity: audioLevel / 200,
-                        transition: 'all 0.15s ease-out'
-                      }}
-                    />
-                  </>
-                )}
-              </div>
+              <Avatar
+                src={displayInfo.avatar}
+                name={displayInfo.name}
+                alt={displayInfo.name}
+                size="w-32 h-32"
+              />
               <h2 className="text-2xl font-bold text-base-content mt-4">
                 {displayInfo.name}
               </h2>
               <p className="text-base-content/60">
                 {callType === 'video' ? 'Video call' : 'Voice call'}
               </p>
-              {/* Audio level indicator */}
-              {audioLevel > 5 && (
-                <div className="mt-4 flex justify-center gap-1">
-                  {[...Array(5)].map((_, i) => (
-                    <div
-                      key={i}
-                      className="w-1 bg-primary rounded-full transition-all duration-100"
-                      style={{
-                        height: `${Math.max(4, (audioLevel / 100) * 20 * (i + 1))}px`,
-                        opacity: audioLevel > (i * 20) ? 1 : 0.3
-                      }}
-                    />
-                  ))}
-                </div>
-              )}
             </div>
           </div>
         )}
 
+        {/* Hidden audio element for remote audio */}
+        <audio ref={remoteAudioRef} autoPlay />
+
         {/* Local video (picture-in-picture) */}
-        {callType === 'video' && localVideoTrack && (
-          <div
+        {callType === 'video' && localStream && (
+          <video
             ref={localVideoRef}
-            className="absolute top-4 right-4 w-32 h-24 bg-base-300 rounded-lg border-2 border-white/20"
-            style={{ width: '128px', height: '96px' }}
+            autoPlay
+            playsInline
+            muted
+            className="absolute top-4 right-4 w-32 h-24 bg-base-300 rounded-lg border-2 border-white/20 object-cover"
           />
         )}
 
@@ -283,21 +217,7 @@ const CallScreen = () => {
             </button>
           )}
 
-          {/* Speaker toggle */}
-          <button
-            onClick={toggleSpeaker}
-            className={`btn btn-circle btn-lg ${isSpeakerEnabled
-              ? 'btn-neutral'
-              : 'btn-outline'
-              }`}
-            title={isSpeakerEnabled ? 'Speaker off' : 'Speaker on'}
-          >
-            {isSpeakerEnabled ? (
-              <Volume2Icon className="w-6 h-6" />
-            ) : (
-              <VolumeXIcon className="w-6 h-6" />
-            )}
-          </button>
+          {/* Speaker toggle removed - WebRTC handles audio automatically */}
         </div>
 
         {/* Call status indicators */}

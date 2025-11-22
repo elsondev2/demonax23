@@ -10,17 +10,17 @@ if (import.meta.env.DEV) {
   import("../utils/incomingCallTest");
   import("../utils/quickCallTest");
 }
-import { useNavigate, useLocation, useParams } from "react-router";
+import { useNavigate, useLocation, useParams, Routes, Route, Navigate } from "react-router-dom";
 import { useNotifications } from "../hooks/useNotifications";
+import { useSwipeable } from "react-swipeable";
 
 import BorderAnimatedContainer from "../components/BorderAnimatedContainer";
-import SwipeableViews from "../components/SwipeableViews";
 import ChatsView from "../components/ChatsView";
+import AppsView from "../components/AppsView";
+import DonateView from "../components/DonateView";
 import FeedView from "../components/FeedView";
 import PostsView from "../components/PostsView";
 import NoticeView from "../components/NoticeView";
-import AppsView from "../components/AppsView";
-import DonateView from "../components/DonateView";
 import CallModal from "../components/CallModal";
 import CallScreen from "../components/CallScreen";
 import SocketStatusIndicator from "../components/SocketStatusIndicator";
@@ -31,6 +31,9 @@ import NotificationsModal from "../components/NotificationsModal";
 import InAppNotificationBanner from "../components/InAppNotificationBanner";
 import GlobalStatusModals from "../components/GlobalStatusModals";
 import UserTutorial from "../components/UserTutorial";
+import SwipeIndicator from "../components/SwipeIndicator";
+import SelectChatPrompt from "../components/SelectChatPrompt";
+import NoChatSelected from "../components/NoChatSelected";
 import { useWelcomeTour } from "../hooks/useWelcomeTour";
 import { useTutorial } from "../hooks/useTutorial";
 import { useCallStore } from "../store/useCallStore";
@@ -60,65 +63,171 @@ function ChatPage() {
   
   // Bottom nav state
   const [showNotifications, setShowNotifications] = useState(false);
-  const { requests, fetchRequests } = useFriendStore();
+  const { requests } = useFriendStore();
+  
+  // Calculate notification counts
+  const totalUnreadMessages = chats?.reduce((total, chat) => total + (chat.unreadCount || 0), 0) || 0;
+  const totalNotifications = (requests?.incoming?.length || 0) + (requests?.outgoing?.length || 0);
+
+  // Track last chat for swipe-left feature
+  const lastChatRef = useRef(null);
+  
+  // Update last chat when a chat is selected
+  useEffect(() => {
+    if (selectedUser || selectedGroup) {
+      lastChatRef.current = selectedUser || selectedGroup;
+    }
+  }, [selectedUser, selectedGroup]);
   
 
   const { userId, groupId } = useParams();
   const [isAuthorizationChecked, setIsAuthorizationChecked] = useState(false);
 
-  const isPostsRoute = location.pathname === '/posts' || location.pathname === '/posts/public' || location.pathname === '/posts/mine';
-  const isNoticesRoute = location.pathname === '/notices';
-  const isAppsRoute = location.pathname === '/apps';
-  const isDonateRoute = location.pathname === '/donate';
-  const isFeatureRoute = isPostsRoute || isNoticesRoute || isAppsRoute || isDonateRoute;
-
-  // Detect mobile to enable swipe-only on mobile
-  const [isMobile, setIsMobile] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const mobile = window.innerWidth < 768;
-      console.log('🔍 ChatPage.jsx Debug - Initial mobile detection:', mobile, 'Width:', window.innerWidth);
-      return mobile;
-    }
-    return false;
-  });
-  useEffect(() => {
-    const onResize = () => {
-      const mobile = window.innerWidth < 768;
-      console.log('🔍 ChatPage.jsx Debug - Resize mobile detection:', mobile, 'Width:', window.innerWidth);
-      setIsMobile(mobile);
-    };
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-
-  // Determine initial view index based on route (mobile only)
-  // 0 = Chat, 1 = Home (Sidebar), 2 = Cassisiacum, 3 = Notices, 4 = Apps, 5 = Donate
-  const getInitialIndex = () => {
-    if (userId || groupId) return 0; // Chat view
-    if (isPostsRoute) return 2; // Cassisiacum
-    if (isNoticesRoute) return 3; // Notices
-    if (isAppsRoute) return 4; // Apps
-    if (isDonateRoute) return 5; // Donate
-    return 1; // Home (Sidebar) - default
-  };
-
-  const [currentViewIndex, setCurrentViewIndex] = useState(getInitialIndex());
-  const [showChatSelectToast, setShowChatSelectToast] = useState(false);
-  const isUserSwipingRef = useRef(false);
   const [inAppNotification, setInAppNotification] = useState(null);
 
-
-
-  // Update view index when route changes externally (mobile)
-  // But don't interfere with user swipes
+  // Redirect to /chats if on /
   useEffect(() => {
-    if (!isMobile || isUserSwipingRef.current) return;
-    const newIndex = getInitialIndex();
-    if (newIndex !== currentViewIndex) {
-      setCurrentViewIndex(newIndex);
+    if (location.pathname === '/') {
+      navigate('/chats', { replace: true });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname, isMobile]);
+  }, [location.pathname, navigate]);
+
+  // Clear chat selection when navigating to different tabs
+  useEffect(() => {
+    const isOnTabRoute = location.pathname.startsWith('/posts') || 
+                        location.pathname.startsWith('/notices') || 
+                        location.pathname.startsWith('/apps') || 
+                        location.pathname.startsWith('/donate');
+    
+    if (isOnTabRoute && (selectedUser || selectedGroup)) {
+      setSelectedUser(null);
+      setSelectedGroup(null);
+    }
+  }, [location.pathname, selectedUser, selectedGroup, setSelectedUser, setSelectedGroup]);
+
+  // Swipeable navigation for mobile - Carousel style
+  const pages = [
+    { id: 'chat', path: '/chat', name: 'Chat', component: 'FeedView' },
+    { id: 'home', path: '/chats', name: 'Home', component: 'ChatsView' },
+    { id: 'posts', path: '/posts', name: 'Cassisiacum', component: 'PostsView' },
+    { id: 'notices', path: '/notices', name: 'Notices', component: 'NoticeView' },
+    { id: 'apps', path: '/apps', name: 'Apps', component: 'AppsView' },
+    { id: 'donate', path: '/donate', name: 'Donate', component: 'DonateView' }
+  ];
+
+  const getCurrentPageIndex = () => {
+    // If in a chat, index 0 (Chat page)
+    if (selectedUser || selectedGroup) return 0;
+    
+    // Check current path
+    if (location.pathname.startsWith('/chats')) return 1; // Home
+    if (location.pathname.startsWith('/posts')) return 2; // Posts
+    if (location.pathname.startsWith('/notices')) return 3; // Notices
+    if (location.pathname.startsWith('/apps')) return 4; // Apps
+    if (location.pathname.startsWith('/donate')) return 5; // Donate
+    
+    return 1; // Default to Home
+  };
+
+  const tabs = pages.slice(1); // For bottom nav (excluding chat page)
+
+  const getCurrentTabIndex = () => {
+    const pageIndex = getCurrentPageIndex();
+    return pageIndex > 0 ? pageIndex - 1 : 0;
+  };
+
+  const [showSelectChatPrompt, setShowSelectChatPrompt] = useState(false);
+
+  const handleSwipe = (direction) => {
+    const isMobile = window.innerWidth < 768;
+    if (!isMobile) return;
+
+    const currentPageIndex = getCurrentPageIndex();
+
+    if (direction === 'left') {
+      // Swipe left = go to next page
+      if (currentPageIndex < pages.length - 1) {
+        const nextPage = pages[currentPageIndex + 1];
+        
+        // Clear chat selection when leaving chat page
+        if (currentPageIndex === 0) {
+          setSelectedUser(null);
+          setSelectedGroup(null);
+        }
+        
+        navigate(nextPage.path, { replace: true });
+      }
+    } else if (direction === 'right') {
+      // Swipe right = go to previous page
+      if (currentPageIndex > 0) {
+        const prevPage = pages[currentPageIndex - 1];
+        
+        // Special handling for going to chat page
+        if (currentPageIndex === 1 && prevPage.id === 'chat') {
+          // Going from Home to Chat
+          if (lastChatRef.current) {
+            const lastChat = lastChatRef.current;
+            if (lastChat.isGroup) {
+              setSelectedGroup(lastChat);
+              navigate(`/chat/group/${lastChat._id}`, { replace: true });
+            } else {
+              setSelectedUser(lastChat);
+              navigate(`/chat/user/${lastChat._id}`, { replace: true });
+            }
+          } else {
+            // No last chat, show prompt then return to home
+            setShowSelectChatPrompt(true);
+            setTimeout(() => {
+              setShowSelectChatPrompt(false);
+              navigate('/chats', { replace: true });
+            }, 3000);
+          }
+        } else {
+          // Normal navigation
+          setSelectedUser(null);
+          setSelectedGroup(null);
+          navigate(prevPage.path, { replace: true });
+        }
+      }
+    }
+  };
+
+  // Track swipe progress for live animations
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const [isSwiping, setIsSwiping] = useState(false);
+
+  const swipeHandlers = useSwipeable({
+    onSwiping: (eventData) => {
+      const isMobile = window.innerWidth < 768;
+      if (!isMobile) return;
+
+      // Track swipe progress for live animation
+      setIsSwiping(true);
+      setSwipeOffset(eventData.deltaX);
+    },
+    onSwipedLeft: () => {
+      console.log('🔄 Swiped left');
+      setIsSwiping(false);
+      setSwipeOffset(0);
+      handleSwipe('left');
+    },
+    onSwipedRight: () => {
+      console.log('🔄 Swiped right');
+      setIsSwiping(false);
+      setSwipeOffset(0);
+      handleSwipe('right');
+    },
+    onTouchEndOrOnMouseUp: () => {
+      // Reset when touch ends without completing swipe
+      setIsSwiping(false);
+      setSwipeOffset(0);
+    },
+    trackMouse: false,
+    trackTouch: true,
+    delta: 50, // Minimum swipe distance
+    preventScrollOnSwipe: true // Prevent scroll interference
+  });
+
 
   // Set up notification callback in chat store
   useEffect(() => {
@@ -214,17 +323,6 @@ function ChatPage() {
     }
   }, [socket, socket?.connected]); // Re-run when socket connects
 
-  // When a chat or contact is selected on mobile, go to Chat view
-  useEffect(() => {
-    const toChat = () => { if (isMobile) setCurrentViewIndex(0); }; // Index 0 = Chat view
-    window.addEventListener('chatSelected', toChat);
-    window.addEventListener('contactSelected', toChat);
-    return () => {
-      window.removeEventListener('chatSelected', toChat);
-      window.removeEventListener('contactSelected', toChat);
-    };
-  }, [isMobile]);
-
   // Handle URL params to select chat with authorization check
   useEffect(() => {
     // Wait for chats to load before checking authorization
@@ -244,7 +342,7 @@ function ChatPage() {
         // Unauthorized or chat doesn't exist - redirect to /chat
         console.warn('⛔ Unauthorized access attempt to user chat:', userId);
         console.warn('Available chats:', chats.map(c => ({ id: c._id, isGroup: c.isGroup })));
-        navigate('/chat', { replace: true });
+        navigate('/chats', { replace: true });
         setIsAuthorizationChecked(true);
       }
     } else if (groupId) {
@@ -258,7 +356,7 @@ function ChatPage() {
         // Unauthorized or group doesn't exist - redirect to /chat
         console.warn('⛔ Unauthorized access attempt to group chat:', groupId);
         console.warn('Available groups:', chats.filter(c => c.isGroup).map(c => c._id));
-        navigate('/chat', { replace: true });
+        navigate('/chats', { replace: true });
         setIsAuthorizationChecked(true);
       }
     } else {
@@ -281,34 +379,11 @@ function ChatPage() {
           navigate(`/chat/group/${selectedGroup._id}`, { replace: true });
         }
       }
-      // If user navigated to a feature page, don't force them back to chat
-    } else if (!userId && !groupId && !isFeatureRoute && location.pathname !== '/chat') {
+    } else if (!userId && !groupId && !location.pathname.startsWith('/chats') && !location.pathname.startsWith('/posts') && !location.pathname.startsWith('/notices') && !location.pathname.startsWith('/apps') && !location.pathname.startsWith('/donate')) {
       // No chat selected and not on a feature route, go back to home
-      navigate('/chat', { replace: true });
+      navigate('/chats', { replace: true });
     }
-  }, [selectedUser, selectedGroup, isMobile, isFeatureRoute, navigate, location.pathname, userId, groupId, currentViewIndex]);
-
-
-
-  // Define two swipeable views (mobile only): Sidebar and Right (Chat or Feature)
-  const getRightComponent = () => {
-    if (isPostsRoute) return <PostsView />;
-    if (isNoticesRoute) return <NoticeView />;
-    if (isAppsRoute) return <AppsView />;
-    if (isDonateRoute) return <DonateView />;
-    return <FeedView />;
-  };
-
-  // Mobile swipe views: Chat | Home (Sidebar) | Cassisiacum | Notices | Apps | Donate
-  const views = [
-    { name: 'Chat', component: <FeedView /> },
-    { name: 'Home', component: <ChatsView onShowTour={() => setManualTourOpen(true)} /> },
-    { name: 'Cassisiacum', component: <PostsView /> },
-    { name: 'Notices', component: <NoticeView /> },
-    { name: 'Apps', component: <AppsView /> },
-    { name: 'Donate', component: <DonateView /> },
-  ];
-
+  }, [selectedUser, selectedGroup, navigate, location.pathname, userId, groupId]);
 
 
   // Cleanup on unmount
@@ -317,19 +392,6 @@ function ChatPage() {
       useCallStore.getState().cleanupCallSystem();
     };
   }, []);
-
-  // Debug logging for mobile scroll issue (throttled to prevent spam)
-  useEffect(() => {
-    const throttledLog = () => {
-      console.log('🔍 ChatPage.jsx Debug - Render with classes:', 'w-full h-[100dvh] md:h-screen');
-      console.log('🔍 ChatPage.jsx Debug - Current mobile state:', isMobile);
-      console.log('🔍 ChatPage.jsx Debug - Current view index:', currentViewIndex);
-    };
-    
-    // Only log once per second to reduce console spam
-    const timer = setTimeout(throttledLog, 1000);
-    return () => clearTimeout(timer);
-  }, [isMobile, currentViewIndex]); // Only re-run when these specific values change
 
   // Show loading while checking authorization for URL-based chat access
   if ((userId || groupId) && !isAuthorizationChecked) {
@@ -343,92 +405,129 @@ function ChatPage() {
     );
   }
 
+  // Chat selection is now handled by conditional rendering
+
   return (
-    <div className="w-full h-[100dvh] md:h-screen">
-      <BorderAnimatedContainer>
-        {isMobile ? (
-          <SwipeableViews
-            views={views}
-            index={currentViewIndex}
-            onIndexChange={(newIndex) => {
-              // Mark that user is swiping to prevent route sync from interfering
-              isUserSwipingRef.current = true;
-              setCurrentViewIndex(newIndex);
-              
-              // Update route based on view index
-              if (newIndex === 0 && (selectedUser || selectedGroup)) {
-                // Chat view - navigate to selected chat
-                if (selectedUser) navigate(`/chat/user/${selectedUser._id}`, { replace: true });
-                else if (selectedGroup) navigate(`/chat/group/${selectedGroup._id}`, { replace: true });
-              } else if (newIndex === 1) {
-                // Home - navigate to /chat and clear selection for bottom nav
-                if (location.pathname !== '/chat') {
-                  navigate('/chat', { replace: true });
-                }
-                // Clear chat selection when leaving chat view
-                setSelectedUser(null);
-                setSelectedGroup(null);
-              } else if (newIndex === 2) {
-                // Cassisiacum - clear selection
-                navigate('/posts', { replace: true });
-                setSelectedUser(null);
-                setSelectedGroup(null);
-              } else if (newIndex === 3) {
-                // Notices - clear selection
-                navigate('/notices', { replace: true });
-                setSelectedUser(null);
-                setSelectedGroup(null);
-              } else if (newIndex === 4) {
-                // Apps - clear selection
-                navigate('/apps', { replace: true });
-                setSelectedUser(null);
-                setSelectedGroup(null);
-              } else if (newIndex === 5) {
-                // Donate - clear selection
-                navigate('/donate', { replace: true });
-                setSelectedUser(null);
-                setSelectedGroup(null);
-              }
-              
-              // Reset flag after navigation completes
-              setTimeout(() => {
-                isUserSwipingRef.current = false;
-              }, 100);
-            }}
-            onSwipeDirection={(dir, idx) => {
-              // Swipe right from Home (idx 1) - go to chat or show toast
-              // "right" swipe means finger moves right, which goes to previous view (lower index)
-              if (dir === 'right' && idx === 1) {
-                if (selectedUser || selectedGroup) {
-                  return 0; // Go to chat
-                } else {
-                  // Show toast and stay on Home
-                  setShowChatSelectToast(true);
-                  setTimeout(() => setShowChatSelectToast(false), 3000);
-                  return 1; // Stay on Home
-                }
-              }
-              return undefined; // Allow normal swipe
-            }}
-            allowMouseDrag={false}
-            showDots={false}
-            showTitle={false}
-            swipeThreshold={140}
-            edgeZoneWidth={80}
-          />
-        ) : (
-          <div className="w-full h-full flex overflow-hidden">
-            {/* Sidebar - Resizable, scrollable content */}
-            <ResizableSidebar>
-              <ChatsView onShowTour={() => setManualTourOpen(true)} />
-            </ResizableSidebar>
-            {/* Main content area - Takes remaining space */}
-            <div className="flex-1 h-full overflow-hidden">
-              {getRightComponent()}
-            </div>
+    <div className="w-full h-[100dvh] md:h-screen flex flex-col" {...swipeHandlers}>
+      <div className="flex-1 overflow-hidden">
+        {/* Desktop Layout - Side by side */}
+        <div className="hidden md:flex w-full h-full overflow-hidden">
+          {/* Sidebar - Resizable on desktop */}
+          <ResizableSidebar>
+            <ChatsView onShowTour={() => setManualTourOpen(true)} />
+          </ResizableSidebar>
+          {/* Main content area */}
+          <div className="flex-1 h-full overflow-hidden relative">
+            {(selectedUser || selectedGroup) ? (
+              <FeedView />
+            ) : location.pathname.startsWith('/posts') ? (
+              <PostsView />
+            ) : location.pathname.startsWith('/notices') ? (
+              <NoticeView />
+            ) : location.pathname.startsWith('/apps') ? (
+              <AppsView />
+            ) : location.pathname.startsWith('/donate') ? (
+              <DonateView />
+            ) : (
+              <NoChatSelected />
+            )}
           </div>
-        )}
-      </BorderAnimatedContainer>
+        </div>
+
+        {/* Mobile Layout - Carousel style with all pages pre-positioned */}
+        <div className="md:hidden w-full h-full overflow-hidden relative">
+          {/* Calculate current page position */}
+          {(() => {
+            const currentPageIndex = getCurrentPageIndex();
+            const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 375;
+            
+            return (
+              <>
+                {/* Page 0: Chat Conversation */}
+                <div 
+                  className={`absolute inset-0 ${isSwiping ? '' : 'transition-transform duration-300 ease-out'}`}
+                  style={{
+                    transform: `translateX(${(0 - currentPageIndex) * screenWidth + (isSwiping ? swipeOffset : 0)}px)`
+                  }}
+                >
+                  {(selectedUser || selectedGroup) ? (
+                    <FeedView />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-base-100">
+                      <div className="text-center text-base-content/50">
+                        <p>No chat selected</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Page 1: Home (Chats List) */}
+                <div 
+                  className={`absolute inset-0 ${isSwiping ? '' : 'transition-transform duration-300 ease-out'}`}
+                  style={{
+                    transform: `translateX(${(1 - currentPageIndex) * screenWidth + (isSwiping ? swipeOffset : 0)}px)`
+                  }}
+                >
+                  <ChatsView onShowTour={() => setManualTourOpen(true)} />
+                </div>
+
+                {/* Page 2: Posts (Cassisiacum) */}
+                <div 
+                  className={`absolute inset-0 ${isSwiping ? '' : 'transition-transform duration-300 ease-out'}`}
+                  style={{
+                    transform: `translateX(${(2 - currentPageIndex) * screenWidth + (isSwiping ? swipeOffset : 0)}px)`
+                  }}
+                >
+                  <PostsView />
+                </div>
+
+                {/* Page 3: Notices */}
+                <div 
+                  className={`absolute inset-0 ${isSwiping ? '' : 'transition-transform duration-300 ease-out'}`}
+                  style={{
+                    transform: `translateX(${(3 - currentPageIndex) * screenWidth + (isSwiping ? swipeOffset : 0)}px)`
+                  }}
+                >
+                  <NoticeView />
+                </div>
+
+                {/* Page 4: Apps */}
+                <div 
+                  className={`absolute inset-0 ${isSwiping ? '' : 'transition-transform duration-300 ease-out'}`}
+                  style={{
+                    transform: `translateX(${(4 - currentPageIndex) * screenWidth + (isSwiping ? swipeOffset : 0)}px)`
+                  }}
+                >
+                  <AppsView />
+                </div>
+
+                {/* Page 5: Donate */}
+                <div 
+                  className={`absolute inset-0 ${isSwiping ? '' : 'transition-transform duration-300 ease-out'}`}
+                  style={{
+                    transform: `translateX(${(5 - currentPageIndex) * screenWidth + (isSwiping ? swipeOffset : 0)}px)`
+                  }}
+                >
+                  <DonateView />
+                </div>
+              </>
+            );
+          })()}
+
+          {/* Select Chat Prompt Overlay */}
+          {showSelectChatPrompt && (
+            <div className="absolute inset-0 bg-base-100/95 backdrop-blur-sm z-50 animate-fade-in">
+              <SelectChatPrompt />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Swipe Indicator */}
+      <SwipeIndicator 
+        currentTab={getCurrentTabIndex()} 
+        totalTabs={tabs.length}
+      />
 
       {/* Call Components - Render globally */}
       <CallModal />
@@ -461,28 +560,17 @@ function ChatPage() {
 
       {/* Bottom Navigation Bar */}
       <BottomNavBar
-        totalNotifications={requests?.incomingPending?.length || 0}
-        totalUnreadMessages={(chats || []).reduce((sum, chat) => sum + (chat.unreadCount || 0), 0)}
-        onNotificationsClick={() => {
-          fetchRequests().catch(() => {});
-          setShowNotifications(true);
-        }}
+        totalNotifications={totalNotifications}
+        totalUnreadMessages={totalUnreadMessages}
+        onNotificationsClick={() => setShowNotifications(true)}
       />
+
 
       {/* Notifications Modal */}
       <NotificationsModal
         isOpen={showNotifications}
         onClose={() => setShowNotifications(false)}
       />
-
-      {/* Toast for "Select a chat" */}
-      {showChatSelectToast && (
-        <div className="toast toast-top toast-center z-50">
-          <div className="alert alert-info">
-            <span>Please select a chat to view messages</span>
-          </div>
-        </div>
-      )}
 
       {/* In-App Notification Banner */}
       <InAppNotificationBanner

@@ -101,6 +101,12 @@ export const useChatStore = create((set, get) => ({
 
   // Set typing status - simple object-based approach (prevents array flickering)
   setUserTyping: (conversationId, userId, userName) => {
+    console.log('🔧 STORE: setUserTyping called', {
+      conversationId,
+      userId,
+      userName
+    });
+    
     const { typingUsers } = get();
     const currentConversation = typingUsers[conversationId] || {};
 
@@ -108,17 +114,22 @@ export const useChatStore = create((set, get) => ({
     const existingUser = currentConversation[userId];
     const now = Date.now();
     
+    console.log('🔧 STORE: Existing user?', existingUser ? 'Yes' : 'No');
+    
     // Skip update if user was just updated within last 1 second (debounce)
     // This prevents flickering from rapid typing events
     if (existingUser && (now - existingUser.timestamp) < 1000) {
+      console.log('⏭️ STORE: Skipping update (debounced)');
       return;
     }
 
     // Only update state if something actually changed
     const needsUpdate = !existingUser || existingUser.name !== userName;
     
+    console.log('🔧 STORE: Needs update?', needsUpdate);
+    
     if (needsUpdate) {
-      set({
+      const newState = {
         typingUsers: {
           ...typingUsers,
           [conversationId]: {
@@ -126,28 +137,41 @@ export const useChatStore = create((set, get) => ({
             [userId]: { userId, name: userName, timestamp: now }
           }
         }
-      });
+      };
+      
+      console.log('✅ STORE: Updating state', newState);
+      set(newState);
     }
   },
 
   // Clear typing status
   clearUserTyping: (conversationId, userId) => {
+    console.log('🔧 STORE: clearUserTyping called', {
+      conversationId,
+      userId
+    });
+    
     const { typingUsers } = get();
     const currentConversation = typingUsers[conversationId] || {};
 
     // Only update if user actually exists
     if (!currentConversation[userId]) {
+      console.log('⏭️ STORE: User not in typing list, skipping');
       return;
     }
+
+    console.log('✅ STORE: Removing user from typing list');
 
     // Remove user from conversation
     const { [userId]: _removed, ...remaining } = currentConversation;
 
     // If no users left, remove the conversation entirely
     if (Object.keys(remaining).length === 0) {
+      console.log('🗑️ STORE: No users left, removing conversation from typingUsers');
       const { [conversationId]: _removedConv, ...remainingConvs } = typingUsers;
       set({ typingUsers: remainingConvs });
     } else {
+      console.log('✅ STORE: Updating conversation with remaining users');
       set({
         typingUsers: {
           ...typingUsers,
@@ -1305,16 +1329,36 @@ export const useChatStore = create((set, get) => ({
 
     // Handle typing and recording indicators
     socket.on("userTyping", ({ conversationId, userId, userName }) => {
+      console.log('📥 STORE: Received userTyping event', {
+        conversationId,
+        userId,
+        userName
+      });
+      
       const { authUser } = useAuthStore.getState();
+      console.log('📥 STORE: Current authUser._id:', authUser?._id);
+      console.log('📥 STORE: Filtering own event?', userId === authUser?._id);
+      
       if (userId !== authUser?._id) {
+        console.log('✅ STORE: Setting user typing in store');
         get().setUserTyping(conversationId, userId, userName);
+      } else {
+        console.log('⏭️ STORE: Skipping own typing event');
       }
     });
 
     socket.on("userStoppedTyping", ({ conversationId, userId }) => {
+      console.log('📥 STORE: Received userStoppedTyping event', {
+        conversationId,
+        userId
+      });
+      
       const { authUser } = useAuthStore.getState();
       if (userId !== authUser?._id) {
+        console.log('✅ STORE: Clearing user typing from store');
         get().clearUserTyping(conversationId, userId);
+      } else {
+        console.log('⏭️ STORE: Skipping own stopTyping event');
       }
     });
 

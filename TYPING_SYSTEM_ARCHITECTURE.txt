@@ -1,0 +1,314 @@
+═══════════════════════════════════════════════════════════════════════════════
+                    TYPING INDICATOR - SYSTEM ARCHITECTURE
+═══════════════════════════════════════════════════════════════════════════════
+
+📋 OVERVIEW
+═══════════════════════════════════════════════════════════════════════════════
+
+The typing indicator system uses Socket.IO for real-time communication between
+users. It tracks when users are actively typing in a conversation and displays
+this information to other participants.
+
+KEY PRINCIPLE: You never see your own typing status, only others see it.
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🏗️ ARCHITECTURE COMPONENTS
+═══════════════════════════════════════════════════════════════════════════════
+
+1. FRONTEND - MessageInput.jsx
+   ├─ Detects user typing activity
+   ├─ Emits socket events: "typing" and "stopTyping"
+   └─ Manages local typing state (isTyping, typingTimeout)
+
+2. BACKEND - socket.js
+   ├─ Receives "typing" and "stopTyping" events
+   ├─ Broadcasts to other users: "userTyping" and "userStoppedTyping"
+   └─ Handles room-based routing (DM vs Group)
+
+3. FRONTEND - useChatStore.js
+   ├─ Listens for "userTyping" and "userStoppedTyping" events
+   ├─ Manages global typing state (typingUsers object)
+   └─ Provides setUserTyping() and clearUserTyping() methods
+
+4. FRONTEND - ChatContainer.jsx
+   ├─ Subscribes to typing users for current conversation
+   ├─ Filters out own typing status
+   └─ Passes typing users to TypingIndicator component
+
+5. FRONTEND - TypingIndicator.jsx
+   ├─ Displays typing status with animated dots
+   ├─ Formats text based on number of users typing
+   └─ Positioned above message input
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🔄 DATA FLOW
+═══════════════════════════════════════════════════════════════════════════════
+
+USER A STARTS TYPING:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 1. User A clicks message input                                              │
+│    └─ MessageInput.jsx: onFocus() triggered                                 │
+│                                                                              │
+│ 2. Check if not already typing                                              │
+│    └─ if (!isTyping) { ... }                                                │
+│                                                                              │
+│ 3. Emit "typing" event to backend                                           │
+│    └─ socket.emit('typing', {                                               │
+│         conversationId: selectedUser._id || selectedGroup._id,              │
+│         isGroup: !!selectedGroup,                                           │
+│         userName: authUser.fullName                                         │
+│       })                                                                     │
+│                                                                              │
+│ 4. Set local typing state                                                   │
+│    └─ setIsTyping(true)                                                     │
+│                                                                              │
+│ 5. Start 2-second inactivity timer                                          │
+│    └─ setTimeout(() => {                                                    │
+│         socket.emit('stopTyping', ...)                                      │
+│         setIsTyping(false)                                                  │
+│       }, 2000)                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    ↓
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ BACKEND (socket.js)                                                         │
+│                                                                              │
+│ 6. Receive "typing" event                                                   │
+│    └─ socket.on("typing", (data) => { ... })                               │
+│                                                                              │
+│ 7. Determine routing based on conversation type                             │
+│    ├─ If Group: Broadcast to group room (except sender)                    │
+│    │   └─ socket.to(`group_${conversationId}`).emit("userTyping", ...)     │
+│    │                                                                         │
+│    └─ If DM: Send to specific user                                          │
+│        └─ io.to(targetSocketId).emit("userTyping", {                        │
+│             conversationId: socket.userId, // Sender's ID                   │
+│             userId: socket.userId,                                          │
+│             userName: userName || socket.user.fullName,                     │
+│             isGroup: false                                                  │
+│           })                                                                │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    ↓
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ USER B RECEIVES (useChatStore.js)                                           │
+│                                                                              │
+│ 8. Listen for "userTyping" event                                            │
+│    └─ socket.on("userTyping", ({ conversationId, userId, userName }) => {  │
+│                                                                              │
+│ 9. Filter out own events                                                    │
+│    └─ if (userId !== authUser._id) { ... }                                 │
+│                                                                              │
+│ 10. Update store with typing user                                           │
+│     └─ get().setUserTyping(conversationId, userId, userName)                │
+│                                                                              │
+│ 11. Store structure:                                                        │
+│     typingUsers: {                                                          │
+│       [conversationId]: {                                                   │
+│         [userId]: {                                                         │
+│           userId: "123...",                                                 │
+│           name: "User A",                                                   │
+│           timestamp: 1234567890                                             │
+│         }                                                                   │
+│       }                                                                     │
+│     }                                                                       │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    ↓
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ USER B UI UPDATE (ChatContainer.jsx)                                        │
+│                                                                              │
+│ 12. Subscribe to typing users for current conversation                      │
+│     └─ const conversationTypingUsers = useChatStore(                        │
+│          state => conversationId ? state.typingUsers[conversationId] : {}   │
+│        )                                                                    │
+│                                                                              │
+│ 13. Extract user names                                                      │
+│     └─ const currentTypingUsers = useMemo(() => {                           │
+│          const names = [];                                                  │
+│          Object.values(conversationTypingUsers).forEach(data => {           │
+│            names.push(data.name);                                           │
+│          });                                                                │
+│          return names;                                                      │
+│        }, [conversationTypingUsers])                                        │
+│                                                                              │
+│ 14. Pass to TypingIndicator component                                       │
+│     └─ <TypingIndicator typingUsers={currentTypingUsers} />                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    ↓
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ DISPLAY (TypingIndicator.jsx)                                               │
+│                                                                              │
+│ 15. Format display text                                                     │
+│     ├─ 1 user: "User A is typing"                                           │
+│     ├─ 2 users: "User A and User B are typing"                              │
+│     └─ 3+ users: "User A and 2 others are typing"                           │
+│                                                                              │
+│ 16. Show animated dots                                                      │
+│     └─ Three bouncing dots with staggered animation                         │
+│                                                                              │
+│ 17. Position above message input                                            │
+│     └─ Rendered in ChatContainer before MessageInput component              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+USER A STOPS TYPING (3 ways):
+═══════════════════════════════════════════════════════════════════════════════
+
+METHOD 1: Inactivity Timeout (2 seconds)
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 1. User A types a character                                                 │
+│    └─ handleTextChange() called                                             │
+│                                                                              │
+│ 2. Clear previous timeout                                                   │
+│    └─ clearTimeout(typingTimeout)                                           │
+│                                                                              │
+│ 3. Set new 2-second timeout                                                 │
+│    └─ setTimeout(() => {                                                    │
+│         socket.emit('stopTyping', ...)                                      │
+│         setIsTyping(false)                                                  │
+│       }, 2000)                                                              │
+│                                                                              │
+│ 4. If no more keystrokes, timeout fires after 2 seconds                     │
+│    └─ Emits "stopTyping" event                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+METHOD 2: Blur Event (Click Away)
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 1. User A clicks outside message input                                      │
+│    └─ onBlur() triggered                                                    │
+│                                                                              │
+│ 2. Check if currently typing                                                │
+│    └─ if (isTyping) { ... }                                                 │
+│                                                                              │
+│ 3. Emit "stopTyping" immediately                                            │
+│    └─ socket.emit('stopTyping', ...)                                        │
+│                                                                              │
+│ 4. Clear typing state and timeout                                           │
+│    └─ setIsTyping(false)                                                    │
+│    └─ clearTimeout(typingTimeout)                                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+METHOD 3: Send Message
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 1. User A sends message                                                     │
+│    └─ handleSubmit() called                                                 │
+│                                                                              │
+│ 2. Clear timeout                                                            │
+│    └─ clearTimeout(typingTimeout)                                           │
+│                                                                              │
+│ 3. Emit "stopTyping"                                                        │
+│    └─ socket.emit('stopTyping', ...)                                        │
+│                                                                              │
+│ 4. Clear typing state                                                       │
+│    └─ setIsTyping(false)                                                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+All three methods follow the same backend flow:
+Backend receives "stopTyping" → Broadcasts "userStoppedTyping" → 
+User B receives event → Store clears typing user → UI updates
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🗄️ DATA STRUCTURES
+═══════════════════════════════════════════════════════════════════════════════
+
+STORE STATE (useChatStore.js):
+{
+  typingUsers: {
+    "conversationId1": {
+      "userId1": {
+        userId: "userId1",
+        name: "John Doe",
+        timestamp: 1234567890
+      },
+      "userId2": {
+        userId: "userId2",
+        name: "Jane Smith",
+        timestamp: 1234567895
+      }
+    },
+    "conversationId2": {
+      "userId3": {
+        userId: "userId3",
+        name: "Bob Johnson",
+        timestamp: 1234567900
+      }
+    }
+  }
+}
+
+SOCKET EVENT PAYLOADS:
+
+Emit "typing":
+{
+  conversationId: "userId or groupId",
+  isGroup: true/false,
+  userName: "John Doe"
+}
+
+Emit "stopTyping":
+{
+  conversationId: "userId or groupId",
+  isGroup: true/false
+}
+
+Receive "userTyping":
+{
+  conversationId: "userId or groupId",
+  userId: "senderId",
+  userName: "John Doe",
+  isGroup: true/false
+}
+
+Receive "userStoppedTyping":
+{
+  conversationId: "userId or groupId",
+  userId: "senderId",
+  isGroup: true/false
+}
+
+
+═══════════════════════════════════════════════════════════════════════════════
+⚡ PERFORMANCE OPTIMIZATIONS
+═══════════════════════════════════════════════════════════════════════════════
+
+1. DEBOUNCING
+   - Store updates only if user doesn't exist or timestamp is old (1 second)
+   - Prevents rapid state updates from causing re-renders
+
+2. MEMOIZATION
+   - ChatContainer uses useMemo for currentTypingUsers
+   - Custom equality check prevents re-renders on timestamp changes
+   - Only re-renders when actual users change
+
+3. STABLE REFERENCES
+   - TypingIndicator uses internal state to prevent flickering
+   - Only updates display when users actually change
+
+4. CLEANUP
+   - Stale indicators cleaned up after 5 seconds
+   - Prevents ghost typing indicators from network issues
+
+5. SELECTIVE SUBSCRIPTIONS
+   - ChatContainer only subscribes to current conversation
+   - Reduces unnecessary re-renders from other conversations
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🔒 SECURITY CONSIDERATIONS
+═══════════════════════════════════════════════════════════════════════════════
+
+1. USER VERIFICATION
+   - Backend uses socket.userId from authenticated session
+   - Cannot spoof typing events for other users
+
+2. ROOM ISOLATION
+   - DM: Only two participants can see each other's typing
+   - Group: Only group members receive typing events
+
+3. NO SENSITIVE DATA
+   - Only userId and userName transmitted
+   - No message content in typing events
+
+
+═══════════════════════════════════════════════════════════════════════════════

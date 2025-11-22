@@ -203,6 +203,15 @@ export default function AppsView() {
                         </div>
 
                         <div className="flex items-center gap-2">
+                            {/* How It Works Button - Mobile visible */}
+                            <button
+                                className="btn btn-ghost btn-sm btn-circle"
+                                onClick={() => setShowHowItWorks(true)}
+                                title="How it works?"
+                            >
+                                <HelpCircle className="w-5 h-5" />
+                            </button>
+
                             <button
                                 className="btn btn-primary btn-sm max-sm:btn-circle"
                                 onClick={() => setShowAddApp(true)}
@@ -265,16 +274,6 @@ export default function AppsView() {
                     </div>
                 </div>
 
-                {/* Floating Question Button - Absolute positioned within content */}
-                <div className="absolute bottom-4 right-4 z-50">
-                    <button
-                        className="btn btn-circle btn-primary btn-lg shadow-2xl hover:scale-110 transition-transform animate-pulse"
-                        onClick={() => setShowHowItWorks(true)}
-                        title="How it works?"
-                    >
-                        <HelpCircle className="w-6 h-6" />
-                    </button>
-                </div>
             </div>
 
             {/* App Detail Modal - iOS Style */}

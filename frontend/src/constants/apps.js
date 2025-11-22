@@ -1,7 +1,16 @@
-import { Music, Youtube, MessageSquare } from 'lucide-react';
+import { Music, Youtube, MessageSquare, Gamepad2 } from 'lucide-react';
 
 // Template apps - ready for integration
 export const TEMPLATE_APPS = [
+    {
+        id: 'checkers',
+        name: 'Checkers Game',
+        icon: Gamepad2,
+        description: 'Play multiplayer checkers',
+        status: 'active',
+        url: '/games/checkers',
+        category: 'Games'
+    },
     {
         id: 'spotify',
         name: 'Spotify',

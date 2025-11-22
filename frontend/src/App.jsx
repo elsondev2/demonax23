@@ -10,6 +10,7 @@ import TermsOfServicePage from "./pages/TermsOfServicePage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import Eulapage from "./pages/Eulapage";
 import LandingPage from "./pages/LandingPage";
+import CheckersGamePage from "./pages/CheckersGamePage";
 import { useAuthStore } from "./store/useAuthStore";
 import { useEffect } from "react";
 import PageLoader from "./components/PageLoader";
@@ -72,8 +73,28 @@ function AppContent() {
       <div className={containerClass}>
         {!isLandingPage && authUser && <AnnouncementBanner />}
         <Routes>
-          <Route path="/" element={authUser ? <Navigate to="/chat" replace /> : <LandingPage />} />
-          <Route path="/chat" element={
+          <Route path="/" element={authUser ? <Navigate to="/chats" replace /> : <LandingPage />} />
+          <Route path="/chats/*" element={
+            <ProtectedRoute>
+              <ChatPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/apps" element={
+            <ProtectedRoute>
+              <ChatPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/donate" element={
+            <ProtectedRoute>
+              <ChatPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/posts" element={
+            <ProtectedRoute>
+              <ChatPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/notices" element={
             <ProtectedRoute>
               <ChatPage />
             </ProtectedRoute>
@@ -88,14 +109,14 @@ function AppContent() {
               <ChatPage />
             </ProtectedRoute>
           } />
-          <Route path="/login" element={authUser ? <Navigate to="/chat" replace /> : <LoginPageNew />} />
-          <Route path="/signin" element={authUser ? <Navigate to="/chat" replace /> : <LoginPageNew />} />
-          <Route path="/signup" element={authUser ? <Navigate to="/chat" replace /> : <SignUpPageNew />} />
-          <Route path="/register" element={authUser ? <Navigate to="/chat" replace /> : <SignUpPageNew />} />
+          <Route path="/login" element={authUser ? <Navigate to="/chats" replace /> : <LoginPageNew />} />
+          <Route path="/signin" element={authUser ? <Navigate to="/chats" replace /> : <LoginPageNew />} />
+          <Route path="/signup" element={authUser ? <Navigate to="/chats" replace /> : <SignUpPageNew />} />
+          <Route path="/register" element={authUser ? <Navigate to="/chats" replace /> : <SignUpPageNew />} />
           <Route path="/verify-email" element={<EmailVerificationPage />} />
           <Route path="/join/:token" element={
             <ProtectedRoute>
-              <JoinGroupPage />
+              <ChatPage />
             </ProtectedRoute>
           } />
           <Route path="/admin/login" element={<AdminLoginPageNew />} />
@@ -104,39 +125,14 @@ function AppContent() {
               <AdminPage />
             </AdminProtectedRoute>
           } />
-          <Route path="/posts" element={
-            <ProtectedRoute redirectTo="/login">
-              <ChatPage />
-            </ProtectedRoute>
-          } />
-          <Route path="/posts/public" element={
-            <ProtectedRoute redirectTo="/login">
-              <ChatPage />
-            </ProtectedRoute>
-          } />
-          <Route path="/posts/mine" element={
-            <ProtectedRoute redirectTo="/login">
-              <ChatPage />
-            </ProtectedRoute>
-          } />
-          <Route path="/notices" element={
-            <ProtectedRoute redirectTo="/login">
-              <ChatPage />
-            </ProtectedRoute>
-          } />
-          <Route path="/apps" element={
-            <ProtectedRoute redirectTo="/login">
-              <ChatPage />
-            </ProtectedRoute>
-          } />
-          <Route path="/donate" element={
-            <ProtectedRoute redirectTo="/login">
-              <ChatPage />
-            </ProtectedRoute>
-          } />
           <Route path="/terms" element={<TermsOfServicePage />} />
           <Route path="/privacy" element={<PrivacyPolicyPage />} />
           <Route path="/eula" element={<Eulapage />} />
+          <Route path="/games/checkers" element={
+            <ProtectedRoute>
+              <CheckersGamePage />
+            </ProtectedRoute>
+          } />
         </Routes>
 
         {!isLandingPage && (

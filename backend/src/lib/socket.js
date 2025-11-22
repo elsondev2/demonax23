@@ -200,14 +200,113 @@ io.on("connection", (socket) => {
     }
   });
 
+  // ===== WEBRTC SIGNALING EVENTS =====
+  
+  // Handle WebRTC offer
+  socket.on("webrtc:offer", (data) => {
+    console.log('📤 BACKEND - WebRTC offer received:', {
+      from: socket.userId,
+      channelName: data.channelName
+    });
+    
+    const { channelName, offer } = data;
+    
+    // Forward offer to all users in the channel except sender
+    socket.to(channelName).emit("webrtc:offer", {
+      from: socket.userId,
+      offer
+    });
+    
+    console.log('✅ BACKEND - WebRTC offer forwarded to channel:', channelName);
+  });
+
+  // Handle WebRTC answer
+  socket.on("webrtc:answer", (data) => {
+    console.log('📤 BACKEND - WebRTC answer received:', {
+      from: socket.userId,
+      channelName: data.channelName
+    });
+    
+    const { channelName, answer } = data;
+    
+    // Forward answer to all users in the channel except sender
+    socket.to(channelName).emit("webrtc:answer", {
+      from: socket.userId,
+      answer
+    });
+    
+    console.log('✅ BACKEND - WebRTC answer forwarded to channel:', channelName);
+  });
+
+  // Handle ICE candidate
+  socket.on("webrtc:iceCandidate", (data) => {
+    console.log('🧊 BACKEND - ICE candidate received:', {
+      from: socket.userId,
+      channelName: data.channelName,
+      candidateType: data.candidate?.type
+    });
+    
+    const { channelName, candidate } = data;
+    
+    // Forward ICE candidate to all users in the channel except sender
+    socket.to(channelName).emit("webrtc:iceCandidate", {
+      from: socket.userId,
+      candidate
+    });
+  });
+
+  // Join WebRTC channel (room)
+  socket.on("webrtc:joinChannel", (data) => {
+    const { channelName } = data;
+    console.log('🚪 BACKEND - User joining WebRTC channel:', {
+      userId: socket.userId,
+      channelName
+    });
+    
+    socket.join(channelName);
+    
+    // Notify others in the channel
+    socket.to(channelName).emit("webrtc:userJoined", {
+      userId: socket.userId
+    });
+    
+    console.log('✅ BACKEND - User joined channel:', channelName);
+  });
+
+  // Leave WebRTC channel
+  socket.on("webrtc:leaveChannel", (data) => {
+    const { channelName } = data;
+    console.log('🚪 BACKEND - User leaving WebRTC channel:', {
+      userId: socket.userId,
+      channelName
+    });
+    
+    socket.leave(channelName);
+    
+    // Notify others in the channel
+    socket.to(channelName).emit("webrtc:userLeft", {
+      userId: socket.userId
+    });
+    
+    console.log('✅ BACKEND - User left channel:', channelName);
+  });
+
   // ===== TYPING INDICATOR EVENTS =====
   
   // Handle typing start
   socket.on("typing", (data) => {
     const { conversationId, isGroup, userName } = data;
     
+    console.log('🔵 BACKEND: Received typing event', {
+      from: socket.userId,
+      userName: userName || socket.user?.fullName,
+      conversationId,
+      isGroup
+    });
+    
     if (isGroup) {
       // Broadcast to all group members except sender
+      console.log(`📤 BACKEND: Broadcasting to group_${conversationId}`);
       socket.to(`group_${conversationId}`).emit("userTyping", {
         conversationId,
         userId: socket.userId,
@@ -217,6 +316,12 @@ io.on("connection", (socket) => {
     } else {
       // Send to the other user in 1:1 chat
       const targetSocketId = getReceiverSocketId(conversationId);
+      console.log('📤 BACKEND: Sending to user', {
+        targetUserId: conversationId,
+        targetSocketId: targetSocketId || 'NOT FOUND',
+        senderUserId: socket.userId
+      });
+      
       if (targetSocketId) {
         io.to(targetSocketId).emit("userTyping", {
           conversationId: socket.userId, // For 1:1, conversation ID is the sender's ID
@@ -224,6 +329,9 @@ io.on("connection", (socket) => {
           userName: userName || socket.user.fullName,
           isGroup: false
         });
+        console.log('✅ BACKEND: userTyping event sent');
+      } else {
+        console.log('❌ BACKEND: Target user not connected');
       }
     }
   });
@@ -232,8 +340,15 @@ io.on("connection", (socket) => {
   socket.on("stopTyping", (data) => {
     const { conversationId, isGroup } = data;
     
+    console.log('🔴 BACKEND: Received stopTyping event', {
+      from: socket.userId,
+      conversationId,
+      isGroup
+    });
+    
     if (isGroup) {
       // Broadcast to all group members except sender
+      console.log(`📤 BACKEND: Broadcasting stopTyping to group_${conversationId}`);
       socket.to(`group_${conversationId}`).emit("userStoppedTyping", {
         conversationId,
         userId: socket.userId,
@@ -242,12 +357,20 @@ io.on("connection", (socket) => {
     } else {
       // Send to the other user in 1:1 chat
       const targetSocketId = getReceiverSocketId(conversationId);
+      console.log('📤 BACKEND: Sending stopTyping to user', {
+        targetUserId: conversationId,
+        targetSocketId: targetSocketId || 'NOT FOUND'
+      });
+      
       if (targetSocketId) {
         io.to(targetSocketId).emit("userStoppedTyping", {
           conversationId: socket.userId, // For 1:1, conversation ID is the sender's ID
           userId: socket.userId,
           isGroup: false
         });
+        console.log('✅ BACKEND: userStoppedTyping event sent');
+      } else {
+        console.log('❌ BACKEND: Target user not connected');
       }
     }
   });

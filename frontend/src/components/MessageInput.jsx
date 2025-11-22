@@ -233,42 +233,39 @@ const MessageInput = ({ onInputFocus }) => {
         setMentionStartIndex(-1);
       }
 
-      // TYPING SYSTEM: Emit typing event on every keystroke
+      // TYPING SYSTEM: CometChat-style implementation
       const { socket } = useAuthStore.getState();
-      if (socket && socket.connected) {
-        const conversationId = selectedUser?._id || selectedGroup?._id;
-        const isGroup = !!selectedGroup;
-
-        if (conversationId) {
-          // Always emit typing event to keep indicator alive on receiver's side
+      const conversationId = selectedUser?._id || selectedGroup?._id;
+      const isGroup = !!selectedGroup;
+      
+      if (socket && socket.connected && conversationId) {
+        // Clear any existing timeout
+        if (typingTimeout) {
+          clearTimeout(typingTimeout);
+        }
+        
+        // If not already typing, send START typing event (only once)
+        if (!isTyping) {
+          console.log('🔵 TYPING: startTyping');
           socket.emit('typing', {
             conversationId,
             isGroup,
             userName: authUser?.fullName
           });
-
-          // Set typing state if not already set
-          if (!isTyping) {
-            setIsTyping(true);
-            // Don't add yourself to local typing users - only show others typing
-          }
-
-          // Clear previous inactivity timeout
-          if (typingTimeout) {
-            clearTimeout(typingTimeout);
-          }
-
-          // Set new 3-second inactivity timeout
-          const timeout = setTimeout(() => {
-            socket.emit('stopTyping', {
-              conversationId,
-              isGroup
-            });
-            setIsTyping(false);
-          }, 3000);
-
-          setTypingTimeout(timeout);
+          setIsTyping(true);
         }
+        
+        // Set inactivity timeout to send STOP typing
+        const timeout = setTimeout(() => {
+          console.log('⏱️ TYPING: endTyping (inactivity)');
+          socket.emit('stopTyping', {
+            conversationId,
+            isGroup
+          });
+          setIsTyping(false);
+        }, 3000); // 3 seconds of inactivity
+        
+        setTypingTimeout(timeout);
       }
     }
   };
@@ -772,22 +769,24 @@ const MessageInput = ({ onInputFocus }) => {
               }
             }}
             onFormatChange={handleFormatChange}
-            onFocus={() => onInputFocus?.()}
+            onFocus={() => {
+              onInputFocus?.();
+              // Typing will start on first keystroke
+            }}
             onBlur={() => {
               // Stop typing when leaving input area
               if (isTyping) {
                 const { socket } = useAuthStore.getState();
-                if (socket && socket.connected) {
-                  const conversationId = selectedUser?._id || selectedGroup?._id;
-                  const isGroup = !!selectedGroup;
+                const conversationId = selectedUser?._id || selectedGroup?._id;
+                const isGroup = !!selectedGroup;
 
-                  if (conversationId) {
-                    socket.emit('stopTyping', {
-                      conversationId,
-                      isGroup
-                    });
-                    setIsTyping(false);
-                  }
+                if (socket && socket.connected && conversationId) {
+                  console.log('🔴 TYPING: endTyping (blur)');
+                  socket.emit('stopTyping', {
+                    conversationId,
+                    isGroup
+                  });
+                  setIsTyping(false);
                 }
 
                 // Clear timeout

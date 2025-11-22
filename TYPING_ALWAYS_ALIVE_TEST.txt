@@ -1,0 +1,165 @@
+═══════════════════════════════════════════════════════════════════════════════
+              TYPING INDICATOR - ALWAYS ALIVE (FIXED VERSION)
+═══════════════════════════════════════════════════════════════════════════════
+
+🎯 WHAT CHANGED
+═══════════════════════════════════════════════════════════════════════════════
+
+OLD BEHAVIOR (BROKEN):
+❌ Typing started on focus
+❌ Stopped immediately after first keystroke
+❌ Didn't restart on subsequent keystrokes
+
+NEW BEHAVIOR (FIXED):
+✅ Typing starts on FIRST KEYSTROKE (not focus)
+✅ Stays alive as long as you keep typing
+✅ Sends keep-alive every 3 seconds
+✅ Only stops after 5 seconds of inactivity OR when you click away
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🧪 QUICK TEST
+═══════════════════════════════════════════════════════════════════════════════
+
+SETUP:
+1. Open 2 browser windows (different users)
+2. Open console (F12) in both
+3. Open debugger (Ctrl+Shift+D) in both
+
+TEST:
+1. Window 1: Click input (just focus, don't type yet)
+   → Should see: 👆 TYPING: Input focused
+   → Should NOT send typing event yet
+
+2. Window 1: Type first character
+   → Should see: ⌨️ TYPING: Keystroke detected
+   → Should see: 🔵 TYPING: Starting typing (from keystroke)
+   → Window 2 should see: "User A is typing"
+
+3. Window 1: Keep typing (type multiple characters)
+   → Should see: ⌨️ TYPING: Keystroke detected (on each key)
+   → Every 3 seconds: 🔄 TYPING: Sending keep-alive typing event
+   → Window 2: Indicator stays visible THE ENTIRE TIME
+
+4. Window 1: Stop typing for 5 seconds
+   → After 5 seconds: ⏱️ TYPING: Inactivity timeout - stopping typing
+   → Window 2: Indicator disappears
+
+5. Window 1: Click away from input
+   → Immediately: 🔴 TYPING: Blur - stopping typing
+   → Window 2: Indicator disappears immediately
+
+
+═══════════════════════════════════════════════════════════════════════════════
+📊 EXPECTED LOGS
+═══════════════════════════════════════════════════════════════════════════════
+
+SCENARIO: Type "hello" continuously
+───────────────────────────────────────────────────────────────────────────────
+
+Window 1 Console:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 👆 TYPING: Input focused                                                    │
+│ ⌨️ TYPING: Keystroke detected                                               │
+│ 🔵 TYPING: Starting typing (from keystroke)                                 │
+│ ⌨️ TYPING: Keystroke detected                                               │
+│ ⌨️ TYPING: Keystroke detected                                               │
+│ ⌨️ TYPING: Keystroke detected                                               │
+│ ⌨️ TYPING: Keystroke detected                                               │
+│ ⌨️ TYPING: Keystroke detected                                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Window 2 UI:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ ● ● ● User A is typing                                                      │
+│ (Stays visible the entire time)                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+SCENARIO: Type continuously for 10 seconds
+───────────────────────────────────────────────────────────────────────────────
+
+Window 1 Console:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ ⌨️ TYPING: Keystroke detected                                               │
+│ 🔵 TYPING: Starting typing (from keystroke)                                 │
+│ ⌨️ TYPING: Keystroke detected                                               │
+│ ⌨️ TYPING: Keystroke detected                                               │
+│ ... (many keystrokes) ...                                                   │
+│ 🔄 TYPING: Sending keep-alive typing event (after 3 seconds)                │
+│ ⌨️ TYPING: Keystroke detected                                               │
+│ ... (more keystrokes) ...                                                   │
+│ 🔄 TYPING: Sending keep-alive typing event (after 6 seconds)                │
+│ ⌨️ TYPING: Keystroke detected                                               │
+│ ... (more keystrokes) ...                                                   │
+│ 🔄 TYPING: Sending keep-alive typing event (after 9 seconds)                │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Window 2 UI:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ ● ● ● User A is typing                                                      │
+│ (Never disappears while typing)                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════
+✅ SUCCESS CRITERIA
+═══════════════════════════════════════════════════════════════════════════════
+
+□ Typing indicator appears on FIRST KEYSTROKE (not focus)
+□ Indicator STAYS VISIBLE while you keep typing
+□ Keep-alive events sent every 3 seconds during typing
+□ Indicator disappears after 5 seconds of inactivity
+□ Indicator disappears immediately when clicking away
+□ No "userStoppedTyping" events while actively typing
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🐛 IF IT STILL DOESN'T WORK
+═══════════════════════════════════════════════════════════════════════════════
+
+Check Window 1 console for:
+
+❌ "❌ TYPING: Socket not connected on focus"
+   → Socket connection issue
+   → Refresh page
+   → Check backend is running
+
+❌ "❌ TYPING: No conversation selected"
+   → No chat selected
+   → Make sure you opened a chat
+
+❌ No "⌨️ TYPING: Keystroke detected" logs
+   → handleTextChange not being called
+   → Check if WYSIWYGMessageInput onChange is working
+
+❌ "🔵 TYPING: Starting typing" but no backend logs
+   → Socket emit not reaching backend
+   → Check network tab for WebSocket frames
+   → Check backend console
+
+
+═══════════════════════════════════════════════════════════════════════════════
+📝 KEY IMPROVEMENTS
+═══════════════════════════════════════════════════════════════════════════════
+
+1. ✅ Typing now starts on KEYSTROKE, not focus
+   - More reliable detection
+   - Works even if focus event is missed
+
+2. ✅ Simplified logic
+   - No complex state checks
+   - Always resets timer on keystroke
+   - Always sends keep-alive every 3 seconds
+
+3. ✅ Longer inactivity timeout (5 seconds)
+   - Gives you more time to think
+   - Less likely to stop while you're still composing
+
+4. ✅ Better logging
+   - Every action is logged
+   - Easy to debug
+   - Clear emoji indicators
+
+
+═══════════════════════════════════════════════════════════════════════════════
