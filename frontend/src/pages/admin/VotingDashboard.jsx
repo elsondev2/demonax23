@@ -40,6 +40,8 @@ const VotingDashboard = () => {
   const [filter, setFilter] = useState('all');
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState(null);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const fetchAnalytics = async () => {
     try {
@@ -51,8 +53,8 @@ const VotingDashboard = () => {
     }
   };
 
-  const fetchVotes = async () => {
-    setLoading(true);
+  const fetchVotes = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await axiosInstance.get('/api/votes/all', {
         params: { page, limit: 20, filter }
@@ -61,32 +63,53 @@ const VotingDashboard = () => {
       setPagination(res.data.pagination);
     } catch (error) {
       console.error('Error fetching votes:', error);
-      toast.error('Failed to load votes');
+      if (!silent) toast.error('Failed to load votes');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
+  };
+
+  const handleRefreshVotes = async () => {
+    setRefreshing(true);
+    await fetchVotes(true);
+    setTimeout(() => setRefreshing(false), 500);
   };
 
   useEffect(() => {
     fetchAnalytics();
     fetchVotes();
-  }, [fetchVotes, filter, page]);
+  }, [filter, page]);
 
+  // Auto-refresh effect
+  useEffect(() => {
+    if (!autoRefresh) return;
+
+    const interval = setInterval(() => {
+      fetchVotes(true); // Silent refresh
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [autoRefresh, filter, page]);
+
+  // Live socket updates
   useEffect(() => {
     if (!socket) return;
 
-    socket.on('vote:update', (data) => {
+    const handleVoteUpdate = (data) => {
       console.log('📊 Admin: Vote update received');
       if (data.stats) {
         setAnalytics(prev => ({ ...prev, ...data.stats }));
       }
-      fetchVotes(); // Refresh vote list
-    });
+      // Silent refresh to avoid flickering
+      fetchVotes(true);
+    };
+
+    socket.on('vote:update', handleVoteUpdate);
 
     return () => {
-      socket.off('vote:update');
+      socket.off('vote:update', handleVoteUpdate);
     };
-  }, [fetchVotes, socket]);
+  }, [socket, filter, page]);
 
   const handleDeleteVote = async (voteId) => {
     if (!confirm('Are you sure you want to delete this vote?')) return;
@@ -229,7 +252,10 @@ const VotingDashboard = () => {
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold">Voting Dashboard</h1>
-          <p className="text-sm md:text-base text-base-content/70">Real-time voting analytics</p>
+          <p className="text-sm md:text-base text-base-content/70">
+            Real-time voting analytics
+            {autoRefresh && <span className="ml-2 badge badge-success badge-sm">Live</span>}
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button onClick={fetchAnalytics} className="btn btn-ghost btn-sm gap-2">
@@ -425,25 +451,44 @@ const VotingDashboard = () => {
         <div className="card-body p-4 md:p-6">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
             <h2 className="card-title text-base md:text-lg">All Votes</h2>
-            <div className="tabs tabs-boxed tabs-sm md:tabs-md">
-              <a
-                className={`tab ${filter === 'all' ? 'tab-active' : ''}`}
-                onClick={() => { setFilter('all'); setPage(1); }}
-              >
-                All
-              </a>
-              <a
-                className={`tab ${filter === 'stay' ? 'tab-active' : ''}`}
-                onClick={() => { setFilter('stay'); setPage(1); }}
-              >
-                Stay
-              </a>
-              <a
-                className={`tab ${filter === 'go' ? 'tab-active' : ''}`}
-                onClick={() => { setFilter('go'); setPage(1); }}
-              >
-                Go
-              </a>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="tabs tabs-boxed tabs-sm md:tabs-md">
+                <a
+                  className={`tab ${filter === 'all' ? 'tab-active' : ''}`}
+                  onClick={() => { setFilter('all'); setPage(1); }}
+                >
+                  All
+                </a>
+                <a
+                  className={`tab ${filter === 'stay' ? 'tab-active' : ''}`}
+                  onClick={() => { setFilter('stay'); setPage(1); }}
+                >
+                  Stay
+                </a>
+                <a
+                  className={`tab ${filter === 'go' ? 'tab-active' : ''}`}
+                  onClick={() => { setFilter('go'); setPage(1); }}
+                >
+                  Go
+                </a>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleRefreshVotes}
+                  className={`btn btn-ghost btn-sm btn-circle ${refreshing ? 'animate-spin' : ''}`}
+                  title="Refresh votes"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setAutoRefresh(!autoRefresh)}
+                  className={`btn btn-sm ${autoRefresh ? 'btn-success' : 'btn-ghost'}`}
+                  title={autoRefresh ? 'Auto-refresh ON (5s)' : 'Auto-refresh OFF'}
+                >
+                  <RefreshCw className={`w-4 h-4 ${autoRefresh ? 'animate-spin' : ''}`} />
+                  <span className="hidden sm:inline ml-1">{autoRefresh ? 'Live' : 'Auto'}</span>
+                </button>
+              </div>
             </div>
           </div>
 

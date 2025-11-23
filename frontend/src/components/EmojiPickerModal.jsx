@@ -119,7 +119,10 @@ const EmojiPickerModal = ({ isOpen, onClose, onSelectEmoji, triggerRef, keepMoun
     // Haptic feedback on emoji selection
     hapticSelection();
     
-    onSelectEmoji(emoji.emoji)
+    // Call the callback with the emoji
+    if (onSelectEmoji) {
+      onSelectEmoji(emoji.emoji);
+    }
 
     // Update recent emojis
     const newRecent = [emoji, ...recentEmojis.filter(e => e.emoji !== emoji.emoji)].slice(0, 24)
