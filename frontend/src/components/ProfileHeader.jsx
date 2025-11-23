@@ -1,24 +1,20 @@
 import { useState, useRef, useEffect } from "react";
-import { LogOutIcon, VolumeOffIcon, Volume2Icon } from "lucide-react";
+import { LogOutIcon, Vote, CreditCard } from "lucide-react";
+import { useNavigate } from "react-router";
 import { useAuthStore } from "../store/useAuthStore";
-import { useChatStore } from "../store/useChatStore";
 import ThemeButton from "./ThemeButton";
 import AccountSettingsModal from "./AccountSettingsModal";
 import FriendsModal from "./FriendsModal";
-import SoundSettingsModal from "./SoundSettingsModal";
 import useFriendStore from "../store/useFriendStore";
 import Avatar from "./Avatar";
 import { UsersIcon } from "lucide-react";
 
-const mouseClickSound = new Audio("/sounds/mouse-click.mp3");
-
 function ProfileHeader({ onShowTour }) {
+  const navigate = useNavigate();
   const { logout, authUser, updateProfile } = useAuthStore();
-  const { isSoundEnabled } = useChatStore();
   const [selectedImg, setSelectedImg] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showFriends, setShowFriends] = useState(false);
-  const [showSoundSettings, setShowSoundSettings] = useState(false);
   const { fetchRequests } = useFriendStore();
 
   useEffect(() => {
@@ -67,17 +63,16 @@ function ProfileHeader({ onShowTour }) {
   };
 
   return (
-    // DaisyUI navbar structure with proper avatar component
-    <div className="navbar bg-base-200 border-b border-base-300 p-4">
-      <div className="navbar-start">
-        <div className="flex items-center gap-3">
+    <div className="navbar bg-base-200 border-b border-base-300 px-4 py-3 min-h-[72px]">
+      <div className="navbar-start flex-1 min-w-0">
+        <div className="flex items-center gap-4">
           {/* AVATAR */}
-          <div className="relative" data-tutorial="profile-button">
+          <div className="relative flex-shrink-0" data-tutorial="profile-button">
             <div className="relative rounded-full ring-2 ring-primary/50 ring-offset-2 ring-offset-base-200">
               <Avatar
                 src={selectedImg || authUser.profilePic}
                 name={authUser.fullName}
-                size="size-14 md:size-16"
+                size="size-14"
                 className="rounded-full"
                 onClick={() => fileInputRef.current.click()}
                 showOnlineStatus={true}
@@ -98,23 +93,22 @@ function ProfileHeader({ onShowTour }) {
           </div>
 
           {/* USERNAME & ONLINE TEXT */}
-          <div className="cursor-pointer" onClick={() => setShowSettings(true)}>
-            <h3 className="text-base-content font-medium text-base max-w-[180px] truncate">
+          <div className="cursor-pointer min-w-0 flex-1" onClick={() => setShowSettings(true)}>
+            <h3 className="text-base-content font-medium text-base truncate">
               {authUser.fullName}
             </h3>
-            <p className="text-base-content/60 text-xs">Online</p>
+            <p className="text-base-content/60 text-sm">Online</p>
           </div>
         </div>
       </div>
 
-      <div className="navbar-end">
-        {/* BUTTONS */}
+      <div className="navbar-end flex-shrink-0">
         <div className="flex gap-2 items-center">
-          {/* FRIENDS MODAL BTN */}
+          {/* FRIENDS BTN */}
           <button
-            className="btn btn-ghost btn-sm btn-circle relative"
+            className="btn btn-ghost btn-sm btn-circle"
             onClick={() => { fetchRequests().catch(() => { }); setShowFriends(true); }}
-            title="Manage friends"
+            title="Friends"
           >
             <UsersIcon className="size-5" />
           </button>
@@ -124,32 +118,35 @@ function ProfileHeader({ onShowTour }) {
             <ThemeButton />
           </div>
 
-          {/* SOUND SETTINGS BTN */}
-          <button
-            className="btn btn-ghost btn-sm btn-circle"
-            onClick={() => {
-              // play click sound before opening settings
-              mouseClickSound.currentTime = 0; // reset to start
-              mouseClickSound.play().catch((error) => console.log("Audio play failed:", error));
-              setShowSoundSettings(true);
-            }}
-            title="Sound settings"
-          >
-            {isSoundEnabled ? (
-              <Volume2Icon className="size-5" />
-            ) : (
-              <VolumeOffIcon className="size-5" />
-            )}
-          </button>
-
-          {/* LOGOUT BTN */}
-          <button
-            className="btn btn-ghost btn-sm btn-circle"
-            onClick={logout}
-            title="Logout"
-          >
-            <LogOutIcon className="size-5" />
-          </button>
+          {/* MORE MENU DROPDOWN */}
+          <div className="dropdown dropdown-end">
+            <button tabIndex={0} className="btn btn-ghost btn-sm btn-circle">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="w-5 h-5 stroke-current">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v.01M12 12v.01M12 18v.01" />
+              </svg>
+            </button>
+            <ul tabIndex={0} className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-box w-52 border border-base-300 z-50">
+              <li>
+                <a onClick={() => navigate('/vote')} className="gap-3">
+                  <Vote className="size-4 text-primary" />
+                  Vote for Demonax
+                </a>
+              </li>
+              <li>
+                <a onClick={() => navigate('/payment-instructions')} className="gap-3">
+                  <CreditCard className="size-4 text-warning" />
+                  Subscribe
+                </a>
+              </li>
+              <div className="divider my-1"></div>
+              <li>
+                <a onClick={logout} className="gap-3 text-error">
+                  <LogOutIcon className="size-4" />
+                  Logout
+                </a>
+              </li>
+            </ul>
+          </div>
         </div>
       </div>
 
@@ -162,9 +159,6 @@ function ProfileHeader({ onShowTour }) {
       )}
       {showFriends && (
         <FriendsModal isOpen={showFriends} onClose={() => setShowFriends(false)} />
-      )}
-      {showSoundSettings && (
-        <SoundSettingsModal isOpen={showSoundSettings} onClose={() => setShowSoundSettings(false)} />
       )}
     </div>
   );

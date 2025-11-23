@@ -7,9 +7,9 @@ export default function PaymentManagementModal({ user: initialUser, onClose, onU
   const [user, setUser] = useState(initialUser);
   const [loading, setLoading] = useState(false);
   
-  // Premium state
-  const [premiumTier, setPremiumTier] = useState(user.premiumTier || 'free');
-  const [premiumDuration, setPremiumDuration] = useState(30);
+  // Subscription state
+  const [subscriptionPlan, setSubscriptionPlan] = useState(user.subscriptionPlan || 'none');
+  const [subscriptionDuration, setSubscriptionDuration] = useState(30);
   
   // Donation state
   const [donationAmount, setDonationAmount] = useState('');
@@ -84,53 +84,61 @@ export default function PaymentManagementModal({ user: initialUser, onClose, onU
   // Removed auto-fill to prevent interference between premium and donation sections
 
   const handleClearAll = () => {
-    setPremiumTier('free');
-    setPremiumDuration(30);
+    setSubscriptionPlan('none');
+    setSubscriptionDuration(30);
     setDonationAmount('');
     setDonationNote('');
     setPaymentNotes('');
   };
 
-  const handleSetPremium = async () => {
-    if (premiumTier === 'free') {
-      toast.error('Please select a premium tier');
+  const handleActivateSubscription = async () => {
+    if (subscriptionPlan === 'none') {
+      toast.error('Please select a subscription plan');
       return;
     }
 
-    if (premiumTier !== 'lifetime' && (!premiumDuration || premiumDuration <= 0)) {
+    if (!subscriptionDuration || subscriptionDuration <= 0) {
       toast.error('Please enter a valid duration');
       return;
     }
 
     setLoading(true);
     try {
-      const response = await axiosInstance.post(`/api/payments/${user._id}/premium`, {
-        tier: premiumTier,
-        duration: premiumTier === 'lifetime' ? null : premiumDuration
+      const response = await axiosInstance.post(`/api/payments/${user._id}/subscription`, {
+        plan: subscriptionPlan,
+        duration: subscriptionDuration,
+        donationAmount: donationAmount ? parseFloat(donationAmount) : 0
       });
       
       // Update local state immediately
       setUser(prev => ({
         ...prev,
         isPremium: true,
-        premiumTier: premiumTier,
+        subscriptionPlan: subscriptionPlan,
         premiumStartDate: new Date(),
         premiumEndDate: response.data.user.premiumEndDate,
-        paymentStatus: 'active'
+        paymentStatus: 'active',
+        ...(donationAmount && {
+          isSupporter: true,
+          totalDonated: response.data.user.totalDonated,
+          supporterTier: response.data.user.supporterTier
+        })
       }));
       
-      toast.success(`Premium ${premiumTier} set successfully!`);
+      toast.success(`${subscriptionPlan.charAt(0).toUpperCase() + subscriptionPlan.slice(1)} subscription activated!`);
+      setDonationAmount('');
+      setDonationNote('');
       onUpdate();
     } catch (error) {
-      console.error('Error setting premium:', error);
-      toast.error(error.response?.data?.message || 'Failed to set premium');
+      console.error('Error activating subscription:', error);
+      toast.error(error.response?.data?.message || 'Failed to activate subscription');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleExtendPremium = async () => {
-    if (!premiumDuration || premiumDuration <= 0) {
+  const handleExtendSubscription = async () => {
+    if (!subscriptionDuration || subscriptionDuration <= 0) {
       toast.error('Please enter valid days to extend');
       return;
     }
@@ -138,7 +146,7 @@ export default function PaymentManagementModal({ user: initialUser, onClose, onU
     setLoading(true);
     try {
       const response = await axiosInstance.put(`/api/payments/${user._id}/premium/extend`, {
-        additionalDays: premiumDuration
+        additionalDays: subscriptionDuration
       });
       
       // Update local state immediately
@@ -148,18 +156,18 @@ export default function PaymentManagementModal({ user: initialUser, onClose, onU
         paymentStatus: 'active'
       }));
       
-      toast.success(`Premium extended by ${premiumDuration} days!`);
+      toast.success(`Subscription extended by ${subscriptionDuration} days!`);
       onUpdate();
     } catch (error) {
-      console.error('Error extending premium:', error);
-      toast.error(error.response?.data?.message || 'Failed to extend premium');
+      console.error('Error extending subscription:', error);
+      toast.error(error.response?.data?.message || 'Failed to extend subscription');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCancelPremium = async () => {
-    if (!confirm('Are you sure you want to cancel this user\'s premium?')) {
+  const handleCancelSubscription = async () => {
+    if (!confirm('Are you sure you want to cancel this Monarc\'s subscription?')) {
       return;
     }
 
@@ -171,16 +179,17 @@ export default function PaymentManagementModal({ user: initialUser, onClose, onU
       setUser(prev => ({
         ...prev,
         isPremium: false,
+        subscriptionPlan: 'none',
         premiumTier: 'free',
         premiumEndDate: null,
         paymentStatus: 'cancelled'
       }));
       
-      toast.success('Premium cancelled successfully');
+      toast.success('Subscription cancelled successfully');
       onUpdate();
     } catch (error) {
-      console.error('Error cancelling premium:', error);
-      toast.error(error.response?.data?.message || 'Failed to cancel premium');
+      console.error('Error cancelling subscription:', error);
+      toast.error(error.response?.data?.message || 'Failed to cancel subscription');
     } finally {
       setLoading(false);
     }
@@ -504,53 +513,50 @@ export default function PaymentManagementModal({ user: initialUser, onClose, onU
             </div>
           </div>
 
-          {/* Premium Management */}
+          {/* Subscription Management */}
           <div className="card bg-base-100 shadow-lg border border-base-200">
             <div className="card-body p-6">
               <h4 className="card-title text-lg flex items-center gap-2 mb-4">
                 <Crown className="w-6 h-6 text-primary" />
-                Premium Management
+                Monarc Subscription Management
               </h4>
               
               {/* Current Status */}
               {user.isPremium && (
                 <div className="alert alert-info mb-4">
                   <div className="flex-col items-start w-full">
-                    <div className="font-semibold">Current Premium Status</div>
+                    <div className="font-semibold">Current Subscription Status</div>
                     <div className="text-sm mt-1">
-                      <div>Tier: <span className="font-medium">{user.premiumTier}</span></div>
+                      <div>Plan: <span className="font-medium capitalize">{user.subscriptionPlan || user.premiumTier}</span></div>
                       {user.premiumStartDate && (
                         <div>Started: {formatDate(user.premiumStartDate)}</div>
                       )}
-                      {user.premiumEndDate && user.premiumTier !== 'lifetime' && (
+                      {user.premiumEndDate && (
                         <div>Expires: {formatDate(user.premiumEndDate)}</div>
-                      )}
-                      {user.premiumTier === 'lifetime' && (
-                        <div className="text-success font-medium">Lifetime Access</div>
                       )}
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Premium Tier Selection - Visual Cards */}
+              {/* Subscription Plan Selection - Visual Cards */}
               <div className="form-control">
                 <label className="label">
-                  <span className="label-text font-semibold">Select Premium Tier</span>
+                  <span className="label-text font-semibold">Select Subscription Plan</span>
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {[
-                    { tier: 'basic', price: '6,000 TSh', features: ['Unlimited messaging', 'Custom themes', 'Priority support'] },
-                    { tier: 'pro', price: '20,000 TSh', features: ['All Basic features', 'Advanced tools', 'Custom badges'] },
-                    { tier: 'premium', price: '35,000 TSh', features: ['All Pro features', 'Advanced analytics', 'VIP badge'] }
-                  ].map(({ tier, price, features }) => (
+                    { plan: 'base', price: '6,000 TSh', features: ['Unlimited messaging', 'Group chats', 'Voice calls', 'Standard support'] },
+                    { plan: 'pro', price: '20,000 TSh', features: ['Everything in Base', 'Video calls', 'Priority support', 'Advanced features', 'No ads'] },
+                    { plan: 'premium', price: '35,000 TSh', features: ['Everything in Pro', 'Unlimited storage', 'Premium support', 'Early access', 'Custom themes'] }
+                  ].map(({ plan, price, features }) => (
                     <button
-                      key={tier}
-                      className={`card ${premiumTier === tier ? 'bg-primary text-primary-content shadow-lg' : 'bg-base-200 hover:bg-base-300'} transition-all cursor-pointer border-2 ${premiumTier === tier ? 'border-primary' : 'border-transparent'}`}
-                      onClick={() => setPremiumTier(tier)}
+                      key={plan}
+                      className={`card ${subscriptionPlan === plan ? 'bg-primary text-primary-content shadow-lg' : 'bg-base-200 hover:bg-base-300'} transition-all cursor-pointer border-2 ${subscriptionPlan === plan ? 'border-primary' : 'border-transparent'}`}
+                      onClick={() => setSubscriptionPlan(plan)}
                     >
                       <div className="card-body p-4">
-                        <h5 className="card-title text-sm capitalize">{tier}</h5>
+                        <h5 className="card-title text-sm capitalize">{plan} Plan</h5>
                         <p className="text-2xl font-bold">{price}</p>
                         <ul className="text-xs space-y-1 mt-2">
                           {features.map((feature, idx) => (
@@ -564,27 +570,46 @@ export default function PaymentManagementModal({ user: initialUser, onClose, onU
               </div>
 
               {/* Duration - Modern Slider */}
-              {premiumTier !== 'lifetime' && premiumTier !== 'free' && (
+              {subscriptionPlan !== 'none' && (
                 <div className="form-control">
                   <label className="label">
                     <span className="label-text font-semibold">Duration</span>
-                    <span className="label-text-alt font-bold text-primary">{premiumDuration} days</span>
+                    <span className="label-text-alt font-bold text-primary">{subscriptionDuration} days</span>
                   </label>
                   <input
                     type="range"
                     min="1"
                     max="365"
-                    value={premiumDuration}
-                    onChange={(e) => setPremiumDuration(parseInt(e.target.value))}
+                    value={subscriptionDuration}
+                    onChange={(e) => setSubscriptionDuration(parseInt(e.target.value))}
                     className="range range-primary"
                     step="1"
                   />
                   <div className="w-full flex justify-between text-xs px-2 mt-2">
-                    <button className="btn btn-xs btn-ghost" onClick={() => setPremiumDuration(30)}>30d</button>
-                    <button className="btn btn-xs btn-ghost" onClick={() => setPremiumDuration(90)}>90d</button>
-                    <button className="btn btn-xs btn-ghost" onClick={() => setPremiumDuration(180)}>6mo</button>
-                    <button className="btn btn-xs btn-ghost" onClick={() => setPremiumDuration(365)}>1yr</button>
+                    <button className="btn btn-xs btn-ghost" onClick={() => setSubscriptionDuration(30)}>30d</button>
+                    <button className="btn btn-xs btn-ghost" onClick={() => setSubscriptionDuration(90)}>90d</button>
+                    <button className="btn btn-xs btn-ghost" onClick={() => setSubscriptionDuration(180)}>6mo</button>
+                    <button className="btn btn-xs btn-ghost" onClick={() => setSubscriptionDuration(365)}>1yr</button>
                   </div>
+                </div>
+              )}
+
+              {/* Optional Donation with Subscription */}
+              {subscriptionPlan !== 'none' && (
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text font-semibold">Optional Donation (TSh)</span>
+                    <span className="label-text-alt">Include donation with subscription</span>
+                  </label>
+                  <input
+                    type="number"
+                    className="input input-bordered"
+                    placeholder="0"
+                    value={donationAmount}
+                    onChange={(e) => setDonationAmount(e.target.value)}
+                    min="0"
+                    step="1000"
+                  />
                 </div>
               )}
 
@@ -592,26 +617,26 @@ export default function PaymentManagementModal({ user: initialUser, onClose, onU
               <div className="flex flex-wrap gap-3 mt-6">
                 <button
                   className="btn btn-primary flex-1 gap-2"
-                  onClick={handleSetPremium}
-                  disabled={loading || premiumTier === 'free'}
+                  onClick={handleActivateSubscription}
+                  disabled={loading || subscriptionPlan === 'none'}
                 >
                   {loading ? <span className="loading loading-spinner loading-sm"></span> : <Crown className="w-4 h-4" />}
-                  Set Premium
+                  Activate Subscription
                 </button>
-                {user.isPremium && user.premiumTier !== 'lifetime' && (
+                {user.isPremium && (
                   <button
                     className="btn btn-secondary flex-1 gap-2"
-                    onClick={handleExtendPremium}
+                    onClick={handleExtendSubscription}
                     disabled={loading}
                   >
                     {loading ? <span className="loading loading-spinner loading-sm"></span> : <Plus className="w-4 h-4" />}
-                    Extend {premiumDuration}d
+                    Extend {subscriptionDuration}d
                   </button>
                 )}
                 {user.isPremium && (
                   <button
                     className="btn btn-error btn-outline gap-2"
-                    onClick={handleCancelPremium}
+                    onClick={handleCancelSubscription}
                     disabled={loading}
                   >
                     <Trash2 className="w-4 h-4" />

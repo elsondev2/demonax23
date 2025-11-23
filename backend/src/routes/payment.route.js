@@ -11,7 +11,8 @@ import {
   updateSupporterStatus,
   removeSupporterStatus,
   updatePaymentNotes,
-  getMyPremiumStatus
+  getMyPremiumStatus,
+  activateSubscription
 } from '../controllers/payment.controller.js';
 import { protectRoute, adminRoute } from '../middleware/auth.middleware.js';
 
@@ -24,6 +25,7 @@ router.get('/my-status', protectRoute, getMyPremiumStatus);
 router.get('/all', protectRoute, adminRoute, getAllPayments);
 router.get('/stats', protectRoute, adminRoute, getPaymentStats);
 router.post('/:userId/premium', protectRoute, adminRoute, setPremium);
+router.post('/:userId/subscription', protectRoute, adminRoute, activateSubscription);
 router.put('/:userId/premium/extend', protectRoute, adminRoute, extendPremium);
 router.delete('/:userId/premium', protectRoute, adminRoute, cancelPremium);
 router.post('/:userId/donation', protectRoute, adminRoute, addDonation);

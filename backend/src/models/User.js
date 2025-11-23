@@ -54,6 +54,11 @@ const userSchema = new mongoose.Schema(
       enum: ["free", "basic", "pro", "lifetime"],
       default: "free",
     },
+    subscriptionPlan: {
+      type: String,
+      enum: ["none", "base", "pro", "premium"],
+      default: "none",
+    },
     premiumStartDate: { type: Date, default: null },
     premiumEndDate: { type: Date, default: null },
     premiumDuration: { type: Number, default: 0 }, // in days

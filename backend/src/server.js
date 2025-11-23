@@ -22,6 +22,8 @@ import mentionRoutes from "./routes/mention.route.js";
 import linkPreviewRoutes from "./routes/linkPreview.route.js";
 import paymentRoutes from "./routes/payment.route.js";
 import agoraRoutes from "./routes/agora.route.js";
+import checkersRoutes from "./routes/checkers.route.js";
+import voteRoutes from "./routes/vote.route.js";
 import { app, server } from "./lib/socket.js";
 import { startStatusCleanupJob } from "./lib/statusCleanup.js";
 import { startPostCleanupJob } from "./lib/postCleanup.js";
@@ -84,6 +86,8 @@ app.use("/api/mentions", mentionRoutes);
 app.use("/api/link", linkPreviewRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/agora", agoraRoutes);
+app.use("/api/checkers", checkersRoutes);
+app.use("/api/votes", voteRoutes);
 
 if (ENV.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "../frontend/dist")));

@@ -92,7 +92,7 @@ const FriendsModal = ({ isOpen, onClose }) => {
       </div>
 
       {/* Content */}
-      <div className="p-4 overflow-y-auto flex-1">
+      <div className="p-4 overflow-y-auto flex-1 min-h-0">
         {tab === 'incoming' && (
           <div>
             {incoming.length === 0 ? (
@@ -273,7 +273,7 @@ const FriendsModal = ({ isOpen, onClose }) => {
 
   return (
     <IOSModal isOpen={isOpen} onClose={onClose} className="max-w-3xl mx-auto">
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col h-full overflow-hidden">
         {modalContent}
       </div>
     </IOSModal>

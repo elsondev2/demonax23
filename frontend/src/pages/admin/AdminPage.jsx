@@ -2,10 +2,11 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { axiosInstance } from "../../lib/axios";
 import { useAuthStore } from "../../store/useAuthStore";
 import { useNavigate, useLocation, Routes, Route, Navigate } from "react-router";
-import { Users, MessageSquare, Layers, Image, LayoutDashboard, Download, FileText, Megaphone, MessageCircle, DollarSign } from "lucide-react";
+import { Users, MessageSquare, Layers, Image, LayoutDashboard, Download, FileText, Megaphone, MessageCircle, DollarSign, Vote } from "lucide-react";
 import toast from "react-hot-toast";
 import AnnouncementModal from "../../components/AnnouncementModal";
 import AppearanceModal from "../../components/AppearanceModal";
+import VotingDashboard from "./VotingDashboard";
 
 // Import extracted components
 import { AdminSidebar, AdminHeader, LoadingSkeleton } from "./components";
@@ -474,6 +475,7 @@ export default function AdminPage() {
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "users", label: "Users", icon: Users },
     { id: "payments", label: "Payments", icon: DollarSign },
+    { id: "votes", label: "Votes", icon: Vote },
     { id: "messages", label: "Messages", icon: MessageSquare },
     { id: "groups", label: "Groups", icon: Layers },
     { id: "community", label: "Community", icon: Users },
@@ -646,6 +648,7 @@ export default function AdminPage() {
                     setDeleteModal={setDeleteModal}
                   />
                 } />
+                <Route path="votes" element={<VotingDashboard />} />
               </Routes>
             )}
           </div>

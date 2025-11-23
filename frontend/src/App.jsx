@@ -22,6 +22,10 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import AdminProtectedRoute from "./components/AdminProtectedRoute";
 import AnnouncementBanner from "./components/AnnouncementBanner";
 import BannedAccountScreen from "./components/BannedAccountScreen";
+import PaymentNotificationModal from "./components/PaymentNotificationModal";
+import PaymentBlockScreen from "./components/PaymentBlockScreen";
+import PaymentInstructionsPage from "./pages/PaymentInstructionsPage";
+import VotingPage from "./pages/VotingPage";
 
 import { Toaster } from "react-hot-toast";
 import { SocketProvider } from "./contexts/SocketContext.jsx";
@@ -30,9 +34,19 @@ function AppContent() {
   const location = useLocation();
   const { authUser } = useAuthStore();
   const isLandingPage = location.pathname === '/';
+  const isPaymentPage = location.pathname === '/payment-instructions';
   
   // Check if user is banned (but allow admins to bypass)
   const isBanned = authUser?.isBanned === true && authUser?.role !== 'admin';
+  
+  // Check if trial has ended (Nov 28, 2025)
+  const TRIAL_END_DATE = new Date("2025-11-28T23:59:59");
+  const hasTrialEnded = new Date() > TRIAL_END_DATE;
+  
+  // Check if user has active subscription
+  const hasActiveSubscription = authUser?.isPremium === true && 
+    authUser?.paymentStatus === 'active' &&
+    (authUser?.premiumEndDate ? new Date(authUser.premiumEndDate) > new Date() : true);
 
   // Debug logging for banned status
   useEffect(() => {
@@ -68,12 +82,18 @@ function AppContent() {
     return <BannedAccountScreen />;
   }
 
+  // Show payment block screen if trial ended and no subscription (except on payment page)
+  if (authUser && hasTrialEnded && !hasActiveSubscription && !isPaymentPage) {
+    return <PaymentBlockScreen />;
+  }
+
   return (
     <SocketProvider>
       <div className={containerClass}>
         {!isLandingPage && authUser && <AnnouncementBanner />}
         <Routes>
           <Route path="/" element={authUser ? <Navigate to="/chats" replace /> : <LandingPage />} />
+          <Route path="/chat" element={<Navigate to="/chats" replace />} />
           <Route path="/chats/*" element={
             <ProtectedRoute>
               <ChatPage />
@@ -133,12 +153,23 @@ function AppContent() {
               <CheckersGamePage />
             </ProtectedRoute>
           } />
+          <Route path="/payment-instructions" element={
+            <ProtectedRoute>
+              <PaymentInstructionsPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/vote" element={
+            <ProtectedRoute>
+              <VotingPage />
+            </ProtectedRoute>
+          } />
         </Routes>
 
         {!isLandingPage && (
           <>
             <Toaster />
             <AppearanceModal />
+            {authUser && !hasTrialEnded && !hasActiveSubscription && <PaymentNotificationModal />}
           </>
         )}
       </div>

@@ -498,7 +498,7 @@ export const getMyPremiumStatus = async (req, res) => {
     const userId = req.user._id;
     
     const user = await User.findById(userId)
-      .select('isPremium premiumTier premiumStartDate premiumEndDate isSupporter supporterTier totalDonated paymentStatus');
+      .select('isPremium premiumTier premiumStartDate premiumEndDate isSupporter supporterTier totalDonated paymentStatus subscriptionPlan');
     
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -507,6 +507,7 @@ export const getMyPremiumStatus = async (req, res) => {
     res.status(200).json({
       isPremium: user.isPremium,
       premiumTier: user.premiumTier,
+      subscriptionPlan: user.subscriptionPlan,
       premiumStartDate: user.premiumStartDate,
       premiumEndDate: user.premiumEndDate,
       isSupporter: user.isSupporter,
@@ -517,6 +518,90 @@ export const getMyPremiumStatus = async (req, res) => {
     });
   } catch (error) {
     console.error("Error in getMyPremiumStatus:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Activate subscription (Admin only)
+export const activateSubscription = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { plan, duration, donationAmount } = req.body; // plan: 'base', 'pro', 'premium'; duration in days
+    
+    if (!plan || !['base', 'pro', 'premium'].includes(plan)) {
+      return res.status(400).json({ message: "Invalid subscription plan" });
+    }
+    
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    
+    // Set subscription duration (default 30 days)
+    const subscriptionDuration = duration || 30;
+    const startDate = new Date();
+    const endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + subscriptionDuration);
+    
+    // Map plan to premium tier
+    let premiumTier = 'basic';
+    if (plan === 'pro') premiumTier = 'pro';
+    if (plan === 'premium') premiumTier = 'pro'; // Both pro and premium use 'pro' tier
+    
+    // Update subscription
+    user.isPremium = true;
+    user.premiumTier = premiumTier;
+    user.subscriptionPlan = plan;
+    user.premiumStartDate = startDate;
+    user.premiumEndDate = endDate;
+    user.premiumDuration = subscriptionDuration;
+    user.paymentStatus = 'active';
+    
+    // Handle donation if provided
+    if (donationAmount && donationAmount > 0) {
+      user.donationHistory.push({
+        amount: donationAmount,
+        note: `Donation with ${plan} plan subscription`,
+        addedBy: req.user._id,
+        date: new Date()
+      });
+      
+      user.totalDonated += donationAmount;
+      user.lastDonationDate = new Date();
+      user.isSupporter = true;
+      
+      // Update supporter tier based on total donated (TSh)
+      if (user.totalDonated >= 100000) {
+        user.supporterTier = 'platinum';
+      } else if (user.totalDonated >= 50000) {
+        user.supporterTier = 'gold';
+      } else if (user.totalDonated >= 20000) {
+        user.supporterTier = 'silver';
+      } else if (user.totalDonated >= 6000) {
+        user.supporterTier = 'bronze';
+      }
+    }
+    
+    await user.save();
+    
+    res.status(200).json({
+      message: "Subscription activated successfully",
+      user: {
+        _id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        isPremium: user.isPremium,
+        subscriptionPlan: user.subscriptionPlan,
+        premiumTier: user.premiumTier,
+        premiumStartDate: user.premiumStartDate,
+        premiumEndDate: user.premiumEndDate,
+        isSupporter: user.isSupporter,
+        supporterTier: user.supporterTier,
+        totalDonated: user.totalDonated
+      }
+    });
+  } catch (error) {
+    console.error("Error in activateSubscription:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };
