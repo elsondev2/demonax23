@@ -11,7 +11,7 @@ import { useAuthStore } from '../store/useAuthStore';
 
 export default function CheckersGamePage({ onClose }) {
   const navigate = useNavigate();
-  const { authUser } = useAuthStore();
+  const { authUser, socket } = useAuthStore();
   const [showInfo, setShowInfo] = useState(false);
   const [gameState, setGameState] = useState('menu'); // menu, difficulty, playing, finished
   const [_gameMode, setGameMode] = useState(null);
@@ -50,10 +50,55 @@ export default function CheckersGamePage({ onClose }) {
     fetchProfile();
   }, [fetchProfile]);
 
+  // Socket listeners for live game updates
+  useEffect(() => {
+    if (!socket || !game) return;
+
+    const handleGameUpdate = (data) => {
+      if (data.gameId === game._id) {
+        console.log('🎮 Game update received:', data);
+        setGame(data.game);
+      }
+    };
+
+    const handleGameMove = (data) => {
+      if (data.gameId === game._id) {
+        console.log('🎮 Move received:', data);
+        setGame(prev => ({
+          ...prev,
+          board: data.board,
+          currentPlayer: data.currentPlayer,
+          players: data.players
+        }));
+      }
+    };
+
+    const handleGameEnd = (data) => {
+      if (data.gameId === game._id) {
+        console.log('🎮 Game ended:', data);
+        setGame(data.game);
+        setGameState('finished');
+        fetchProfile();
+      }
+    };
+
+    socket.on('checkers:gameUpdate', handleGameUpdate);
+    socket.on('checkers:move', handleGameMove);
+    socket.on('checkers:gameEnd', handleGameEnd);
+
+    return () => {
+      socket.off('checkers:gameUpdate', handleGameUpdate);
+      socket.off('checkers:move', handleGameMove);
+      socket.off('checkers:gameEnd', handleGameEnd);
+    };
+  }, [socket, game, fetchProfile]);
+
   const fetchAvailablePlayers = async () => {
     try {
       const res = await axiosInstance.get('/api/messages/contacts');
-      setAvailablePlayers(res.data || []);
+      // Filter only online users
+      const onlineUsers = (res.data || []).filter(user => user.isOnline);
+      setAvailablePlayers(onlineUsers);
     } catch (error) {
       console.error('Error fetching players:', error);
       toast.error('Failed to load players');
@@ -111,7 +156,10 @@ export default function CheckersGamePage({ onClose }) {
       const res = await axiosInstance.put(`/api/checkers/games/${game._id}/move`, {
         board: newBoard,
         currentPlayer: nextPlayer,
-        scores
+        scores: {
+          red: scores.red || 0,
+          black: scores.black || 0
+        }
       });
       setGame(res.data);
 
@@ -122,7 +170,7 @@ export default function CheckersGamePage({ onClose }) {
       }
     } catch (error) {
       console.error('Error making move:', error);
-      toast.error('Failed to make move');
+      toast.error(error.response?.data?.message || 'Failed to make move');
     }
   };
 
@@ -404,9 +452,9 @@ export default function CheckersGamePage({ onClose }) {
               {availablePlayers.length === 0 ? (
                 <div className="text-center py-8 md:py-12">
                   <Users className="w-12 h-12 md:w-16 md:h-16 mx-auto mb-3 md:mb-4 text-base-content/30" />
-                  <p className="text-base-content/70 text-sm md:text-base">No players available</p>
+                  <p className="text-base-content/70 text-sm md:text-base">No online players</p>
                   <p className="text-xs md:text-sm text-base-content/50 mt-2">
-                    Add friends to play with them!
+                    Wait for friends to come online or play vs AI!
                   </p>
                 </div>
               ) : (
@@ -414,18 +462,35 @@ export default function CheckersGamePage({ onClose }) {
                   <button
                     key={player._id}
                     onClick={() => handleSelectPlayer(player)}
-                    className="w-full flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-xl bg-base-200 hover:bg-base-300 transition-all"
+                    disabled={!player.isOnline}
+                    className={`w-full flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-xl transition-all ${
+                      player.isOnline 
+                        ? 'bg-base-200 hover:bg-base-300 cursor-pointer' 
+                        : 'bg-base-200/50 cursor-not-allowed opacity-60'
+                    }`}
                   >
-                    <Avatar
-                      src={player.profilePic}
-                      name={player.fullName}
-                      size="w-10 h-10 md:w-12 md:h-12"
-                    />
+                    <div className="relative">
+                      <Avatar
+                        src={player.profilePic}
+                        name={player.fullName}
+                        size="w-10 h-10 md:w-12 md:h-12"
+                      />
+                      {player.isOnline && (
+                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-success rounded-full border-2 border-base-100"></div>
+                      )}
+                    </div>
                     <div className="flex-1 text-left min-w-0">
-                      <div className="font-semibold text-sm md:text-base truncate">{player.fullName}</div>
+                      <div className="font-semibold text-sm md:text-base truncate flex items-center gap-2">
+                        {player.fullName}
+                        {player.isOnline && <span className="badge badge-success badge-xs">Online</span>}
+                      </div>
                       <div className="text-xs md:text-sm text-base-content/70 truncate">{player.email}</div>
                     </div>
-                    <div className="badge badge-primary badge-sm md:badge-md flex-shrink-0">Challenge</div>
+                    <div className={`badge badge-sm md:badge-md flex-shrink-0 ${
+                      player.isOnline ? 'badge-primary' : 'badge-ghost'
+                    }`}>
+                      {player.isOnline ? 'Challenge' : 'Offline'}
+                    </div>
                   </button>
                 ))
               )}

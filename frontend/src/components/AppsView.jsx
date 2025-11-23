@@ -357,7 +357,7 @@ export default function AppsView() {
 
             {/* Checkers Game Modal */}
             {showCheckersGame && (
-                <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm">
+                <div className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm">
                     <div className="fixed inset-0 md:inset-4 bg-base-100 md:rounded-2xl shadow-2xl overflow-hidden flex flex-col">
                         <CheckersGamePage onClose={() => setShowCheckersGame(false)} />
                     </div>
