@@ -6,6 +6,7 @@ import IOSModal from './IOSModal';
 import { useToast } from '../hooks/useToast';
 import { TEMPLATE_APPS } from '../constants/apps';
 import AppCard from './AppCard';
+import CheckersGamePage from '../pages/CheckersGamePage';
 
 // --- Sub-components ---
 
@@ -162,11 +163,17 @@ export default function AppsView() {
     const [selectedApp, setSelectedApp] = useState(null);
     const [showAddApp, setShowAddApp] = useState(false);
     const [showHowItWorks, setShowHowItWorks] = useState(false);
+    const [showCheckersGame, setShowCheckersGame] = useState(false);
     const { toast, showToast } = useToast();
 
     const handleAppClick = useCallback((app) => {
-        if (app.status === 'active' && app.url) {
-            window.open(app.url, '_blank');
+        if (app.status === 'active') {
+            if (app.id === 'checkers') {
+                // Open checkers in modal
+                setShowCheckersGame(true);
+            } else if (app.url) {
+                window.open(app.url, '_blank');
+            }
         } else {
             setSelectedApp(app);
         }
@@ -347,6 +354,15 @@ export default function AppsView() {
 
             {/* Toast Notification */}
             <ToastNotification toast={toast} />
+
+            {/* Checkers Game Modal */}
+            {showCheckersGame && (
+                <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm">
+                    <div className="fixed inset-0 md:inset-4 bg-base-100 md:rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+                        <CheckersGamePage onClose={() => setShowCheckersGame(false)} />
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

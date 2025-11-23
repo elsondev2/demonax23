@@ -1,14 +1,17 @@
-import { ArrowLeft, Gamepad2, Info, Trophy, Star, Crown } from 'lucide-react';
+import { ArrowLeft, Gamepad2, Info, Trophy, Star, Crown, Users, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { axiosInstance } from '../lib/axios';
 import toast from 'react-hot-toast';
 import CheckersBoard from '../components/checkers/CheckersBoard';
 import GameModeSelector from '../components/checkers/GameModeSelector';
 import DifficultySelector from '../components/checkers/DifficultySelector';
+import Avatar from '../components/Avatar';
+import { useAuthStore } from '../store/useAuthStore';
 
-export default function CheckersGamePage() {
+export default function CheckersGamePage({ onClose }) {
   const navigate = useNavigate();
+  const { authUser } = useAuthStore();
   const [showInfo, setShowInfo] = useState(false);
   const [gameState, setGameState] = useState('menu'); // menu, difficulty, playing, finished
   const [_gameMode, setGameMode] = useState(null);
@@ -16,27 +19,66 @@ export default function CheckersGamePage() {
   const [game, setGame] = useState(null);
   const [profile, setProfile] = useState(null);
   const [_loading, setLoading] = useState(false);
+  const [showPlayerSelector, setShowPlayerSelector] = useState(false);
+  const [availablePlayers, setAvailablePlayers] = useState([]);
+  const [selectedMode, setSelectedMode] = useState(null);
 
-  useEffect(() => {
-    fetchProfile();
-  }, []);
-
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
+    if (!authUser) return;
+    
     try {
       const res = await axiosInstance.get('/api/checkers/profile');
       setProfile(res.data);
     } catch (error) {
       console.error('Error fetching profile:', error);
+      // If profile doesn't exist, create one with user's info
+      if (error.response?.status === 404) {
+        try {
+          const createRes = await axiosInstance.post('/api/checkers/profile', {
+            userId: authUser._id,
+            username: authUser.fullName
+          });
+          setProfile(createRes.data);
+        } catch (createError) {
+          console.error('Error creating profile:', createError);
+        }
+      }
+    }
+  }, [authUser]);
+
+  useEffect(() => {
+    fetchProfile();
+  }, [fetchProfile]);
+
+  const fetchAvailablePlayers = async () => {
+    try {
+      const res = await axiosInstance.get('/api/messages/contacts');
+      setAvailablePlayers(res.data || []);
+    } catch (error) {
+      console.error('Error fetching players:', error);
+      toast.error('Failed to load players');
     }
   };
 
-  const handleSelectMode = (mode) => {
+  const handleSelectMode = async (mode) => {
     setGameMode(mode);
+    setSelectedMode(mode);
+    
     if (mode === 'ai') {
       setGameState('difficulty');
+    } else if (mode === 'friendly' || mode === 'arena') {
+      // Show player selector for online modes
+      await fetchAvailablePlayers();
+      setShowPlayerSelector(true);
     } else {
       startGame(mode);
     }
+  };
+
+  const handleSelectPlayer = (player) => {
+    setShowPlayerSelector(false);
+    startGame(selectedMode, null, player._id);
+    toast.success(`Inviting ${player.fullName} to play...`);
   };
 
   const handleSelectDifficulty = (diff) => {
@@ -44,13 +86,14 @@ export default function CheckersGamePage() {
     startGame('ai', diff);
   };
 
-  const startGame = async (mode, diff = null) => {
+  const startGame = async (mode, diff = null, opponentId = null) => {
     setLoading(true);
     try {
       const res = await axiosInstance.post('/api/checkers/games', {
         gameType: mode,
         difficulty: diff,
-        pointsBet: 0
+        pointsBet: 0,
+        opponentId
       });
       setGame(res.data);
       setGameState('playing');
@@ -125,39 +168,49 @@ export default function CheckersGamePage() {
   };
 
   return (
-    <div className="w-full h-[100dvh] md:h-screen flex flex-col bg-base-100">
+    <div className="w-full h-full flex flex-col bg-base-100 overflow-hidden">
       {/* Header */}
       <div className="flex-shrink-0 border-b border-base-300 bg-base-200">
-        <div className="p-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="p-3 md:p-4 flex items-center justify-between">
+          <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
             <button
-              onClick={() => navigate('/apps')}
-              className="btn btn-ghost btn-sm btn-circle"
+              onClick={() => onClose ? onClose() : navigate(-1)}
+              className="btn btn-ghost btn-sm btn-circle flex-shrink-0"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                 <Gamepad2 className="w-5 h-5 text-primary" />
               </div>
-              <div>
-                <h1 className="text-lg md:text-xl font-bold">Checkers</h1>
+              <div className="min-w-0">
+                <h1 className="text-base md:text-lg font-bold truncate">Checkers</h1>
                 <p className="text-xs text-base-content/60 hidden sm:block">Classic board game</p>
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {profile && (
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-primary/10 rounded-full">
-                <Trophy className="w-4 h-4 text-primary" />
-                <span className="text-sm font-semibold">{profile.points}</span>
+          <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
+            {authUser && (
+              <div className="flex items-center gap-2">
+                <Avatar
+                  src={authUser.profilePic}
+                  name={authUser.fullName}
+                  size="w-8 h-8"
+                  className="hidden sm:block"
+                />
+                {profile && (
+                  <div className="flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1 bg-primary/10 rounded-full">
+                    <Trophy className="w-3 h-3 md:w-4 md:h-4 text-primary" />
+                    <span className="text-xs md:text-sm font-semibold">{profile.points}</span>
+                  </div>
+                )}
               </div>
             )}
             <button
               onClick={() => setShowInfo(!showInfo)}
               className="btn btn-ghost btn-sm btn-circle"
             >
-              <Info className="w-5 h-5" />
+              <Info className="w-4 h-4 md:w-5 md:h-5" />
             </button>
           </div>
         </div>
@@ -165,45 +218,68 @@ export default function CheckersGamePage() {
 
       {/* Info Banner */}
       {showInfo && (
-        <div className="alert alert-info m-4">
-          <Info className="w-5 h-5" />
-          <div>
+        <div className="alert alert-info m-3 md:m-4">
+          <Info className="w-5 h-5 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
             <p className="font-semibold text-sm">How to Play</p>
             <p className="text-xs">Click on a piece to select it, then click on a valid square to move. Capture opponent pieces by jumping over them! Reach the opposite end to become a King!</p>
           </div>
-          <button onClick={() => setShowInfo(false)} className="btn btn-ghost btn-xs">Close</button>
+          <button onClick={() => setShowInfo(false)} className="btn btn-ghost btn-xs flex-shrink-0">Close</button>
         </div>
       )}
 
       {/* Game Content */}
-      <div className="flex-1 overflow-y-auto p-4 pb-safe">
+      <div className="flex-1 overflow-y-auto p-3 md:p-4 pb-safe">
         {gameState === 'menu' && (
           <div className="max-w-6xl mx-auto">
+            {/* Hero Section */}
+            <div className="text-center mb-6 md:mb-8">
+              <div className="inline-flex items-center justify-center w-20 h-20 md:w-24 md:h-24 rounded-full bg-gradient-to-br from-primary to-secondary mb-3 md:mb-4">
+                <Gamepad2 className="w-10 h-10 md:w-12 md:h-12 text-primary-content" />
+              </div>
+              <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold mb-2 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                Checkers Arena
+              </h2>
+              <p className="text-base-content/70 text-sm md:text-base lg:text-lg px-4">Challenge friends or test your skills against AI</p>
+            </div>
+
             {/* Profile Stats */}
             {profile && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div className="stat bg-base-200 rounded-lg p-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 mb-6 md:mb-8">
+                <div className="stat bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl p-3 md:p-4 border border-primary/20">
+                  <div className="stat-figure text-primary">
+                    <Trophy className="w-5 h-5 md:w-6 md:h-6" />
+                  </div>
                   <div className="stat-title text-xs">Points</div>
-                  <div className="stat-value text-2xl text-primary">{profile.points}</div>
+                  <div className="stat-value text-xl md:text-2xl text-primary">{profile.points}</div>
                 </div>
-                <div className="stat bg-base-200 rounded-lg p-4">
+                <div className="stat bg-gradient-to-br from-success/10 to-success/5 rounded-xl p-3 md:p-4 border border-success/20">
+                  <div className="stat-figure text-success">
+                    <Star className="w-5 h-5 md:w-6 md:h-6" />
+                  </div>
                   <div className="stat-title text-xs">Wins</div>
-                  <div className="stat-value text-2xl text-success">{profile.stats.wins}</div>
+                  <div className="stat-value text-xl md:text-2xl text-success">{profile.stats.wins}</div>
                 </div>
-                <div className="stat bg-base-200 rounded-lg p-4">
+                <div className="stat bg-gradient-to-br from-error/10 to-error/5 rounded-xl p-3 md:p-4 border border-error/20">
+                  <div className="stat-figure text-error">
+                    <X className="w-5 h-5 md:w-6 md:h-6" />
+                  </div>
                   <div className="stat-title text-xs">Losses</div>
-                  <div className="stat-value text-2xl text-error">{profile.stats.losses}</div>
+                  <div className="stat-value text-xl md:text-2xl text-error">{profile.stats.losses}</div>
                 </div>
-                <div className="stat bg-base-200 rounded-lg p-4">
+                <div className="stat bg-gradient-to-br from-warning/10 to-warning/5 rounded-xl p-3 md:p-4 border border-warning/20">
+                  <div className="stat-figure text-warning">
+                    <Crown className="w-5 h-5 md:w-6 md:h-6" />
+                  </div>
                   <div className="stat-title text-xs">Streak</div>
-                  <div className="stat-value text-2xl text-warning">{profile.currentStreak}</div>
+                  <div className="stat-value text-xl md:text-2xl text-warning">{profile.currentStreak}</div>
                 </div>
               </div>
             )}
 
-            <div className="text-center mb-6">
-              <h2 className="text-2xl font-bold mb-2">Select Game Mode</h2>
-              <p className="text-base-content/70">Choose how you want to play</p>
+            <div className="text-center mb-4 md:mb-6">
+              <h3 className="text-lg md:text-xl font-bold mb-1 md:mb-2">Select Game Mode</h3>
+              <p className="text-sm md:text-base text-base-content/60">Choose how you want to play</p>
             </div>
 
             <GameModeSelector onSelectMode={handleSelectMode} />
@@ -289,7 +365,7 @@ export default function CheckersGamePage() {
                   <button onClick={handleNewGame} className="btn btn-primary">
                     New Game
                   </button>
-                  <button onClick={() => navigate('/apps')} className="btn btn-ghost">
+                  <button onClick={() => onClose ? onClose() : navigate('/apps')} className="btn btn-ghost">
                     Back to Apps
                   </button>
                 </div>
@@ -298,6 +374,77 @@ export default function CheckersGamePage() {
           </div>
         )}
       </div>
+
+      {/* Player Selector Modal */}
+      {showPlayerSelector && (
+        <div className="modal modal-open">
+          <div className="modal-box max-w-2xl">
+            <button
+              onClick={() => setShowPlayerSelector(false)}
+              className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="mb-6">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-3 bg-primary/20 rounded-full">
+                  <Users className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-xl">Select Opponent</h3>
+                  <p className="text-sm text-base-content/70">
+                    Choose a player to challenge
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="max-h-96 overflow-y-auto space-y-2 px-1">
+              {availablePlayers.length === 0 ? (
+                <div className="text-center py-8 md:py-12">
+                  <Users className="w-12 h-12 md:w-16 md:h-16 mx-auto mb-3 md:mb-4 text-base-content/30" />
+                  <p className="text-base-content/70 text-sm md:text-base">No players available</p>
+                  <p className="text-xs md:text-sm text-base-content/50 mt-2">
+                    Add friends to play with them!
+                  </p>
+                </div>
+              ) : (
+                availablePlayers.map((player) => (
+                  <button
+                    key={player._id}
+                    onClick={() => handleSelectPlayer(player)}
+                    className="w-full flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-xl bg-base-200 hover:bg-base-300 transition-all"
+                  >
+                    <Avatar
+                      src={player.profilePic}
+                      name={player.fullName}
+                      size="w-10 h-10 md:w-12 md:h-12"
+                    />
+                    <div className="flex-1 text-left min-w-0">
+                      <div className="font-semibold text-sm md:text-base truncate">{player.fullName}</div>
+                      <div className="text-xs md:text-sm text-base-content/70 truncate">{player.email}</div>
+                    </div>
+                    <div className="badge badge-primary badge-sm md:badge-md flex-shrink-0">Challenge</div>
+                  </button>
+                ))
+              )}
+            </div>
+
+            <div className="modal-action">
+              <button
+                onClick={() => setShowPlayerSelector(false)}
+                className="btn btn-ghost"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+          <form method="dialog" className="modal-backdrop" onClick={() => setShowPlayerSelector(false)}>
+            <button>close</button>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
