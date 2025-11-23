@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ThumbsUp, ThumbsDown, Users, TrendingUp, Trash2, RefreshCw, Download } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, Users, TrendingUp, Trash2, RefreshCw, Download, Eye, X } from 'lucide-react';
 import { axiosInstance } from '../../lib/axios';
 import toast from 'react-hot-toast';
 import { useSocket } from '../../contexts/SocketContext';
@@ -42,6 +42,7 @@ const VotingDashboard = () => {
   const [pagination, setPagination] = useState(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedVote, setSelectedVote] = useState(null);
 
   const fetchAnalytics = async () => {
     try {
@@ -109,7 +110,7 @@ const VotingDashboard = () => {
     return () => {
       socket.off('vote:update', handleVoteUpdate);
     };
-  }, [socket, filter, page]);
+  }, [socket, filter, page, fetchVotes]);
 
   const handleDeleteVote = async (voteId) => {
     if (!confirm('Are you sure you want to delete this vote?')) return;
@@ -520,18 +521,34 @@ const VotingDashboard = () => {
                         </div>
                       </div>
                       {vote.reason && (
-                        <p className="text-xs mt-2 line-clamp-2 italic">"{vote.reason}"</p>
+                        <div 
+                          className="text-xs mt-2 line-clamp-2 italic cursor-pointer hover:text-primary"
+                          onClick={() => setSelectedVote(vote)}
+                        >
+                          "{vote.reason}"
+                        </div>
                       )}
                       <div className="flex items-center justify-between mt-2">
                         <span className="text-xs opacity-70">
                           {new Date(vote.createdAt).toLocaleDateString()}
                         </span>
-                        <button
-                          onClick={() => handleDeleteVote(vote._id)}
-                          className="btn btn-ghost btn-xs text-error"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
+                        <div className="flex gap-1">
+                          {vote.reason && (
+                            <button
+                              onClick={() => setSelectedVote(vote)}
+                              className="btn btn-ghost btn-xs text-info"
+                              title="View full reason"
+                            >
+                              <Eye className="w-3 h-3" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDeleteVote(vote._id)}
+                            className="btn btn-ghost btn-xs text-error"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -572,7 +589,10 @@ const VotingDashboard = () => {
                           </div>
                         </td>
                         <td>
-                          <div className="max-w-xs truncate">
+                          <div 
+                            className={`max-w-xs truncate ${vote.reason ? 'cursor-pointer hover:text-primary' : ''}`}
+                            onClick={() => vote.reason && setSelectedVote(vote)}
+                          >
                             {vote.reason || <span className="opacity-50">No reason</span>}
                           </div>
                         </td>
@@ -582,12 +602,23 @@ const VotingDashboard = () => {
                           </div>
                         </td>
                         <td>
-                          <button
-                            onClick={() => handleDeleteVote(vote._id)}
-                            className="btn btn-ghost btn-sm text-error"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <div className="flex gap-2">
+                            {vote.reason && (
+                              <button
+                                onClick={() => setSelectedVote(vote)}
+                                className="btn btn-ghost btn-sm text-info"
+                                title="View full reason"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleDeleteVote(vote._id)}
+                              className="btn btn-ghost btn-sm text-error"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -622,6 +653,85 @@ const VotingDashboard = () => {
           )}
         </div>
       </div>
+
+      {/* Reason Modal */}
+      {selectedVote && (
+        <div className="modal modal-open">
+          <div className="modal-box max-w-2xl">
+            <button
+              onClick={() => setSelectedVote(null)}
+              className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Header */}
+            <div className="mb-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="avatar">
+                  <div className="w-12 h-12 rounded-full">
+                    <img src={selectedVote.userInfo?.profilePic || '/avatar.png'} alt="" />
+                  </div>
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg">{selectedVote.userInfo?.fullName}</h3>
+                  <p className="text-sm text-base-content/70">{selectedVote.userInfo?.email}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className={`badge ${selectedVote.vote === 'stay' ? 'badge-success' : 'badge-error'} gap-2`}>
+                  {selectedVote.vote === 'stay' ? (
+                    <>
+                      <ThumbsUp className="w-3 h-3" />
+                      Stay
+                    </>
+                  ) : (
+                    <>
+                      <ThumbsDown className="w-3 h-3" />
+                      Go
+                    </>
+                  )}
+                </div>
+                <span className="text-sm text-base-content/70">
+                  {new Date(selectedVote.createdAt).toLocaleString()}
+                </span>
+              </div>
+            </div>
+
+            {/* Reason Content */}
+            <div className="bg-base-200 rounded-lg p-4">
+              <h4 className="font-semibold mb-2 text-sm text-base-content/70">Reason:</h4>
+              <p className="text-base leading-relaxed whitespace-pre-wrap">
+                {selectedVote.reason || <span className="italic opacity-70">No reason provided</span>}
+              </p>
+            </div>
+
+            {/* Footer */}
+            <div className="modal-action">
+              <button
+                onClick={() => setSelectedVote(null)}
+                className="btn btn-ghost"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  handleDeleteVote(selectedVote._id);
+                  setSelectedVote(null);
+                }}
+                className="btn btn-error gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete Vote
+              </button>
+            </div>
+          </div>
+          <form method="dialog" className="modal-backdrop" onClick={() => setSelectedVote(null)}>
+            <button>close</button>
+          </form>
+        </div>
+      )}
     </div>
   );
 };
