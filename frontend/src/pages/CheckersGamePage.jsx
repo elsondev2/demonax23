@@ -96,9 +96,12 @@ export default function CheckersGamePage({ onClose }) {
   const fetchAvailablePlayers = async () => {
     try {
       const res = await axiosInstance.get('/api/messages/contacts');
-      // Filter only online users
-      const onlineUsers = (res.data || []).filter(user => user.isOnline);
-      setAvailablePlayers(onlineUsers);
+      // Show all users but mark their online status
+      const users = (res.data || []).map(user => ({
+        ...user,
+        isOnline: user.isOnline || false
+      }));
+      setAvailablePlayers(users);
     } catch (error) {
       console.error('Error fetching players:', error);
       toast.error('Failed to load players');
@@ -452,47 +455,71 @@ export default function CheckersGamePage({ onClose }) {
               {availablePlayers.length === 0 ? (
                 <div className="text-center py-8 md:py-12">
                   <Users className="w-12 h-12 md:w-16 md:h-16 mx-auto mb-3 md:mb-4 text-base-content/30" />
+                  <p className="text-base-content/70 text-sm md:text-base">No contacts found</p>
+                  <p className="text-xs md:text-sm text-base-content/50 mt-2">
+                    Add friends to play with them or play vs AI!
+                  </p>
+                </div>
+              ) : availablePlayers.filter(p => p.isOnline).length === 0 ? (
+                <div className="text-center py-8 md:py-12">
+                  <Users className="w-12 h-12 md:w-16 md:h-16 mx-auto mb-3 md:mb-4 text-base-content/30" />
                   <p className="text-base-content/70 text-sm md:text-base">No online players</p>
                   <p className="text-xs md:text-sm text-base-content/50 mt-2">
-                    Wait for friends to come online or play vs AI!
+                    {availablePlayers.length} contact{availablePlayers.length !== 1 ? 's' : ''} offline. Try playing vs AI!
                   </p>
                 </div>
               ) : (
-                availablePlayers.map((player) => (
-                  <button
-                    key={player._id}
-                    onClick={() => handleSelectPlayer(player)}
-                    disabled={!player.isOnline}
-                    className={`w-full flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-xl transition-all ${
-                      player.isOnline 
-                        ? 'bg-base-200 hover:bg-base-300 cursor-pointer' 
-                        : 'bg-base-200/50 cursor-not-allowed opacity-60'
-                    }`}
-                  >
-                    <div className="relative">
-                      <Avatar
-                        src={player.profilePic}
-                        name={player.fullName}
-                        size="w-10 h-10 md:w-12 md:h-12"
-                      />
-                      {player.isOnline && (
+                <>
+                  {/* Online Players First */}
+                  {availablePlayers.filter(p => p.isOnline).map((player) => (
+                    <button
+                      key={player._id}
+                      onClick={() => handleSelectPlayer(player)}
+                      className="w-full flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-xl bg-base-200 hover:bg-base-300 transition-all cursor-pointer"
+                    >
+                      <div className="relative">
+                        <Avatar
+                          src={player.profilePic}
+                          name={player.fullName}
+                          size="w-10 h-10 md:w-12 md:h-12"
+                        />
                         <div className="absolute bottom-0 right-0 w-3 h-3 bg-success rounded-full border-2 border-base-100"></div>
-                      )}
-                    </div>
-                    <div className="flex-1 text-left min-w-0">
-                      <div className="font-semibold text-sm md:text-base truncate flex items-center gap-2">
-                        {player.fullName}
-                        {player.isOnline && <span className="badge badge-success badge-xs">Online</span>}
                       </div>
-                      <div className="text-xs md:text-sm text-base-content/70 truncate">{player.email}</div>
+                      <div className="flex-1 text-left min-w-0">
+                        <div className="font-semibold text-sm md:text-base truncate flex items-center gap-2">
+                          {player.fullName}
+                          <span className="badge badge-success badge-xs">Online</span>
+                        </div>
+                        <div className="text-xs md:text-sm text-base-content/70 truncate">{player.email}</div>
+                      </div>
+                      <div className="badge badge-primary badge-sm md:badge-md flex-shrink-0">Challenge</div>
+                    </button>
+                  ))}
+                  
+                  {/* Offline Players */}
+                  {availablePlayers.filter(p => !p.isOnline).length > 0 && (
+                    <div className="divider text-xs text-base-content/50">Offline</div>
+                  )}
+                  {availablePlayers.filter(p => !p.isOnline).map((player) => (
+                    <div
+                      key={player._id}
+                      className="w-full flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-xl bg-base-200/50 opacity-60 cursor-not-allowed"
+                    >
+                      <div className="relative">
+                        <Avatar
+                          src={player.profilePic}
+                          name={player.fullName}
+                          size="w-10 h-10 md:w-12 md:h-12"
+                        />
+                      </div>
+                      <div className="flex-1 text-left min-w-0">
+                        <div className="font-semibold text-sm md:text-base truncate">{player.fullName}</div>
+                        <div className="text-xs md:text-sm text-base-content/70 truncate">{player.email}</div>
+                      </div>
+                      <div className="badge badge-ghost badge-sm md:badge-md flex-shrink-0">Offline</div>
                     </div>
-                    <div className={`badge badge-sm md:badge-md flex-shrink-0 ${
-                      player.isOnline ? 'badge-primary' : 'badge-ghost'
-                    }`}>
-                      {player.isOnline ? 'Challenge' : 'Offline'}
-                    </div>
-                  </button>
-                ))
+                  ))}
+                </>
               )}
             </div>
 
