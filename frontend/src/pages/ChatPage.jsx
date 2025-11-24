@@ -153,6 +153,7 @@ function ChatPage() {
           setSelectedGroup(null);
         }
         
+        // Don't reset swipe state here, let it persist through navigation
         navigate(nextPage.path, { replace: true });
       }
     } else if (direction === 'right') {
@@ -188,6 +189,12 @@ function ChatPage() {
         }
       }
     }
+    
+    // Reset swipe state after transition completes
+    setTimeout(() => {
+      setIsSwiping(false);
+      setSwipeOffset(0);
+    }, 300); // Match the CSS transition duration
   };
 
   // Track swipe progress for live animations
@@ -199,26 +206,53 @@ function ChatPage() {
       const isMobile = window.innerWidth < 768;
       if (!isMobile) return;
 
+      // Only allow swipe if it starts from the edges (left 20% or right 20% of screen)
+      const edgeThreshold = window.innerWidth * 0.2; // 20% of screen width
+      if (eventData.initial[0] > edgeThreshold && eventData.initial[0] < window.innerWidth - edgeThreshold) {
+        return; // Ignore swipes that don't start from edges
+      }
+
       // Track swipe progress for live animation
       setIsSwiping(true);
       setSwipeOffset(eventData.deltaX);
     },
-    onSwipedLeft: () => {
+    onSwipedLeft: (eventData) => {
+      const isMobile = window.innerWidth < 768;
+      if (!isMobile) return;
+
+      // Only allow swipe if it starts from the edges
+      const edgeThreshold = window.innerWidth * 0.2;
+      if (eventData.initial[0] > edgeThreshold && eventData.initial[0] < window.innerWidth - edgeThreshold) {
+        return; // Ignore swipes that don't start from edges
+      }
+
       console.log('🔄 Swiped left');
-      setIsSwiping(false);
-      setSwipeOffset(0);
+      // Don't reset state immediately - let handleSwipe do it after transition
       handleSwipe('left');
     },
-    onSwipedRight: () => {
+    onSwipedRight: (eventData) => {
+      const isMobile = window.innerWidth < 768;
+      if (!isMobile) return;
+
+      // Only allow swipe if it starts from the edges
+      const edgeThreshold = window.innerWidth * 0.2;
+      if (eventData.initial[0] > edgeThreshold && eventData.initial[0] < window.innerWidth - edgeThreshold) {
+        return; // Ignore swipes that don't start from edges
+      }
+
       console.log('🔄 Swiped right');
-      setIsSwiping(false);
-      setSwipeOffset(0);
+      // Don't reset state immediately - let handleSwipe do it after transition
       handleSwipe('right');
     },
     onTouchEndOrOnMouseUp: () => {
-      // Reset when touch ends without completing swipe
-      setIsSwiping(false);
-      setSwipeOffset(0);
+      // Only reset if swipe didn't complete
+      if (!isSwiping) return;
+      
+      // Give handleSwipe a chance to complete the transition
+      setTimeout(() => {
+        setIsSwiping(false);
+        setSwipeOffset(0);
+      }, 350); // Slightly longer than transition duration to be safe
     },
     trackMouse: false,
     trackTouch: true,

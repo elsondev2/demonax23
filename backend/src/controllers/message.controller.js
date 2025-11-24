@@ -707,3 +707,94 @@ export const markGroupRead = async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 };
+
+// ✅ Add emoji reaction to a message
+export const reactToMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { emoji } = req.body;
+    const userId = req.user._id;
+
+    if (!emoji || emoji.trim().length === 0) {
+      return res.status(400).json({ message: "Emoji is required" });
+    }
+
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    // Check if user already reacted with this emoji
+    const existingReactionIndex = message.reactions?.findIndex(
+      r => r.emoji === emoji && r.userId.toString() === userId.toString()
+    ) ?? -1;
+
+    if (existingReactionIndex >= 0) {
+      // Remove reaction if already exists (toggle)
+      message.reactions.splice(existingReactionIndex, 1);
+    } else {
+      // Add new reaction
+      if (!message.reactions) message.reactions = [];
+      message.reactions.push({
+        emoji,
+        userId,
+        createdAt: new Date()
+      });
+    }
+
+    await message.save();
+    await message.populate("reactions.userId", "fullName profilePic");
+
+    // Emit reaction update to relevant users
+    const { io, getReceiverSocketId } = await import("../socket.js");
+    
+    if (message.groupId) {
+      // Notify all group members
+      const group = await Group.findById(message.groupId);
+      if (group) {
+        group.members.forEach(memberId => {
+          const socketId = getReceiverSocketId(memberId);
+          if (socketId) {
+            io.to(socketId).emit("messageReacted", {
+              messageId: message._id,
+              reactions: message.reactions,
+              userId: userId.toString()
+            });
+          }
+        });
+      }
+    } else {
+      // Notify both users in direct message
+      const otherUserId = message.senderId.toString() === userId.toString() 
+        ? message.receiverId 
+        : message.senderId;
+
+      const senderSocketId = getReceiverSocketId(userId);
+      const receiverSocketId = getReceiverSocketId(otherUserId);
+
+      if (senderSocketId) {
+        io.to(senderSocketId).emit("messageReacted", {
+          messageId: message._id,
+          reactions: message.reactions,
+          userId: userId.toString()
+        });
+      }
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit("messageReacted", {
+          messageId: message._id,
+          reactions: message.reactions,
+          userId: userId.toString()
+        });
+      }
+    }
+
+    res.status(200).json({ 
+      message: "Reaction updated", 
+      reactions: message.reactions 
+    });
+  } catch (error) {
+    console.error("Error in reactToMessage:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+

@@ -12,6 +12,7 @@ import {
   markGroupRead,
   uploadAttachment,
   uploadAudio,
+  reactToMessage,
 } from "../controllers/message.controller.js";
 
 const router = express.Router();
@@ -23,6 +24,7 @@ router.get("/group/:id", protectRoute, getGroupMessages); // Group messages
 router.post("/send/:id", protectRoute, sendMessage);
 router.post("/upload-attachment", protectRoute, uploadAttachment);
 router.post("/upload-audio", protectRoute, uploadAudio);
+router.post("/:messageId/react", protectRoute, reactToMessage); // Add emoji reaction
 router.put("/edit/:id", protectRoute, editMessage);
 router.delete("/delete/:id", protectRoute, deleteMessage);
 router.post("/read/:id", protectRoute, markConversationRead);

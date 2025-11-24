@@ -139,9 +139,14 @@ export default function CheckersGamePage({ onClose }) {
 
     if (game) {
       const handlePlayerJoined = (data) => {
-        // Reload the game when opponent joins to get updated status
-        loadGame(game._id);
-        toast.success(`${data.userName} joined the game!`);
+        // Only reload if game status is still waiting (opponent just joined)
+        if (game.status === 'waiting') {
+          loadGame(game._id);
+        }
+        // Only show toast if the joined player is not the current user
+        if (data.userId !== authUser._id) {
+          toast.success(`${data.userName} joined the game!`);
+        }
       };
 
       const handleGameMove = (data) => {
@@ -565,23 +570,6 @@ export default function CheckersGamePage({ onClose }) {
                     );
                   })}
                 </div>
-
-                {spectators.length > 0 && (
-                  <div className="mt-4">
-                    <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                      <Eye className="w-4 h-4" />
-                      Spectators ({spectators.length})
-                    </h4>
-                    <div className="flex flex-wrap gap-2">
-                      {spectators.map((spec) => (
-                        <div key={spec.userId} className="flex items-center gap-1 bg-base-300 rounded-full px-2 py-1">
-                          <Avatar src={spec.profilePic} name={spec.userName} size="w-5 h-5" />
-                          <span className="text-xs">{spec.userName}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
 
               <div className="flex flex-col gap-2">
@@ -596,6 +584,13 @@ export default function CheckersGamePage({ onClose }) {
                     </p>
                   )}
                 </div>
+
+                {game.gameType === 'arena' && game.pointsBet > 0 && (
+                  <div className="text-center p-3 bg-warning/10 rounded-lg border-2 border-warning">
+                    <div className="text-xs text-base-content/60 mb-1">Stakes at Risk</div>
+                    <div className="text-2xl font-bold text-warning">{game.pointsBet} Scones</div>
+                  </div>
+                )}
 
                 {!isSpectating && (
                   <button onClick={handleAbandon} className="btn btn-error btn-sm">
@@ -618,6 +613,23 @@ export default function CheckersGamePage({ onClose }) {
               gameType={game.gameType}
               disabled={isSpectating}
             />
+
+            {/* Spectators Section */}
+            {spectators.length > 0 && (
+              <div className="mt-6 card bg-base-200">
+                <div className="card-body py-3">
+                  <h3 className="text-sm font-semibold mb-2">Spectators ({spectators.length})</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {spectators.map(spectator => (
+                      <div key={spectator.userId} className="flex items-center gap-2 bg-base-300 px-3 py-1 rounded-full">
+                        <img src={spectator.profilePic} alt={spectator.userName} className="w-6 h-6 rounded-full object-cover" />
+                        <span className="text-xs font-medium">{spectator.userName}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -625,21 +637,35 @@ export default function CheckersGamePage({ onClose }) {
           <div className="max-w-2xl mx-auto">
             <div className="card bg-base-200 shadow-xl">
               <div className="card-body text-center">
-                <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                  <Trophy className="w-10 h-10 text-primary" />
+                <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4 animate-bounce">
+                  <Trophy className="w-10 h-10 text-primary animate-pulse" />
                 </div>
                 <h2 className="card-title justify-center text-2xl mb-2">Game Over!</h2>
                 {!isSpectating && (
-                  <p className="text-xl font-bold mb-4">
-                    {(() => {
-                      const myPlayer = game.players.find(p => p.userId._id === authUser._id);
-                      const isWinner = myPlayer && myPlayer.color === game.winner;
-                      return isWinner ? 'You Won!' : 'You Lost';
-                    })()}
-                  </p>
+                  <div className="mb-4">
+                    <p className="text-xl font-bold mb-2 animate-bounce">
+                      {(() => {
+                        const myPlayer = game.players.find(p => p.userId._id === authUser._id);
+                        const isWinner = myPlayer && myPlayer.color === game.winner;
+                        return isWinner ? 'You Won!' : 'You Lost';
+                      })()}
+                    </p>
+                    {game.gameType === 'arena' && game.pointsBet > 0 && (
+                      <p className={`text-lg font-bold ${(() => {
+                        const myPlayer = game.players.find(p => p.userId._id === authUser._id);
+                        return myPlayer && myPlayer.color === game.winner ? 'text-success' : 'text-error';
+                      })()}`}>
+                        {(() => {
+                          const myPlayer = game.players.find(p => p.userId._id === authUser._id);
+                          const isWinner = myPlayer && myPlayer.color === game.winner;
+                          return isWinner ? `+${game.pointsBet} Scones` : `-${game.pointsBet} Scones`;
+                        })()}
+                      </p>
+                    )}
+                  </div>
                 )}
                 {isSpectating && (
-                  <p className="text-xl font-bold mb-4 capitalize">
+                  <p className="text-xl font-bold mb-4 capitalize animate-bounce">
                     {game.winner} Player Won!
                   </p>
                 )}

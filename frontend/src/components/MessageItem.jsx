@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useSwipeable } from "react-swipeable";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
-import { AlertCircle, RotateCcw, Edit, Trash2, Quote, FileText, MoreVertical, Phone, Video, Download, Maximize2, FileArchive, FileCode, FileSpreadsheet, FileVideo, FileAudio, File } from "lucide-react";
+import { AlertCircle, RotateCcw, Edit, Trash2, Quote, FileText, MoreVertical, Phone, Video, Download, Maximize2, FileArchive, FileCode, FileSpreadsheet, FileVideo, FileAudio, File, Smile, X } from "lucide-react";
 import useLongPress from "../hooks/useLongPress";
 import { hapticMedium, hapticLight } from "../utils/haptic";
 import Avatar from "./Avatar";
@@ -50,8 +50,16 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [isSwipeActive, setIsSwipeActive] = useState(false);
   const [previewImage, setPreviewImage] = useState(null); // For full preview modal
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [reactions, setReactions] = useState(message.reactions || []);
+  const [isReactingToMessage, setIsReactingToMessage] = useState(false);
   const messageRef = useRef(null);
   const dropdownRef = useRef(null);
+
+  // Update reactions when message changes
+  useEffect(() => {
+    setReactions(message.reactions || []);
+  }, [message.reactions]);
 
   // Reset image loading state when message image changes
   useEffect(() => {
@@ -183,6 +191,35 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
     setShowContextMenu(false);
     setShowDropdown(false);
     onDelete(message._id);
+  };
+
+  const handleReactToMessage = async (emoji) => {
+    try {
+      setIsReactingToMessage(true);
+      const { axiosInstance } = await import("../lib/axios");
+      await axiosInstance.post(`/api/messages/${message._id}/react`, { emoji });
+      setShowEmojiPicker(false);
+    } catch (error) {
+      console.error('Failed to react to message:', error);
+    } finally {
+      setIsReactingToMessage(false);
+    }
+  };
+
+  const getGroupedReactions = () => {
+    // Group reactions by emoji
+    const grouped = {};
+    reactions.forEach(reaction => {
+      if (!grouped[reaction.emoji]) {
+        grouped[reaction.emoji] = [];
+      }
+      grouped[reaction.emoji].push(reaction);
+    });
+    return grouped;
+  };
+
+  const userHasReacted = (emoji) => {
+    return reactions?.some(r => r.emoji === emoji && r.userId === authUser?._id);
   };
 
   const handleLongPress = () => {
@@ -958,6 +995,74 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
                   <RotateCcw className="w-3 h-3" />
                   Retry
                 </button>
+              </div>
+            )}
+
+            {/* Emoji Reactions Display */}
+            {reactions && reactions.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2 pt-1 border-t border-base-300/20">
+                {Object.entries(getGroupedReactions()).map(([emoji, reacts]) => (
+                  <button
+                    key={emoji}
+                    onClick={() => handleReactToMessage(emoji)}
+                    className={`px-1.5 py-0.5 rounded-full text-sm flex items-center gap-0.5 transition-colors ${
+                      userHasReacted(emoji)
+                        ? isOwnMessage
+                          ? 'bg-primary-content/30 hover:bg-primary-content/40'
+                          : 'bg-base-300/50 hover:bg-base-300/70'
+                        : isOwnMessage
+                          ? 'bg-primary-content/10 hover:bg-primary-content/20'
+                          : 'bg-base-200 hover:bg-base-300/50'
+                    }`}
+                    title={`Reacted by: ${reacts.map(r => {
+                      const userId = typeof r.userId === 'object' ? r.userId._id : r.userId;
+                      return userId === authUser?._id ? 'You' : (typeof r.userId === 'object' ? r.userId.fullName : 'User');
+                    }).join(', ')}`}
+                    disabled={isReactingToMessage}
+                  >
+                    <span>{emoji}</span>
+                    {reacts.length > 1 && <span className="text-xs font-medium">{reacts.length}</span>}
+                  </button>
+                ))}
+                {/* Add reaction button */}
+                <div className="relative">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowEmojiPicker(!showEmojiPicker);
+                    }}
+                    className={`px-1.5 py-0.5 rounded-full text-sm transition-colors ${
+                      showEmojiPicker
+                        ? 'bg-primary text-primary-content'
+                        : isOwnMessage
+                          ? 'bg-primary-content/10 hover:bg-primary-content/20 text-primary-content/60'
+                          : 'bg-base-200 hover:bg-base-300 text-base-content/60'
+                    }`}
+                    title="Add reaction"
+                    disabled={isReactingToMessage}
+                  >
+                    <Smile className="w-4 h-4" />
+                  </button>
+                  
+                  {/* Quick emoji picker */}
+                  {showEmojiPicker && (
+                    <div className="absolute bottom-full right-0 mb-2 bg-base-100 border border-base-300 rounded-lg shadow-xl p-2 z-50 grid grid-cols-6 gap-1">
+                      {['👍', '❤️', '😂', '😢', '😡', '🔥', '👏', '🙏', '✨', '🎉', '😍', '🤔'].map(emoji => (
+                        <button
+                          key={emoji}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleReactToMessage(emoji);
+                          }}
+                          className="text-xl hover:scale-125 transition-transform duration-150 cursor-pointer"
+                          title={emoji}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>

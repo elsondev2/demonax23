@@ -1911,6 +1911,9 @@ export const useChatStore = create((set, get) => ({
     console.log("📡 Socket ID:", socket.id);
     console.log("📡 Subscription timestamp:", new Date().toISOString());
     set({ isSubscribed: true, currentSocketId: socket.id });
+
+    // Also subscribe to message reactions
+    get().subscribeToReactions();
   },
 
   // Validate and repair chat state if needed
@@ -1997,6 +2000,30 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+  // Handle emoji reactions to messages
+  subscribeToReactions: () => {
+    const socket = useAuthStore.getState().socket;
+    if (!socket) return;
+
+    socket.on("messageReacted", (data) => {
+      const { messageId, reactions, userId } = data;
+      console.log('😊 Message reaction received:', { messageId, emoji: reactions?.map(r => r.emoji) });
+
+      // Update the message in the messages array with new reactions
+      const { messages } = get();
+      const updatedMessages = messages.map(msg => {
+        if (msg._id === messageId) {
+          return {
+            ...msg,
+            reactions: reactions || []
+          };
+        }
+        return msg;
+      });
+      set({ messages: updatedMessages });
+    });
+  },
+
   unsubscribeFromMessages: () => {
     const socket = useAuthStore.getState().socket;
     if (socket) {
@@ -2013,6 +2040,7 @@ export const useChatStore = create((set, get) => ({
       socket.off("userStoppedTyping");
       socket.off("userRecording");
       socket.off("userStoppedRecording");
+      socket.off("messageReacted");
 
       // Clear cleanup interval
       const { typingCleanupInterval } = get();

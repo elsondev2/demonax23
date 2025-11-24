@@ -136,23 +136,22 @@ const CheckersBoard = ({ board, onMove, currentPlayer, isMyTurn, gameType, disab
               const isLight = (rowIndex + colIndex) % 2 === 0;
               const isSelected = selectedPiece?.row === rowIndex && selectedPiece?.col === colIndex;
               const isValid = isValidMove(rowIndex, colIndex);
-              const isAnimating = animatingPiece && 
-                ((animatingPiece.from.row === rowIndex && animatingPiece.from.col === colIndex) ||
-                 (animatingPiece.to.row === rowIndex && animatingPiece.to.col === colIndex));
+              const isFromSquare = animatingPiece?.from.row === rowIndex && animatingPiece?.from.col === colIndex;
+              const isToSquare = animatingPiece?.to.row === rowIndex && animatingPiece?.to.col === colIndex;
 
               return (
                 <div
                   key={`${rowIndex}-${colIndex}`}
                   onClick={() => handleSquareClick(rowIndex, colIndex)}
                   className={`
-                    relative flex items-center justify-center transition-all duration-200
+                    relative flex items-center justify-center transition-all duration-200 overflow-hidden
                     ${isLight ? 'bg-amber-100' : 'bg-amber-800'}
-                    ${isSelected ? 'ring-4 ring-primary ring-inset' : ''}
-                    ${isValid ? 'ring-4 ring-success ring-inset animate-pulse' : ''}
+                    ${isSelected ? 'border-4 border-primary' : ''}
+                    ${isValid ? 'shadow-inset shadow-success' : ''}
                     ${disabled ? 'cursor-not-allowed' : 'cursor-pointer hover:brightness-110'}
                   `}
                 >
-                  {cell && !isAnimating && (
+                  {cell && !isFromSquare && (
                     <div
                       className={`
                         w-[70%] h-[70%] rounded-full flex items-center justify-center
@@ -168,8 +167,23 @@ const CheckersBoard = ({ board, onMove, currentPlayer, isMyTurn, gameType, disab
                       )}
                     </div>
                   )}
+                  {isToSquare && animatingPiece && (
+                    <div
+                      className={`
+                        w-[70%] h-[70%] rounded-full flex items-center justify-center
+                        shadow-lg
+                        ${board[animatingPiece.from.row][animatingPiece.from.col]?.player === 'red' ? 'bg-gradient-to-br from-red-500 to-red-700' : 'bg-gradient-to-br from-gray-800 to-black'}
+                        ${board[animatingPiece.from.row][animatingPiece.from.col]?.type === 'king' ? 'ring-4 ring-yellow-400' : ''}
+                        animate-[slideIn_0.4s_cubic-bezier(0.34,1.56,0.64,1)]
+                      `}
+                    >
+                      {board[animatingPiece.from.row][animatingPiece.from.col]?.type === 'king' && (
+                        <span className="text-yellow-400 text-xl md:text-2xl font-bold">♔</span>
+                      )}
+                    </div>
+                  )}
                   {isValid && !cell && (
-                    <div className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-success opacity-50 animate-pulse"></div>
+                    <div className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-success opacity-70 animate-pulse"></div>
                   )}
                 </div>
               );

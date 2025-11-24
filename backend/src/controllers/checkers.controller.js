@@ -352,7 +352,7 @@ export const endGame = async (req, res) => {
           pointsAwarded = { easy: 5, medium: 10, hard: 20, expert: 30 }[game.difficulty] || 10;
           profile.stats.aiWins[game.difficulty] = (profile.stats.aiWins[game.difficulty] || 0) + 1;
         } else if (game.gameType === "arena") {
-          pointsAwarded = game.pointsBet * 2;
+          pointsAwarded = game.pointsBet;
           profile.stats.arenaWins += 1;
         }
         
@@ -362,7 +362,7 @@ export const endGame = async (req, res) => {
         profile.stats.losses += 1;
         profile.currentStreak = 0;
 
-        if (game.gameType === "arena") {
+        if (game.gameType === "arena" && game.pointsBet > 0) {
           profile.stats.arenaLosses += 1;
           profile.points = Math.max(0, profile.points - game.pointsBet);
         }

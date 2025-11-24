@@ -9,6 +9,15 @@ const quotedMessageSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const reactionSchema = new mongoose.Schema(
+  {
+    emoji: { type: String, required: true }, // e.g., "👍", "❤️", "😂"
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    createdAt: { type: Date, default: Date.now }
+  },
+  { _id: false }
+);
+
 const messageSchema = new mongoose.Schema(
   {
     senderId: {
@@ -62,6 +71,7 @@ const messageSchema = new mongoose.Schema(
       trim: true,
     },
     quotedMessage: quotedMessageSchema,
+    reactions: [reactionSchema],
     mentions: [
       {
         type: { type: String, enum: ['user', 'group', 'community', 'everyone', 'here'] },
