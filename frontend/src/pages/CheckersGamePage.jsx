@@ -11,7 +11,7 @@ import { useAuthStore } from '../store/useAuthStore';
 
 export default function CheckersGamePage({ onClose }) {
   const navigate = useNavigate();
-  const { authUser, socket } = useAuthStore();
+  const { authUser, socket, onlineUsers } = useAuthStore();
   const [showInfo, setShowInfo] = useState(false);
   const [gameState, setGameState] = useState('menu'); // menu, difficulty, playing, finished
   const [_gameMode, setGameMode] = useState(null);
@@ -96,10 +96,10 @@ export default function CheckersGamePage({ onClose }) {
   const fetchAvailablePlayers = async () => {
     try {
       const res = await axiosInstance.get('/api/messages/contacts');
-      // Show all users but mark their online status
+      // Show all users but mark their online status using onlineUsers array
       const users = (res.data || []).map(user => ({
         ...user,
-        isOnline: user.isOnline || false
+        isOnline: onlineUsers.includes(user._id)
       }));
       setAvailablePlayers(users);
     } catch (error) {
