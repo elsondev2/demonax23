@@ -10,7 +10,7 @@ import Avatar from '../components/Avatar';
 import { useAuthStore } from '../store/useAuthStore';
 import '../styles/checkers-animations.css';
 
-export default function CheckersGamePage({ onClose }) {
+export default function CheckersGamePage() {
   const navigate = useNavigate();
   const { gameId: urlGameId } = useParams();
   const { authUser, socket, onlineUsers } = useAuthStore();
@@ -387,7 +387,7 @@ export default function CheckersGamePage({ onClose }) {
       <div className="flex-shrink-0 border-b border-base-300 bg-base-200">
         <div className="p-3 md:p-4 flex items-center justify-between">
           <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
-            <button onClick={() => onClose ? onClose() : navigate(-1)} className="btn btn-ghost btn-sm btn-circle">
+            <button onClick={() => navigate(-1)} className="btn btn-ghost btn-sm btn-circle">
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div className="flex items-center gap-2 min-w-0">
@@ -687,7 +687,7 @@ export default function CheckersGamePage({ onClose }) {
 
                 <div className="card-actions justify-center gap-2">
                   <button onClick={handleNewGame} className="btn btn-primary">New Game</button>
-                  <button onClick={() => onClose ? onClose() : navigate('/apps')} className="btn btn-ghost">Back to Apps</button>
+                  {/* <button onClick={() => onClose ? onClose() : navigate('/apps')} className="btn btn-ghost">Back to Apps</button> */}
                 </div>
               </div>
             </div>

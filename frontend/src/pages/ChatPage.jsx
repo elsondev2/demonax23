@@ -34,6 +34,7 @@ import VoteNotification from "../components/VoteNotification";
 import SwipeIndicator from "../components/SwipeIndicator";
 import SelectChatPrompt from "../components/SelectChatPrompt";
 import NoChatSelected from "../components/NoChatSelected";
+import CheckersGamePage from "./CheckersGamePage";
 import { useWelcomeTour } from "../hooks/useWelcomeTour";
 import { useCallStore } from "../store/useCallStore";
 import useFriendStore from "../store/useFriendStore";
@@ -95,7 +96,8 @@ function ChatPage() {
     const isOnTabRoute = location.pathname.startsWith('/posts') || 
                         location.pathname.startsWith('/notices') || 
                         location.pathname.startsWith('/apps') || 
-                        location.pathname.startsWith('/donate');
+                        location.pathname.startsWith('/donate') ||
+                        location.pathname.startsWith('/games/checkers');
     
     if (isOnTabRoute && (selectedUser || selectedGroup)) {
       setSelectedUser(null);
@@ -110,6 +112,7 @@ function ChatPage() {
     { id: 'posts', path: '/posts', name: 'Cassisiacum', component: 'PostsView' },
     { id: 'notices', path: '/notices', name: 'Notices', component: 'NoticeView' },
     { id: 'apps', path: '/apps', name: 'Apps', component: 'AppsView' },
+    { id: 'games', path: '/games/checkers', name: 'Checkers', component: 'CheckersGamePage' },
     { id: 'donate', path: '/donate', name: 'Donate', component: 'DonateView' }
   ];
 
@@ -122,7 +125,8 @@ function ChatPage() {
     if (location.pathname.startsWith('/posts')) return 2; // Posts
     if (location.pathname.startsWith('/notices')) return 3; // Notices
     if (location.pathname.startsWith('/apps')) return 4; // Apps
-    if (location.pathname.startsWith('/donate')) return 5; // Donate
+    if (location.pathname.startsWith('/games/checkers')) return 5; // Games
+    if (location.pathname.startsWith('/donate')) return 6; // Donate
     
     return 1; // Default to Home
   };
@@ -458,6 +462,8 @@ function ChatPage() {
               <NoticeView />
             ) : location.pathname.startsWith('/apps') ? (
               <AppsView />
+            ) : location.pathname.startsWith('/games/checkers') ? (
+              <CheckersGamePage />
             ) : location.pathname.startsWith('/donate') ? (
               <DonateView />
             ) : (
@@ -533,11 +539,21 @@ function ChatPage() {
                   <AppsView />
                 </div>
 
-                {/* Page 5: Donate */}
+                {/* Page 5: Checkers */}
                 <div 
                   className={`absolute inset-0 ${isSwiping ? '' : 'transition-transform duration-300 ease-out'}`}
                   style={{
                     transform: `translateX(${(5 - currentPageIndex) * screenWidth + (isSwiping ? swipeOffset : 0)}px)`
+                  }}
+                >
+                  <CheckersGamePage />
+                </div>
+
+                {/* Page 6: Donate */}
+                <div 
+                  className={`absolute inset-0 ${isSwiping ? '' : 'transition-transform duration-300 ease-out'}`}
+                  style={{
+                    transform: `translateX(${(6 - currentPageIndex) * screenWidth + (isSwiping ? swipeOffset : 0)}px)`
                   }}
                 >
                   <DonateView />
