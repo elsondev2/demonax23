@@ -159,7 +159,7 @@ export default function CheckersGamePage({ onClose }) {
 
       const handleSpectatorJoined = (data) => {
         setSpectators(prev => [...prev, data]);
-        if (!isSpectating) toast.info(`${data.userName} is watching`, { icon: '👁️' });
+        if (!isSpectating) toast.info(`${data.userName} is watching`);
       };
 
       const handleSpectatorLeft = (data) => {
@@ -304,7 +304,7 @@ export default function CheckersGamePage({ onClose }) {
       
       const myPlayer = game.players.find(p => p.userId._id === authUser._id);
       const isWinner = myPlayer && myPlayer.color === winner;
-      toast[isWinner ? 'success' : 'error'](isWinner ? 'You won! 🎉' : 'You lost. Try again!');
+      toast[isWinner ? 'success' : 'error'](isWinner ? 'You won!' : 'You lost. Try again!');
     } catch (error) {
       console.error('Error ending game:', error);
     }
@@ -346,7 +346,7 @@ export default function CheckersGamePage({ onClose }) {
       setIsSpectating(true);
       socket.emit('checkers:spectate', { gameId });
       navigate(`/games/checkers/${gameId}`);
-      toast.success('Now spectating game', { icon: '👁️' });
+      toast.success('Now spectating game');
     } catch {
       toast.error('Failed to spectate game');
     }

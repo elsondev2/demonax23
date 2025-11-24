@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Eye } from 'lucide-react';
 
 const CheckersBoard = ({ board, onMove, currentPlayer, isMyTurn, gameType, disabled = false }) => {
   const [selectedPiece, setSelectedPiece] = useState(null);
@@ -179,8 +180,8 @@ const CheckersBoard = ({ board, onMove, currentPlayer, isMyTurn, gameType, disab
         {/* Spectator overlay */}
         {disabled && (
           <div className="absolute inset-0 bg-black/10 pointer-events-none flex items-center justify-center">
-            <div className="bg-base-200/90 px-4 py-2 rounded-full text-sm font-semibold">
-              👁️ Spectating
+            <div className="bg-base-200/90 px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2">
+              <Eye size={16} /> Spectating
             </div>
           </div>
         )}
