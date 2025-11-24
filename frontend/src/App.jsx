@@ -153,6 +153,11 @@ function AppContent() {
               <CheckersGamePage />
             </ProtectedRoute>
           } />
+          <Route path="/games/checkers/:gameId" element={
+            <ProtectedRoute>
+              <CheckersGamePage />
+            </ProtectedRoute>
+          } />
           <Route path="/payment-instructions" element={
             <ProtectedRoute>
               <PaymentInstructionsPage />

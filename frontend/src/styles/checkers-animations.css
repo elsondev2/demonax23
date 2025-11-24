@@ -1,0 +1,101 @@
+/* Checkers piece animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(var(--p), 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(var(--p), 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(var(--p), 0);
+  }
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Piece hover effects */
+.checkers-piece {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.checkers-piece:hover {
+  transform: scale(1.1) translateY(-2px);
+  filter: brightness(1.2);
+}
+
+.checkers-piece:active {
+  transform: scale(0.95);
+}
+
+/* Board square highlights */
+.checkers-square-valid {
+  animation: pulse-ring 1.5s infinite;
+}
+
+/* King crown animation */
+.king-crown {
+  animation: bounce 2s infinite;
+}
+
+/* Spectator badge */
+.spectator-badge {
+  animation: fadeIn 0.3s ease-in;
+}
+
+/* Live indicator pulse */
+.live-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}

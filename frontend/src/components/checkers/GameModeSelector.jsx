@@ -1,4 +1,4 @@
-import { Users, Bot, Trophy, UserPlus } from 'lucide-react';
+import { Users, Bot, Trophy, UserPlus, Eye } from 'lucide-react';
 
 const GameModeSelector = ({ onSelectMode }) => {
   const modes = [
@@ -37,6 +37,15 @@ const GameModeSelector = ({ onSelectMode }) => {
       gradient: 'from-info to-info/70',
       iconBg: 'bg-info/20',
       iconColor: 'text-info'
+    },
+    {
+      id: 'lobby',
+      name: 'Watch Live Matches',
+      description: 'Spectate ongoing games',
+      icon: Eye,
+      gradient: 'from-success to-success/70',
+      iconBg: 'bg-success/20',
+      iconColor: 'text-success'
     }
   ];
 

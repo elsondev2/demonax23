@@ -427,6 +427,164 @@ io.on("connection", (socket) => {
     }
   });
 
+  // ===== CHECKERS GAME EVENTS =====
+  
+  // Join a game room
+  socket.on("checkers:joinGame", (data) => {
+    const { gameId } = data;
+    console.log('🎮 BACKEND - User joining checkers game:', {
+      userId: socket.userId,
+      gameId
+    });
+    
+    socket.join(`checkers_${gameId}`);
+    
+    // Notify others in the game
+    socket.to(`checkers_${gameId}`).emit("checkers:playerJoined", {
+      userId: socket.userId,
+      userName: socket.user.fullName,
+      profilePic: socket.user.profilePic
+    });
+    
+    console.log('✅ BACKEND - User joined checkers game:', gameId);
+  });
+
+  // Leave a game room
+  socket.on("checkers:leaveGame", (data) => {
+    const { gameId } = data;
+    console.log('🎮 BACKEND - User leaving checkers game:', {
+      userId: socket.userId,
+      gameId
+    });
+    
+    socket.leave(`checkers_${gameId}`);
+    
+    // Notify others in the game
+    socket.to(`checkers_${gameId}`).emit("checkers:playerLeft", {
+      userId: socket.userId
+    });
+    
+    console.log('✅ BACKEND - User left checkers game:', gameId);
+  });
+
+  // Send game challenge
+  socket.on("checkers:sendChallenge", (data) => {
+    const { gameId, opponentId, challengerId, challengerName, gameMode } = data;
+    console.log('🎮 BACKEND - Challenge sent:', {
+      from: challengerId,
+      to: opponentId,
+      gameId,
+      gameMode
+    });
+    
+    const targetSocketId = getReceiverSocketId(opponentId);
+    if (targetSocketId) {
+      io.to(targetSocketId).emit("checkers:receiveChallenge", {
+        gameId,
+        challengerId,
+        challengerName,
+        gameMode
+      });
+      console.log('✅ BACKEND - Challenge delivered to opponent');
+    } else {
+      console.log('❌ BACKEND - Opponent not online');
+    }
+  });
+
+  // Broadcast move to game room
+  socket.on("checkers:makeMove", (data) => {
+    const { gameId, board, currentPlayer, scores, moveData } = data;
+    console.log('🎮 BACKEND - Move made in game:', {
+      gameId,
+      currentPlayer,
+      scores
+    });
+    
+    // Broadcast to all players and spectators in the game room
+    io.to(`checkers_${gameId}`).emit("checkers:move", {
+      gameId,
+      board,
+      currentPlayer,
+      scores,
+      moveData,
+      movedBy: socket.userId
+    });
+    
+    console.log('✅ BACKEND - Move broadcasted to game room');
+  });
+
+  // Broadcast game update
+  socket.on("checkers:updateGame", (data) => {
+    const { gameId, game } = data;
+    console.log('🎮 BACKEND - Game update:', {
+      gameId,
+      status: game.status
+    });
+    
+    io.to(`checkers_${gameId}`).emit("checkers:gameUpdate", {
+      gameId,
+      game
+    });
+    
+    console.log('✅ BACKEND - Game update broadcasted');
+  });
+
+  // Broadcast game end
+  socket.on("checkers:endGame", (data) => {
+    const { gameId, game } = data;
+    console.log('🎮 BACKEND - Game ended:', {
+      gameId,
+      winner: game.winner
+    });
+    
+    io.to(`checkers_${gameId}`).emit("checkers:gameEnd", {
+      gameId,
+      game
+    });
+    
+    // Broadcast to lobby for live matches update
+    io.emit("checkers:lobbyUpdate");
+    
+    console.log('✅ BACKEND - Game end broadcasted');
+  });
+
+  // Join spectator mode for a game
+  socket.on("checkers:spectate", (data) => {
+    const { gameId } = data;
+    console.log('👁️ BACKEND - User spectating game:', {
+      userId: socket.userId,
+      gameId
+    });
+    
+    socket.join(`checkers_${gameId}`);
+    
+    // Notify players that someone is watching
+    socket.to(`checkers_${gameId}`).emit("checkers:spectatorJoined", {
+      userId: socket.userId,
+      userName: socket.user.fullName,
+      profilePic: socket.user.profilePic
+    });
+    
+    console.log('✅ BACKEND - User now spectating game:', gameId);
+  });
+
+  // Stop spectating
+  socket.on("checkers:stopSpectate", (data) => {
+    const { gameId } = data;
+    console.log('👁️ BACKEND - User stopped spectating:', {
+      userId: socket.userId,
+      gameId
+    });
+    
+    socket.leave(`checkers_${gameId}`);
+    
+    socket.to(`checkers_${gameId}`).emit("checkers:spectatorLeft", {
+      userId: socket.userId
+    });
+    
+    console.log('✅ BACKEND - User stopped spectating game:', gameId);
+  });
+
   socket.on("disconnect", () => {
     console.log("A user disconnected", socket.user.fullName);
     delete userSocketMap[userId];

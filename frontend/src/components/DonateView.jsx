@@ -551,7 +551,7 @@ export default function DonateView() {
                 <h2 className="text-3xl font-bold mb-2">Our Amazing Supporters</h2>
                 <p className="text-primary-content/90 max-w-2xl mx-auto">
                   {stats?.totalSupporters > 0
-                    ? `${stats.totalSupporters} incredible people are helping us build something amazing! Every contribution makes a difference.`
+                    ? `${stats.totalSupporters} incredible ${stats.totalSupporters === 1 ? 'person is' : 'people are'} helping us build something amazing! Every contribution makes a difference.`
                     : "Be among the first to support this project and help us grow!"}
                 </p>
               </div>

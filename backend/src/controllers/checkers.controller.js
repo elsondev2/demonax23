@@ -231,7 +231,7 @@ export const makeMove = async (req, res) => {
   try {
     const userId = req.user._id;
     const { gameId } = req.params;
-    const { board, currentPlayer, scores } = req.body;
+    const { board, currentPlayer, scores, moveData } = req.body;
 
     const game = await CheckersGame.findById(gameId);
 
@@ -268,6 +268,17 @@ export const makeMove = async (req, res) => {
 
     await game.save();
     await game.populate("players.userId", "fullName username profilePic");
+
+    // Emit socket event for real-time update
+    const { io } = await import("../lib/socket.js");
+    io.to(`checkers_${gameId}`).emit("checkers:move", {
+      gameId,
+      board,
+      currentPlayer,
+      scores,
+      moveData,
+      movedBy: userId
+    });
 
     res.status(200).json(game);
   } catch (error) {

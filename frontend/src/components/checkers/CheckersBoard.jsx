@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 
-const CheckersBoard = ({ board, onMove, currentPlayer, isMyTurn, gameType }) => {
+const CheckersBoard = ({ board, onMove, currentPlayer, isMyTurn, gameType, disabled = false }) => {
   const [selectedPiece, setSelectedPiece] = useState(null);
   const [validMoves, setValidMoves] = useState([]);
+  const [animatingPiece, setAnimatingPiece] = useState(null);
 
   useEffect(() => {
     if (selectedPiece) {
@@ -65,6 +66,7 @@ const CheckersBoard = ({ board, onMove, currentPlayer, isMyTurn, gameType }) => 
   };
 
   const handleSquareClick = (row, col) => {
+    if (disabled) return;
     if (!isMyTurn && gameType !== 'local' && gameType !== 'ai') return;
 
     const piece = board[row][col];
@@ -79,7 +81,12 @@ const CheckersBoard = ({ board, onMove, currentPlayer, isMyTurn, gameType }) => 
     if (selectedPiece) {
       const move = validMoves.find(m => m.row === row && m.col === col);
       if (move) {
-        makeMove(move);
+        // Animate the move
+        setAnimatingPiece({ from: selectedPiece, to: { row, col } });
+        setTimeout(() => {
+          makeMove(move);
+          setAnimatingPiece(null);
+        }, 300);
       }
       setSelectedPiece(null);
     }
@@ -121,48 +128,62 @@ const CheckersBoard = ({ board, onMove, currentPlayer, isMyTurn, gameType }) => 
 
   return (
     <div className="w-full max-w-2xl mx-auto">
-      <div className="aspect-square w-full bg-base-300 rounded-lg overflow-hidden shadow-2xl">
+      <div className="aspect-square w-full bg-base-300 rounded-lg overflow-hidden shadow-2xl relative">
         <div className="grid grid-cols-8 h-full">
           {board.map((row, rowIndex) =>
             row.map((cell, colIndex) => {
               const isLight = (rowIndex + colIndex) % 2 === 0;
               const isSelected = selectedPiece?.row === rowIndex && selectedPiece?.col === colIndex;
               const isValid = isValidMove(rowIndex, colIndex);
+              const isAnimating = animatingPiece && 
+                ((animatingPiece.from.row === rowIndex && animatingPiece.from.col === colIndex) ||
+                 (animatingPiece.to.row === rowIndex && animatingPiece.to.col === colIndex));
 
               return (
                 <div
                   key={`${rowIndex}-${colIndex}`}
                   onClick={() => handleSquareClick(rowIndex, colIndex)}
                   className={`
-                    relative flex items-center justify-center cursor-pointer transition-all
+                    relative flex items-center justify-center transition-all duration-200
                     ${isLight ? 'bg-amber-100' : 'bg-amber-800'}
                     ${isSelected ? 'ring-4 ring-primary ring-inset' : ''}
                     ${isValid ? 'ring-4 ring-success ring-inset animate-pulse' : ''}
-                    hover:brightness-110
+                    ${disabled ? 'cursor-not-allowed' : 'cursor-pointer hover:brightness-110'}
                   `}
                 >
-                  {cell && (
+                  {cell && !isAnimating && (
                     <div
                       className={`
                         w-[70%] h-[70%] rounded-full flex items-center justify-center
-                        shadow-lg transition-transform hover:scale-110
+                        shadow-lg transition-all duration-200
                         ${cell.player === 'red' ? 'bg-gradient-to-br from-red-500 to-red-700' : 'bg-gradient-to-br from-gray-800 to-black'}
                         ${cell.type === 'king' ? 'ring-4 ring-yellow-400' : ''}
+                        ${!disabled && 'hover:scale-110'}
+                        animate-[fadeIn_0.3s_ease-in]
                       `}
                     >
                       {cell.type === 'king' && (
-                        <span className="text-yellow-400 text-2xl font-bold">♔</span>
+                        <span className="text-yellow-400 text-xl md:text-2xl font-bold">♔</span>
                       )}
                     </div>
                   )}
                   {isValid && !cell && (
-                    <div className="w-4 h-4 rounded-full bg-success opacity-50"></div>
+                    <div className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-success opacity-50 animate-pulse"></div>
                   )}
                 </div>
               );
             })
           )}
         </div>
+        
+        {/* Spectator overlay */}
+        {disabled && (
+          <div className="absolute inset-0 bg-black/10 pointer-events-none flex items-center justify-center">
+            <div className="bg-base-200/90 px-4 py-2 rounded-full text-sm font-semibold">
+              👁️ Spectating
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
