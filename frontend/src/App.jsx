@@ -150,12 +150,12 @@ function AppContent() {
           <Route path="/eula" element={<Eulapage />} />
           <Route path="/games/checkers" element={
             <ProtectedRoute>
-
+              <CheckersGamePage />
             </ProtectedRoute>
           } />
           <Route path="/games/checkers/:gameId" element={
             <ProtectedRoute>
-
+              <CheckersGamePage />
             </ProtectedRoute>
           } />
           <Route path="/payment-instructions" element={
