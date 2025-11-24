@@ -233,21 +233,31 @@ export const makeMove = async (req, res) => {
     const { gameId } = req.params;
     const { board, currentPlayer, scores, moveData } = req.body;
 
+    console.log(`[makeMove] User ${userId} attempting move in game ${gameId}`);
+    console.log(`[makeMove] Request body:`, { board: !!board, currentPlayer, scores, moveData: !!moveData });
+
     const game = await CheckersGame.findById(gameId);
 
     if (!game) {
+      console.log(`[makeMove] Game ${gameId} not found`);
       return res.status(404).json({ message: "Game not found" });
     }
 
+    console.log(`[makeMove] Game found. Status: ${game.status}, CurrentPlayer: ${game.currentPlayer}, GameType: ${game.gameType}`);
+    console.log(`[makeMove] Game players:`, game.players.map(p => ({ userId: p.userId, color: p.color })));
+
     if (game.status !== "active") {
-      return res.status(400).json({ message: "Game is not active" });
+      console.log(`[makeMove] Game not active: ${game.status}`);
+      return res.status(400).json({ message: `Game is not active (status: ${game.status})` });
     }
 
     // Verify it's the user's turn (for multiplayer games)
     if (game.gameType !== "local" && game.gameType !== "ai") {
       const player = game.players.find(p => p.userId.toString() === userId.toString());
+      console.log(`[makeMove] Player found:`, !!player, player?.color);
       if (!player || player.color !== game.currentPlayer) {
-        return res.status(400).json({ message: "Not your turn" });
+        console.log(`[makeMove] Not user's turn. Player: ${player ? 'found' : 'not found'}, Player color: ${player?.color}, Current turn: ${game.currentPlayer}`);
+        return res.status(400).json({ message: `Not your turn (you: ${player?.color}, current: ${game.currentPlayer})` });
       }
     }
 
@@ -257,16 +267,20 @@ export const makeMove = async (req, res) => {
     game.moveHistory += 1;
     game.lastMoveAt = new Date();
 
+    console.log(`[makeMove] Updating game. New currentPlayer: ${currentPlayer}, Board length: ${board?.length}`);
+
     // Update scores
     if (scores) {
       game.players.forEach((player, index) => {
         if (scores[player.color] !== undefined) {
+          console.log(`[makeMove] Updating ${player.color} score: ${player.score} -> ${scores[player.color]}`);
           player.score = scores[player.color];
         }
       });
     }
 
     await game.save();
+    console.log(`[makeMove] Game saved successfully`);
     await game.populate("players.userId", "fullName username profilePic");
 
     // Emit socket event for real-time update

@@ -101,7 +101,7 @@ export default function CheckersGamePage({ onClose }) {
       notification.innerHTML = `
         <div class="alert alert-info shadow-2xl border-2 border-primary">
           <div class="flex-1">
-            <h3 class="font-bold text-sm">🎮 Checkers Challenge!</h3>
+            <h3 class="font-bold text-sm">Checkers Challenge!</h3>
             <div class="text-xs mt-1">${data.challengerName} challenged you!</div>
           </div>
           <div class="flex gap-2">
@@ -112,7 +112,7 @@ export default function CheckersGamePage({ onClose }) {
       `;
       document.body.appendChild(notification);
       setTimeout(() => notification.parentElement && notification.remove(), 30000);
-      toast.success(`${data.challengerName} challenged you!`, { duration: 5000, icon: '🎮' });
+      toast.success(`${data.challengerName} challenged you!`, { duration: 5000 });
     };
 
     window.acceptCheckersChallenge = async (gameId) => {
@@ -137,6 +137,12 @@ export default function CheckersGamePage({ onClose }) {
     socket.on('checkers:receiveChallenge', handleChallenge);
 
     if (game) {
+      const handlePlayerJoined = (data) => {
+        // Reload the game when opponent joins to get updated status
+        loadGame(game._id);
+        toast.success(`${data.userName} joined the game!`);
+      };
+
       const handleGameMove = (data) => {
         if (data.gameId === game._id) {
           setGame(prev => ({
@@ -170,6 +176,7 @@ export default function CheckersGamePage({ onClose }) {
       socket.on('checkers:gameEnd', handleGameEnd);
       socket.on('checkers:spectatorJoined', handleSpectatorJoined);
       socket.on('checkers:spectatorLeft', handleSpectatorLeft);
+      socket.on('checkers:playerJoined', handlePlayerJoined);
 
       return () => {
         socket.off('checkers:receiveChallenge', handleChallenge);
@@ -177,6 +184,7 @@ export default function CheckersGamePage({ onClose }) {
         socket.off('checkers:gameEnd', handleGameEnd);
         socket.off('checkers:spectatorJoined', handleSpectatorJoined);
         socket.off('checkers:spectatorLeft', handleSpectatorLeft);
+        socket.off('checkers:playerJoined', handlePlayerJoined);
       };
     }
 
@@ -276,11 +284,13 @@ export default function CheckersGamePage({ onClose }) {
 
   const handleMove = async (newBoard, nextPlayer, scores) => {
     try {
-      const res = await axiosInstance.put(`/api/checkers/games/${game._id}/move`, {
+      const moveData = {
         board: newBoard,
         currentPlayer: nextPlayer,
         scores: { red: scores.red || 0, black: scores.black || 0 }
-      });
+      };
+      console.log('Sending move:', moveData);
+      const res = await axiosInstance.put(`/api/checkers/games/${game._id}/move`, moveData);
       setGame(res.data);
 
       if (scores.red === 0 || scores.black === 0) {
@@ -288,6 +298,8 @@ export default function CheckersGamePage({ onClose }) {
         await endGame(winner);
       }
     } catch (err) {
+      console.error('Move error response:', err.response?.data);
+      console.error('Move error status:', err.response?.status);
       toast.error(err.response?.data?.message || 'Failed to make move');
     }
   };
@@ -621,13 +633,13 @@ export default function CheckersGamePage({ onClose }) {
                     {(() => {
                       const myPlayer = game.players.find(p => p.userId._id === authUser._id);
                       const isWinner = myPlayer && myPlayer.color === game.winner;
-                      return isWinner ? 'You Won! 🎉' : 'You Lost';
+                      return isWinner ? 'You Won!' : 'You Lost';
                     })()}
                   </p>
                 )}
                 {isSpectating && (
                   <p className="text-xl font-bold mb-4 capitalize">
-                    {game.winner} Player Won! 🎉
+                    {game.winner} Player Won!
                   </p>
                 )}
                 
