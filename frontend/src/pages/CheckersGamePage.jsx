@@ -50,48 +50,119 @@ export default function CheckersGamePage({ onClose }) {
     fetchProfile();
   }, [fetchProfile]);
 
-  // Socket listeners for live game updates
+  // Socket listeners for live game updates and challenges
   useEffect(() => {
-    if (!socket || !game) return;
+    if (!socket) return;
 
-    const handleGameUpdate = (data) => {
-      if (data.gameId === game._id) {
-        console.log('🎮 Game update received:', data);
-        setGame(data.game);
+    // Handle incoming game challenge
+    const handleChallenge = (data) => {
+      console.log('🎮 Challenge received:', data);
+      
+      // Show notification with action buttons
+      const notification = document.createElement('div');
+      notification.className = 'fixed top-20 right-4 z-[200] max-w-sm animate-slide-in-right';
+      notification.innerHTML = `
+        <div class="alert alert-info shadow-2xl border-2 border-primary">
+          <div class="flex-1">
+            <h3 class="font-bold text-sm">🎮 Checkers Challenge!</h3>
+            <div class="text-xs mt-1">
+              ${data.challengerName} challenged you to a ${data.gameMode} game!
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <button class="btn btn-primary btn-xs" onclick="window.acceptCheckersChallenge('${data.gameId}')">
+              Accept
+            </button>
+            <button class="btn btn-ghost btn-xs" onclick="this.closest('.alert').parentElement.remove()">
+              Dismiss
+            </button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(notification);
+      
+      // Auto-remove after 30 seconds
+      setTimeout(() => {
+        if (notification.parentElement) {
+          notification.remove();
+        }
+      }, 30000);
+      
+      // Play notification sound
+      toast.success(`${data.challengerName} challenged you to play Checkers!`, {
+        duration: 5000,
+        icon: '🎮'
+      });
+    };
+
+    // Global function to accept challenge
+    window.acceptCheckersChallenge = async (gameId) => {
+      try {
+        const res = await axiosInstance.get(`/api/checkers/games/${gameId}`);
+        setGame(res.data);
+        setGameState('playing');
+        toast.success('Challenge accepted! Game starting...');
+        
+        // Remove notification
+        document.querySelectorAll('.alert').forEach(alert => {
+          if (alert.textContent.includes('Checkers Challenge')) {
+            alert.closest('.animate-slide-in-right')?.remove();
+          }
+        });
+      } catch (error) {
+        console.error('Error accepting challenge:', error);
+        toast.error('Failed to join game');
       }
     };
 
-    const handleGameMove = (data) => {
-      if (data.gameId === game._id) {
-        console.log('🎮 Move received:', data);
-        setGame(prev => ({
-          ...prev,
-          board: data.board,
-          currentPlayer: data.currentPlayer,
-          players: data.players
-        }));
-      }
-    };
+    socket.on('checkers:challenge', handleChallenge);
 
-    const handleGameEnd = (data) => {
-      if (data.gameId === game._id) {
-        console.log('🎮 Game ended:', data);
-        setGame(data.game);
-        setGameState('finished');
-        fetchProfile();
-      }
-    };
+    // Game update handlers (only if game exists)
+    if (game) {
+      const handleGameUpdate = (data) => {
+        if (data.gameId === game._id) {
+          console.log('🎮 Game update received:', data);
+          setGame(data.game);
+        }
+      };
 
-    socket.on('checkers:gameUpdate', handleGameUpdate);
-    socket.on('checkers:move', handleGameMove);
-    socket.on('checkers:gameEnd', handleGameEnd);
+      const handleGameMove = (data) => {
+        if (data.gameId === game._id) {
+          console.log('🎮 Move received:', data);
+          setGame(prev => ({
+            ...prev,
+            board: data.board,
+            currentPlayer: data.currentPlayer,
+            players: data.players
+          }));
+        }
+      };
+
+      const handleGameEnd = (data) => {
+        if (data.gameId === game._id) {
+          console.log('🎮 Game ended:', data);
+          setGame(data.game);
+          setGameState('finished');
+          fetchProfile();
+        }
+      };
+
+      socket.on('checkers:gameUpdate', handleGameUpdate);
+      socket.on('checkers:move', handleGameMove);
+      socket.on('checkers:gameEnd', handleGameEnd);
+
+      return () => {
+        socket.off('checkers:challenge', handleChallenge);
+        socket.off('checkers:gameUpdate', handleGameUpdate);
+        socket.off('checkers:move', handleGameMove);
+        socket.off('checkers:gameEnd', handleGameEnd);
+      };
+    }
 
     return () => {
-      socket.off('checkers:gameUpdate', handleGameUpdate);
-      socket.off('checkers:move', handleGameMove);
-      socket.off('checkers:gameEnd', handleGameEnd);
+      socket.off('checkers:challenge', handleChallenge);
     };
-  }, [socket, game, fetchProfile]);
+  }, [socket, game, fetchProfile, authUser]);
 
   const fetchAvailablePlayers = async () => {
     try {
@@ -123,10 +194,35 @@ export default function CheckersGamePage({ onClose }) {
     }
   };
 
-  const handleSelectPlayer = (player) => {
+  const handleSelectPlayer = async (player) => {
     setShowPlayerSelector(false);
-    startGame(selectedMode, null, player._id);
-    toast.success(`Inviting ${player.fullName} to play...`);
+    
+    try {
+      // Start the game
+      const gameRes = await axiosInstance.post('/api/checkers/games', {
+        gameType: selectedMode,
+        pointsBet: 0,
+        opponentId: player._id
+      });
+      
+      setGame(gameRes.data);
+      setGameState('playing');
+      
+      // Send notification to the challenged player
+      if (socket) {
+        socket.emit('checkers:challenge', {
+          gameId: gameRes.data._id,
+          opponentId: player._id,
+          challengerName: authUser.fullName,
+          gameMode: selectedMode
+        });
+      }
+      
+      toast.success(`Challenge sent to ${player.fullName}!`);
+    } catch (error) {
+      console.error('Error starting game:', error);
+      toast.error(error.response?.data?.message || 'Failed to start game');
+    }
   };
 
   const handleSelectDifficulty = (diff) => {
