@@ -117,7 +117,8 @@ export default function CheckersGamePage({ onClose }) {
 
     window.acceptCheckersChallenge = async (gameId) => {
       try {
-        const res = await axiosInstance.get(`/api/checkers/games/${gameId}`);
+        // Call the joinGame API to officially register the player
+        const res = await axiosInstance.post(`/api/checkers/games/${gameId}/join`);
         setGame(res.data);
         setGameState('playing');
         setIsSpectating(false);
