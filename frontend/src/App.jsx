@@ -10,6 +10,7 @@ import TermsOfServicePage from "./pages/TermsOfServicePage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import Eulapage from "./pages/Eulapage";
 import LandingPage from "./pages/LandingPage";
+import AuthChoicePage from "./pages/AuthChoicePage";
 import CheckersGamePage from "./pages/CheckersGamePage";
 import { useAuthStore } from "./store/useAuthStore";
 import { useEffect } from "react";
@@ -129,7 +130,7 @@ function AppContent() {
               <ChatPage />
             </ProtectedRoute>
           } />
-          <Route path="/login" element={authUser ? <Navigate to="/chats" replace /> : <LoginPageNew />} />
+          <Route path="/login" element={authUser ? <Navigate to="/chats" replace /> : <AuthChoicePage />} />
           <Route path="/signin" element={authUser ? <Navigate to="/chats" replace /> : <LoginPageNew />} />
           <Route path="/signup" element={authUser ? <Navigate to="/chats" replace /> : <SignUpPageNew />} />
           <Route path="/register" element={authUser ? <Navigate to="/chats" replace /> : <SignUpPageNew />} />
