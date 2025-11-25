@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, Component } from 'react';
 import { LexicalComposer } from '@lexical/react/LexicalComposer';
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
 import { ContentEditable } from '@lexical/react/LexicalContentEditable';
@@ -18,6 +18,31 @@ import {
 } from 'lexical';
 import { $generateHtmlFromNodes } from '@lexical/html';
 import { mergeRegister } from '@lexical/utils';
+
+/**
+ * Error Boundary component for Lexical editor
+ */
+class LexicalErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('Lexical editor error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return <div className="text-error text-sm p-2">Editor error occurred. Please refresh.</div>;
+    }
+    return this.props.children;
+  }
+}
 
 /**
  * Plugin to handle formatting commands from toolbar
@@ -210,10 +235,7 @@ const WYSIWYGMessageInput = ({
               {placeholder}
             </div>
           }
-          ErrorBoundary={(error) => {
-            console.error('Lexical error:', error);
-            return <div className="text-error text-sm p-2">Editor error occurred</div>;
-          }}
+          ErrorBoundary={LexicalErrorBoundary}
         />
         
         <OnChangePlugin onChange={handleChange} />

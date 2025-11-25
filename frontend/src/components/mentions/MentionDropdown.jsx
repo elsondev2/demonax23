@@ -84,28 +84,41 @@ const MentionDropdown = ({
     onSelect?.(item);
   };
 
-  // Handle keyboard navigation
+  // Handle keyboard navigation - only when dropdown is visible and has results
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (!results.length) return;
+      // Only handle navigation keys when we have results
+      if (!results.length) {
+        // Still handle Escape to close
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          onClose?.();
+        }
+        return;
+      }
 
       switch (e.key) {
         case 'ArrowDown':
           e.preventDefault();
+          e.stopPropagation();
           setSelectedIndex((prev) => (prev + 1) % results.length);
           break;
         case 'ArrowUp':
           e.preventDefault();
+          e.stopPropagation();
           setSelectedIndex((prev) => (prev - 1 + results.length) % results.length);
           break;
         case 'Enter':
           e.preventDefault();
+          e.stopPropagation();
           if (results[selectedIndex]) {
             onSelect?.(results[selectedIndex]);
           }
           break;
         case 'Escape':
           e.preventDefault();
+          e.stopPropagation();
           onClose?.();
           break;
         default:
@@ -113,8 +126,9 @@ const MentionDropdown = ({
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    // Use capture phase to intercept before other handlers
+    document.addEventListener('keydown', handleKeyDown, true);
+    return () => document.removeEventListener('keydown', handleKeyDown, true);
   }, [results, selectedIndex, onClose, onSelect]);
 
   // Scroll selected item into view

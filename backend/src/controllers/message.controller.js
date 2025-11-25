@@ -280,7 +280,7 @@ export const sendMessage = async (req, res) => {
 export const editMessage = async (req, res) => {
   try {
     const { id: messageId } = req.params;
-    const { text } = req.body;
+    const { text, html } = req.body;
     const userId = req.user._id;
 
     // Find the message by ID
@@ -296,8 +296,11 @@ export const editMessage = async (req, res) => {
       return res.status(403).json({ message: "You can only edit your own messages." });
     }
     
-    // Update the message text
+    // Update the message text and html
     message.text = text;
+    if (html !== undefined) {
+      message.html = html;
+    }
     message.updatedAt = new Date();
     const savedMessage = await message.save();
     
@@ -746,7 +749,7 @@ export const reactToMessage = async (req, res) => {
     await message.populate("reactions.userId", "fullName profilePic");
 
     // Emit reaction update to relevant users
-    const { io, getReceiverSocketId } = await import("../socket.js");
+    const { io, getReceiverSocketId } = await import("../lib/socket.js");
     
     if (message.groupId) {
       // Notify all group members

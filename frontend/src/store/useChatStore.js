@@ -99,79 +99,42 @@ export const useChatStore = create((set, get) => ({
   typingUsers: {}, // { conversationId: [{ userId, name, timestamp }] }
   recordingUsers: {}, // { conversationId: [{ userId, name, timestamp }] }
 
-  // Set typing status - simple object-based approach (prevents array flickering)
+  // Set typing status - simplified approach like inspiration app
   setUserTyping: (conversationId, userId, userName) => {
-    console.log('🔧 STORE: setUserTyping called', {
-      conversationId,
-      userId,
-      userName
-    });
-    
     const { typingUsers } = get();
     const currentConversation = typingUsers[conversationId] || {};
-
-    // Only update if user doesn't exist or timestamp is old (prevents rapid updates)
-    const existingUser = currentConversation[userId];
     const now = Date.now();
     
-    console.log('🔧 STORE: Existing user?', existingUser ? 'Yes' : 'No');
-    
-    // Skip update if user was just updated within last 1 second (debounce)
-    // This prevents flickering from rapid typing events
-    if (existingUser && (now - existingUser.timestamp) < 1000) {
-      console.log('⏭️ STORE: Skipping update (debounced)');
-      return;
-    }
-
-    // Only update state if something actually changed
-    const needsUpdate = !existingUser || existingUser.name !== userName;
-    
-    console.log('🔧 STORE: Needs update?', needsUpdate);
-    
-    if (needsUpdate) {
-      const newState = {
-        typingUsers: {
-          ...typingUsers,
-          [conversationId]: {
-            ...currentConversation,
-            [userId]: { userId, name: userName, timestamp: now }
-          }
+    // Always update - no debouncing (simpler and more reliable)
+    set({
+      typingUsers: {
+        ...typingUsers,
+        [conversationId]: {
+          ...currentConversation,
+          [userId]: { userId, name: userName, timestamp: now }
         }
-      };
-      
-      console.log('✅ STORE: Updating state', newState);
-      set(newState);
-    }
+      }
+    });
   },
 
-  // Clear typing status
+  // Clear typing status - simplified
   clearUserTyping: (conversationId, userId) => {
-    console.log('🔧 STORE: clearUserTyping called', {
-      conversationId,
-      userId
-    });
-    
     const { typingUsers } = get();
     const currentConversation = typingUsers[conversationId] || {};
 
     // Only update if user actually exists
     if (!currentConversation[userId]) {
-      console.log('⏭️ STORE: User not in typing list, skipping');
       return;
     }
-
-    console.log('✅ STORE: Removing user from typing list');
 
     // Remove user from conversation
     const { [userId]: _removed, ...remaining } = currentConversation;
 
     // If no users left, remove the conversation entirely
     if (Object.keys(remaining).length === 0) {
-      console.log('🗑️ STORE: No users left, removing conversation from typingUsers');
       const { [conversationId]: _removedConv, ...remainingConvs } = typingUsers;
       set({ typingUsers: remainingConvs });
     } else {
-      console.log('✅ STORE: Updating conversation with remaining users');
       set({
         typingUsers: {
           ...typingUsers,
@@ -181,34 +144,22 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
-  // Set recording status
+  // Set recording status - simplified
   setUserRecording: (conversationId, userId, userName) => {
     const { recordingUsers } = get();
     const currentConversation = recordingUsers[conversationId] || {};
-
-    // Only update if user doesn't exist or timestamp is old (prevents rapid updates)
-    const existingUser = currentConversation[userId];
     const now = Date.now();
     
-    // Skip update if user was just updated within last 1 second (debounce)
-    if (existingUser && (now - existingUser.timestamp) < 1000) {
-      return;
-    }
-
-    // Only update state if something actually changed
-    const needsUpdate = !existingUser || existingUser.name !== userName;
-    
-    if (needsUpdate) {
-      set({
-        recordingUsers: {
-          ...recordingUsers,
-          [conversationId]: {
-            ...currentConversation,
-            [userId]: { userId, name: userName, timestamp: now }
-          }
+    // Always update - no debouncing
+    set({
+      recordingUsers: {
+        ...recordingUsers,
+        [conversationId]: {
+          ...currentConversation,
+          [userId]: { userId, name: userName, timestamp: now }
         }
-      });
-    }
+      }
+    });
   },
 
   // Clear recording status
@@ -1092,9 +1043,11 @@ export const useChatStore = create((set, get) => ({
       _id: tempId,
       senderId: authUser,  // Pass full user object for optimistic message
       text: messageData.text,
+      html: messageData.html || null,  // Include HTML for formatted messages
       image: messageData.image,  // Keep base64 for instant preview
       attachments: messageData.attachments || [],
       audio: messageData.audio || null,
+      mentions: messageData.mentions || [],  // Include mentions
       quotedMessage: get().quotedMessage || null,
       createdAt: new Date().toISOString(),
       status: 'pending',
@@ -1206,7 +1159,7 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
-  editMessage: async (messageId, newText) => {
+  editMessage: async (messageId, newText, newHtml = null) => {
     const { messages } = get();
 
     // Find the message being edited
@@ -1218,6 +1171,7 @@ export const useChatStore = create((set, get) => ({
     const updatedMessage = {
       ...originalMessage,
       text: newText,
+      html: newHtml,
       updatedAt: new Date().toISOString(),
     };
 
@@ -1227,7 +1181,10 @@ export const useChatStore = create((set, get) => ({
     set({ messages: updatedMessages });
 
     try {
-      const res = await axiosInstance.put(`/api/messages/edit/${messageId}`, { text: newText });
+      const res = await axiosInstance.put(`/api/messages/edit/${messageId}`, { 
+        text: newText,
+        html: newHtml 
+      });
       if (res.status === 200 && res.data) {
         // Update with the server response
         const finalMessages = updatedMessages.map(msg =>
@@ -1799,6 +1756,45 @@ export const useChatStore = create((set, get) => ({
       }
     });
 
+    // Batch read receipts (IMPROVED - more efficient)
+    socket.on("messagesReadBatch", ({ messageIds, userId, conversationId }) => {
+      console.log("📖 Received batch read receipt:", { messageIds: messageIds.length, userId });
+
+      const { currentConversationId } = get();
+      const { authUser } = useAuthStore.getState();
+      
+      // Only update if we're viewing the relevant conversation
+      const isRelevantConversation = currentConversationId === conversationId;
+      
+      if (!isRelevantConversation) return;
+
+      const currentMessages = get().messages;
+      const messageIdSet = new Set(messageIds);
+      
+      const updatedMessages = currentMessages.map(msg => {
+        // Only update messages that are in the batch
+        if (!messageIdSet.has(msg._id)) return msg;
+        
+        const senderId = typeof msg.senderId === 'object' ? msg.senderId._id : msg.senderId;
+        
+        // Only update messages sent by current user
+        if (senderId === authUser._id) {
+          const readBy = Array.isArray(msg.readBy) ? msg.readBy : [];
+          const newReadBy = Array.from(new Set([...readBy, userId]));
+
+          return {
+            ...msg,
+            readBy: newReadBy,
+            status: 'read'
+          };
+        }
+        
+        return msg;
+      });
+      
+      set({ messages: updatedMessages });
+    });
+
     // Listen for group updates
     socket.on("groupUpdated", (updatedGroup) => {
       console.log("Received group update:", updatedGroup);
@@ -2006,7 +2002,7 @@ export const useChatStore = create((set, get) => ({
     if (!socket) return;
 
     socket.on("messageReacted", (data) => {
-      const { messageId, reactions, userId } = data;
+      const { messageId, reactions } = data;
       console.log('😊 Message reaction received:', { messageId, emoji: reactions?.map(r => r.emoji) });
 
       // Update the message in the messages array with new reactions

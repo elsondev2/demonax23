@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 
 function ImagePreviewModal({ src, alt, onClose }) {
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(0.6); // Start at 60% zoom
 
   const handleDownload = async () => {
     try {

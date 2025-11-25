@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useChatStore } from "../store/useChatStore";
 import { SendIcon, XIcon, Smile, Paperclip, Mic, StopCircle, Sparkles, FileText } from "lucide-react";
@@ -35,7 +35,6 @@ const MessageInput = ({ onInputFocus }) => {
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [audioStream, setAudioStream] = useState(null);
   const [typingTimeout, setTypingTimeout] = useState(null);
-  const [isTyping, setIsTyping] = useState(false);
 
   const { sendMessage, selectedUser, selectedGroup, messageInputText, setMessageInputText, quotedMessage, clearQuotedMessage, messages, playKeystrokeSound } = useChatStore();
   const [isEmojiOpen, setIsEmojiOpen] = useState(false);
@@ -111,43 +110,40 @@ const MessageInput = ({ onInputFocus }) => {
     return () => clearInterval(interval);
   }, [isRecording, recordStartTs]);
 
-  // Cleanup audio stream, typing, and recording indicators on unmount
+  // Cleanup audio stream on unmount
   useEffect(() => {
     return () => {
       if (audioStream) {
         audioStream.getTracks().forEach(track => track.stop());
       }
+    };
+  }, [audioStream]);
 
+  // Cleanup typing timeout and recording indicators on unmount or chat switch
+  useEffect(() => {
+    const currentTypingTimeout = typingTimeout;
+    const currentIsRecording = isRecording;
+    const currentConversationId = selectedUser?._id || selectedGroup?._id;
+    const currentIsGroup = !!selectedGroup;
+
+    return () => {
       // Clear typing timeout
-      if (typingTimeout) {
-        clearTimeout(typingTimeout);
+      if (currentTypingTimeout) {
+        clearTimeout(currentTypingTimeout);
       }
 
       const { socket } = useAuthStore.getState();
-      if (socket && socket.connected) {
-        const conversationId = selectedUser?._id || selectedGroup?._id;
-        const isGroup = !!selectedGroup;
-
-        if (conversationId) {
-          // Stop typing indicator if active
-          if (isTyping) {
-            socket.emit('stopTyping', {
-              conversationId,
-              isGroup
-            });
-          }
-
-          // Stop recording indicator if active
-          if (isRecording) {
-            socket.emit('stopRecording', {
-              conversationId,
-              isGroup
-            });
-          }
+      if (socket && socket.connected && currentConversationId) {
+        // Stop recording indicator if active
+        if (currentIsRecording) {
+          socket.emit('stopRecording', {
+            conversationId: currentConversationId,
+            isGroup: currentIsGroup
+          });
         }
       }
     };
-  }, [audioStream, typingTimeout, isTyping, isRecording, selectedUser, selectedGroup]);
+  }, [typingTimeout, isRecording, selectedUser?._id, selectedGroup]);
 
   // Close emoji picker on mount and when switching chats
   useEffect(() => { setIsEmojiOpen(false); }, []);
@@ -179,8 +175,8 @@ const MessageInput = ({ onInputFocus }) => {
     return null;
   };
 
-  // Calculate dropdown position - above input area, within chat interface
-  const calculateMentionPosition = () => {
+  // Calculate dropdown position - above input area, within chat interface (memoized)
+  const calculateMentionPosition = useCallback(() => {
     const input = inputRef.current;
     if (!input) return { top: 0, left: 0 };
 
@@ -210,15 +206,15 @@ const MessageInput = ({ onInputFocus }) => {
     }
 
     return { top, left };
-  };
+  }, []);
 
   // Handle text change with mention detection and typing indicator
-  const handleTextChange = (newText) => {
+  const handleTextChange = useCallback((newText) => {
     if (newText.length <= 2000) {
       setText(newText);
 
-      // Detect mention trigger
-      const cursorPos = inputRef.current?.selectionStart || newText.length;
+      // Detect mention trigger - use text length as cursor position for WYSIWYG
+      const cursorPos = newText.length;
       const mention = detectMention(newText, cursorPos);
 
       if (mention) {
@@ -226,49 +222,55 @@ const MessageInput = ({ onInputFocus }) => {
         setMentionQuery(mention.query);
         setMentionStartIndex(mention.startIndex);
         setMentionTriggerType(mention.type);
-        setMentionPosition(calculateMentionPosition());
+        // Debounce position calculation
+        requestAnimationFrame(() => {
+          setMentionPosition(calculateMentionPosition());
+        });
       } else {
         setShowMentionDropdown(false);
         setMentionQuery('');
         setMentionStartIndex(-1);
       }
 
-      // TYPING SYSTEM: CometChat-style implementation
+      // TYPING SYSTEM: Exact copy of inspiration app logic
       const { socket } = useAuthStore.getState();
       const conversationId = selectedUser?._id || selectedGroup?._id;
-      const isGroup = !!selectedGroup;
+      const isGroupChat = !!selectedGroup;
       
       if (socket && socket.connected && conversationId) {
-        // Clear any existing timeout
+        // Clear timeout on every keystroke (like inspiration app)
         if (typingTimeout) {
           clearTimeout(typingTimeout);
         }
         
-        // If not already typing, send START typing event (only once)
-        if (!isTyping) {
-          console.log('🔵 TYPING: startTyping');
+        // If text has content, send typing and set timeout
+        if (newText.trim()) {
+          // Send typing event (like updateStatus in inspiration app)
           socket.emit('typing', {
             conversationId,
-            isGroup,
+            isGroup: isGroupChat,
             userName: authUser?.fullName
           });
-          setIsTyping(true);
-        }
-        
-        // Set inactivity timeout to send STOP typing
-        const timeout = setTimeout(() => {
-          console.log('⏱️ TYPING: endTyping (inactivity)');
+          
+          // Set timeout to send idle after 3 seconds
+          const timeout = setTimeout(() => {
+            socket.emit('stopTyping', {
+              conversationId,
+              isGroup: isGroupChat
+            });
+          }, 3000);
+          
+          setTypingTimeout(timeout);
+        } else {
+          // If text is empty, send idle immediately (like inspiration app)
           socket.emit('stopTyping', {
             conversationId,
-            isGroup
+            isGroup: isGroupChat
           });
-          setIsTyping(false);
-        }, 3000); // 3 seconds of inactivity
-        
-        setTypingTimeout(timeout);
+        }
       }
     }
-  };
+  }, [selectedUser?._id, selectedGroup, authUser?.fullName, typingTimeout, calculateMentionPosition]);
 
   // Handle format toggle (activates/deactivates formatting mode)
   const handleFormatToggle = (formatType) => {
@@ -280,11 +282,11 @@ const MessageInput = ({ onInputFocus }) => {
 
   // Handle mention selection
   const handleMentionSelect = (item) => {
-    const input = inputRef.current;
-    if (!input || mentionStartIndex === -1) return;
+    if (mentionStartIndex === -1) return;
 
     const beforeMention = text.substring(0, mentionStartIndex);
-    const afterMention = text.substring(input.selectionStart);
+    // For WYSIWYG editor, we use text length as cursor position since selectionStart isn't available
+    const afterMention = text.substring(text.length);
 
     // Format mention based on type
     const mentionText = mentionTriggerType === 'user'
@@ -293,6 +295,11 @@ const MessageInput = ({ onInputFocus }) => {
 
     const newText = beforeMention + mentionText + ' ' + afterMention;
     setText(newText);
+    
+    // Update WYSIWYG editor content
+    if (commandsRef.current) {
+      commandsRef.current.setText(newText);
+    }
 
     // Track mention with full details
     setMentions(prev => {
@@ -314,12 +321,12 @@ const MessageInput = ({ onInputFocus }) => {
     setMentionQuery('');
     setMentionStartIndex(-1);
 
-    // Set cursor after mention
-    setTimeout(() => {
-      const newCursorPos = mentionStartIndex + mentionText.length + 1;
-      input.setSelectionRange(newCursorPos, newCursorPos);
-      input.focus();
-    }, 0);
+    // Focus editor after mention insertion
+    requestAnimationFrame(() => {
+      if (commandsRef.current) {
+        commandsRef.current.focus();
+      }
+    });
   };
 
   // Close dropdown on click outside
@@ -377,34 +384,20 @@ const MessageInput = ({ onInputFocus }) => {
     // Haptic feedback on send
     hapticSuccess();
 
-    // Stop typing when sending message
+    // Clear typing timeout when sending (like inspiration app)
     if (typingTimeout) {
       clearTimeout(typingTimeout);
       setTypingTimeout(null);
     }
 
-    const { socket } = useAuthStore.getState();
-    if (socket && socket.connected && isTyping) {
-      const conversationId = selectedUser?._id || selectedGroup?._id;
-      const isGroup = !!selectedGroup;
-
-      if (conversationId) {
-        socket.emit('stopTyping', {
-          conversationId,
-          isGroup
-        });
-        setIsTyping(false);
-      }
-    }
-
-    // ✅ FIX 1: CLEAR INPUT IMMEDIATELY (before sending)
-    // Store values before clearing
+    // IMPORTANT: Capture all values BEFORE clearing anything
     const messageText = text;
     const messageImage = image;
-    const messageAttachments = attachments;
+    const messageAttachments = [...attachments]; // Clone array
     const messageAudio = audio;
-    const messageMentions = mentions;
-    const messageHtml = getHtml();
+    const messageMentions = [...mentions]; // Clone array
+    const messageHtml = getHtml(); // Get HTML before clearing editor
+    const messageQuotedMessage = quotedMessage; // Capture quoted message before clearing
     
     // Clear UI immediately for instant feedback
     setText("");
@@ -416,12 +409,12 @@ const MessageInput = ({ onInputFocus }) => {
     setMentions([]);
     clearQuotedMessage();
 
-    // Keep input focused so user can continue typing
-    setTimeout(() => {
+    // Keep input focused so user can continue typing (with small delay for editor to be ready)
+    requestAnimationFrame(() => {
       if (commandsRef.current) {
         commandsRef.current.focus();
       }
-    }, 0);
+    });
 
     // Now send in background (non-blocking)
     try {
@@ -447,14 +440,14 @@ const MessageInput = ({ onInputFocus }) => {
         image: imageData,
         attachments: messageAttachments,
         audio: messageAudio,
-        mentions: validatedMentions
+        mentions: validatedMentions,
+        quotedMessage: messageQuotedMessage
       });
     } catch (error) {
       console.error("Failed to send message:", error);
       const errorMsg = error.response?.data?.message || error.message || 'Failed to send message';
       alert(`Error: ${errorMsg}`);
     }
-    // ✅ FIX 2: NO FINALLY BLOCK - Don't block button
   };
 
   // Validate mentions before sending
@@ -759,7 +752,7 @@ const MessageInput = ({ onInputFocus }) => {
         <div className="flex-1 relative">
           <WYSIWYGMessageInput
             onChange={(newText) => {
-              setText(newText);
+              // Only call handleTextChange - it handles setText internally
               handleTextChange(newText);
             }}
             onEnter={() => {
@@ -774,26 +767,10 @@ const MessageInput = ({ onInputFocus }) => {
               // Typing will start on first keystroke
             }}
             onBlur={() => {
-              // Stop typing when leaving input area
-              if (isTyping) {
-                const { socket } = useAuthStore.getState();
-                const conversationId = selectedUser?._id || selectedGroup?._id;
-                const isGroup = !!selectedGroup;
-
-                if (socket && socket.connected && conversationId) {
-                  console.log('🔴 TYPING: endTyping (blur)');
-                  socket.emit('stopTyping', {
-                    conversationId,
-                    isGroup
-                  });
-                  setIsTyping(false);
-                }
-
-                // Clear timeout
-                if (typingTimeout) {
-                  clearTimeout(typingTimeout);
-                  setTypingTimeout(null);
-                }
+              // Clear typing timeout when leaving input area
+              if (typingTimeout) {
+                clearTimeout(typingTimeout);
+                setTypingTimeout(null);
               }
             }}
             placeholder={getPlaceholder()}
@@ -857,12 +834,13 @@ const MessageInput = ({ onInputFocus }) => {
                   });
 
                   const chunks = [];
+                  const startTime = Date.now(); // Capture start time in closure
                   mr.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
                   mr.onstop = async () => {
                     setIsProcessingAudio(true);
                     try {
                       let blob = new Blob(chunks, { type: mimeType });
-                      const durationSec = Math.round((Date.now() - recordStartTs) / 1000);
+                      const durationSec = Math.round((Date.now() - startTime) / 1000);
 
                       // Apply additional audio processing if supported
                       if (supportsAdvancedAudioProcessing() && durationSec > 1) {
@@ -932,12 +910,13 @@ const MessageInput = ({ onInputFocus }) => {
                       const mr = new MediaRecorder(basicStream, { mimeType, audioBitsPerSecond });
 
                       const chunks = [];
+                      const basicStartTime = Date.now(); // Capture start time in closure
                       mr.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
                       mr.onstop = async () => {
                         setIsProcessingAudio(true);
                         try {
                           const blob = new Blob(chunks, { type: mimeType });
-                          const durationSec = Math.round((Date.now() - recordStartTs) / 1000);
+                          const durationSec = Math.round((Date.now() - basicStartTime) / 1000);
                           const reader = new FileReader();
                           reader.readAsDataURL(blob);
                           await new Promise((r) => (reader.onloadend = r));
@@ -1028,7 +1007,25 @@ const MessageInput = ({ onInputFocus }) => {
       </form>
 
       {/* Emoji Picker Modal - keepMounted for faster reopen */}
-      <EmojiPickerModal isOpen={isEmojiOpen} onClose={() => setIsEmojiOpen(false)} onSelectEmoji={(emoji) => setText(prev => (prev || "") + emoji)} triggerRef={emojiBtnRef} keepMounted={false} />
+      <EmojiPickerModal 
+        isOpen={isEmojiOpen} 
+        onClose={() => setIsEmojiOpen(false)} 
+        onSelectEmoji={(emoji) => {
+          // Update both text state AND WYSIWYG editor
+          const newText = (text || "") + emoji;
+          setText(newText);
+          // Update WYSIWYG editor content
+          if (commandsRef.current) {
+            commandsRef.current.setText(newText);
+            // Focus editor after emoji insertion
+            requestAnimationFrame(() => {
+              commandsRef.current?.focus();
+            });
+          }
+        }} 
+        triggerRef={emojiBtnRef} 
+        keepMounted={false} 
+      />
 
       {/* Attachment Type Modal */}
       <AttachmentTypeModal

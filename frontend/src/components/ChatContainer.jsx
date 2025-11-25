@@ -293,10 +293,19 @@ function ChatContainer() {
       setShowBackToBottom(false);
     }
 
-    // Hide new message indicator if user scrolls to bottom
-    if (isNearBottom() && showNewMessageIndicator) {
-      setShowNewMessageIndicator(false);
-      setNewMessageCount(0);
+    // Hide new message indicator and mark as read if user scrolls to bottom
+    if (isNearBottom()) {
+      if (showNewMessageIndicator) {
+        setShowNewMessageIndicator(false);
+        setNewMessageCount(0);
+      }
+      
+      // Auto-mark conversation as read when scrolled to bottom
+      if (selectedUser) {
+        markConversationRead(selectedUser._id);
+      } else if (selectedGroup) {
+        markGroupRead(selectedGroup._id);
+      }
     }
   };
 
@@ -496,29 +505,42 @@ function ChatContainer() {
               </div>
             )}
             
-            {items.map((it, idx) => (
-              it.type === 'date' ? (
-                <DateSeparator key={`date-${idx}`} date={it.date} />
-              ) : it.type === 'unread' ? (
-                <UnreadSeparator key={`unread-${idx}`} count={it.count} />
-              ) : (
-                <MessageItem
-                  key={it.message._id}
-                  ref={it.isTodayFirst ? todayFirstMessageRef : null}
-                  message={{ ...it.message, status: it.message.status || (it.message.isOptimistic ? 'pending' : 'sent') }}
-                  selectedGroup={selectedGroup}
-                  selectedUser={selectedUser}
-                  authUser={authUser}
-                  onEdit={handleEditMessage}
-                  onDelete={handleDeleteMessage}
-                  onUserClick={handleUserClick}
-                  onQuote={handleQuote}
-                  groupPosition={it.groupPosition}
-                  isUnread={it.isUnread}
-                  showNameTag
-                />
-              )
-            ))}
+            {(() => {
+              // Pre-calculate message items and their indices for isNearBottom check
+              const messageItems = items.filter(i => i.type === 'message');
+              const totalMessages = messageItems.length;
+              
+              return items.map((it, idx) => {
+                // Check if this is one of the last 3 message items
+                const messageIndex = it.type === 'message' ? messageItems.findIndex(m => m === it) : -1;
+                const isNearBottom = messageIndex >= 0 && messageIndex >= totalMessages - 3;
+                
+                if (it.type === 'date') {
+                  return <DateSeparator key={`date-${idx}`} date={it.date} />;
+                } else if (it.type === 'unread') {
+                  return <UnreadSeparator key={`unread-${idx}`} count={it.count} />;
+                } else {
+                  return (
+                    <MessageItem
+                      key={it.message._id}
+                      ref={it.isTodayFirst ? todayFirstMessageRef : null}
+                      message={{ ...it.message, status: it.message.status || (it.message.isOptimistic ? 'pending' : 'sent') }}
+                      selectedGroup={selectedGroup}
+                      selectedUser={selectedUser}
+                      authUser={authUser}
+                      onEdit={handleEditMessage}
+                      onDelete={handleDeleteMessage}
+                      onUserClick={handleUserClick}
+                      onQuote={handleQuote}
+                      groupPosition={it.groupPosition}
+                      isUnread={it.isUnread}
+                      isNearBottom={isNearBottom}
+                      showNameTag
+                    />
+                  );
+                }
+              });
+            })()}
             
             {/* 👇 scroll target */}
             <div 

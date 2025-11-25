@@ -375,6 +375,115 @@ io.on("connection", (socket) => {
     }
   });
 
+  // ===== READ RECEIPTS =====
+  
+  // Handle mark as read (single message - legacy support)
+  socket.on("markAsRead", async (data) => {
+    const { messageId, conversationId, isGroup } = data;
+    const userId = socket.userId;
+    
+    try {
+      // Update message in database
+      const message = await Message.findById(messageId);
+      if (!message) return;
+      
+      // Add user to readBy array if not already there
+      if (!message.readBy.includes(userId)) {
+        message.readBy.push(userId);
+        await message.save();
+        
+        // Notify sender that message was read
+        if (isGroup) {
+          // Notify all group members
+          const group = await Group.findById(conversationId);
+          if (group) {
+            group.members.forEach(memberId => {
+              const socketId = getReceiverSocketId(memberId);
+              if (socketId) {
+                io.to(socketId).emit("messageRead", {
+                  messageId,
+                  userId,
+                  conversationId
+                });
+              }
+            });
+          }
+        } else {
+          // Notify the sender in 1:1 chat
+          const senderSocketId = getReceiverSocketId(message.senderId);
+          if (senderSocketId) {
+            io.to(senderSocketId).emit("messageRead", {
+              messageId,
+              userId,
+              conversationId
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error marking message as read:', error);
+    }
+  });
+
+  // Handle batch mark as read (IMPROVED - more efficient)
+  socket.on("markAsReadBatch", async (data) => {
+    const { messageIds, conversationId, isGroup } = data;
+    const userId = socket.userId;
+    
+    if (!Array.isArray(messageIds) || messageIds.length === 0) return;
+    
+    try {
+      // Batch update all messages in one query
+      const result = await Message.updateMany(
+        {
+          _id: { $in: messageIds },
+          readBy: { $ne: userId } // Only update if user not already in readBy
+        },
+        {
+          $addToSet: { readBy: userId } // Add user to readBy array (no duplicates)
+        }
+      );
+
+      console.log(`📖 Batch marked ${result.modifiedCount} messages as read for user ${userId}`);
+
+      // Notify relevant users about batch read
+      if (isGroup) {
+        // Notify all group members
+        const group = await Group.findById(conversationId);
+        if (group) {
+          group.members.forEach(memberId => {
+            const socketId = getReceiverSocketId(memberId);
+            if (socketId) {
+              io.to(socketId).emit("messagesReadBatch", {
+                messageIds,
+                userId,
+                conversationId
+              });
+            }
+          });
+        }
+      } else {
+        // Get unique senders from the messages
+        const messages = await Message.find({ _id: { $in: messageIds } }).select('senderId');
+        const senderIds = [...new Set(messages.map(m => m.senderId.toString()))];
+        
+        // Notify each sender
+        senderIds.forEach(senderId => {
+          const senderSocketId = getReceiverSocketId(senderId);
+          if (senderSocketId) {
+            io.to(senderSocketId).emit("messagesReadBatch", {
+              messageIds,
+              userId,
+              conversationId
+            });
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error batch marking messages as read:', error);
+    }
+  });
+
   // ===== RECORDING INDICATOR EVENTS =====
   
   // Handle recording start

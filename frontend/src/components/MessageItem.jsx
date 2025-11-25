@@ -10,6 +10,7 @@ import AudioPlayer from "./AudioPlayer";
 import ImagePreviewModal from "./ImagePreviewModal";
 import MessageWithLinkPreviews from "./MessageWithLinkPreviews";
 import FormattedMessageText from "./FormattedMessageText";
+import { useMessageReadDetection } from "../hooks/useMessageReadDetection";
 
 // Utility function to detect if text contains only emojis (1-3)
 const isEmojiOnly = (text) => {
@@ -37,13 +38,14 @@ const isEmojiOnly = (text) => {
   return { isEmoji: count >= 1 && count <= 3, count };
 };
 
-const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selectedGroup, groupPosition, isUnread }) => {
+const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selectedGroup, groupPosition, isUnread, isNearBottom = false }) => {
   const { authUser } = useAuthStore();
   const { sendMessage } = useChatStore();
 
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [dropdownPosition, setDropdownPosition] = useState('bottom'); // 'bottom' or 'top'
+  // Default to 'top' if isNearBottom, otherwise 'bottom'
+  const [dropdownPosition, setDropdownPosition] = useState(isNearBottom ? 'top' : 'bottom'); // 'bottom' or 'top'
   const [imageLoading, setImageLoading] = useState(!!message.image);
   const [attachmentLoadingStates, setAttachmentLoadingStates] = useState({});
   const [imageMenuOpen, setImageMenuOpen] = useState(null); // Track which image menu is open
@@ -53,8 +55,20 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [reactions, setReactions] = useState(message.reactions || []);
   const [isReactingToMessage, setIsReactingToMessage] = useState(false);
+  const [reactionAnimation, setReactionAnimation] = useState(null); // { emoji, timestamp }
   const messageRef = useRef(null);
   const dropdownRef = useRef(null);
+
+  // Automatic read detection
+  const conversationId = selectedUser?._id || selectedGroup?._id;
+  const { observeMessage } = useMessageReadDetection(conversationId, !!selectedGroup);
+
+  // Update dropdown position when isNearBottom changes
+  useEffect(() => {
+    if (isNearBottom) {
+      setDropdownPosition('top');
+    }
+  }, [isNearBottom]);
 
   // Update reactions when message changes
   useEffect(() => {
@@ -179,6 +193,20 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
     }
   }, [imageMenuOpen]);
 
+  // Close emoji picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showEmojiPicker && !event.target.closest('.emoji-picker-container')) {
+        setShowEmojiPicker(false);
+      }
+    };
+
+    if (showEmojiPicker) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showEmojiPicker]);
+
   const handleEditClick = (e) => {
     e.stopPropagation();
     setShowContextMenu(false);
@@ -196,11 +224,24 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
   const handleReactToMessage = async (emoji) => {
     try {
       setIsReactingToMessage(true);
+      
+      // Show animation immediately
+      setReactionAnimation({ emoji, timestamp: Date.now() });
+      
+      // Scroll message into view
+      if (messageRef.current) {
+        messageRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      
       const { axiosInstance } = await import("../lib/axios");
       await axiosInstance.post(`/api/messages/${message._id}/react`, { emoji });
       setShowEmojiPicker(false);
+      
+      // Clear animation after 1 second
+      setTimeout(() => setReactionAnimation(null), 1000);
     } catch (error) {
       console.error('Failed to react to message:', error);
+      setReactionAnimation(null);
     } finally {
       setIsReactingToMessage(false);
     }
@@ -340,6 +381,13 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
 
+  // Attach read detection observer
+  useEffect(() => {
+    if (messageRef.current && message) {
+      return observeMessage(messageRef.current, message);
+    }
+  }, [observeMessage, message]);
+
   return (
     <div
       className={`px-2 md:px-4 py-1 ${showAvatar ? 'mt-2' : 'mt-0.5'} relative message-item`}
@@ -396,13 +444,22 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
               }`}
             {...longPressEvents}
           >
+          {/* Reaction Animation Overlay */}
+          {reactionAnimation && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+              <div className="text-6xl animate-ping-once">
+                {reactionAnimation.emoji}
+              </div>
+            </div>
+          )}
+          
           {/* Three-dot menu button - Always visible */}
           <div className="absolute top-1 right-1" ref={dropdownRef}>
             <button
               onClick={(e) => {
                 e.stopPropagation();
 
-                // Detect if message is near bottom of viewport
+                // Detect if message is near bottom of viewport or is one of last 3 messages
                 if (messageRef.current && !showDropdown) {
                   const rect = messageRef.current.getBoundingClientRect();
                   const viewportHeight = window.innerHeight;
@@ -411,10 +468,20 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
                   // Dropdown menu height is approximately 150-200px
                   const dropdownHeight = 200;
 
-                  // If not enough space below for dropdown, show it upward
-                  if (spaceBelow < dropdownHeight) {
+                  console.log('🔽 Dropdown position check:', {
+                    messageId: message._id,
+                    isNearBottom,
+                    spaceBelow,
+                    dropdownHeight,
+                    shouldShowUpward: spaceBelow < dropdownHeight || isNearBottom
+                  });
+
+                  // If not enough space below OR this is one of the last 3 messages, show upward
+                  if (spaceBelow < dropdownHeight || isNearBottom) {
+                    console.log('⬆️ Setting dropdown to TOP');
                     setDropdownPosition('top');
                   } else {
+                    console.log('⬇️ Setting dropdown to BOTTOM');
                     setDropdownPosition('bottom');
                   }
                 }
@@ -432,7 +499,21 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
 
             {/* Dropdown menu */}
             {showDropdown && (
-              <div className={`absolute ${isOwnMessage ? 'right-0' : 'left-0'} ${dropdownPosition === 'top' ? 'bottom-7' : 'top-7'} bg-base-100 border border-base-300 rounded-lg shadow-xl py-1.5 min-w-[120px] z-50 ${dropdownPosition === 'top' ? 'dropdown-menu-animate-up origin-bottom-right' : 'dropdown-menu-animate origin-top-right'}`}>
+              <div className={`absolute ${isOwnMessage ? 'right-0' : 'left-0'} ${dropdownPosition === 'top' ? 'bottom-7' : 'top-7'} bg-base-100 border border-base-300 rounded-lg shadow-xl py-1.5 px-1.5 min-w-[160px] z-50 ${dropdownPosition === 'top' ? 'dropdown-menu-animate-up origin-bottom-right' : 'dropdown-menu-animate origin-top-right'}`}>
+                {/* React option - available for all messages */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowDropdown(false);
+                    // Small delay to ensure dropdown closes before emoji picker opens
+                    setTimeout(() => setShowEmojiPicker(true), 50);
+                  }}
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-base-200 active:bg-base-300 flex items-center gap-2.5 text-base-content transition-colors duration-150 rounded-md"
+                >
+                  <Smile className="w-4 h-4 flex-shrink-0" />
+                  <span className="font-medium">React</span>
+                </button>
+
                 {/* Quote option - available for all messages */}
                 <button
                   onClick={(e) => {
@@ -440,7 +521,7 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
                     setShowDropdown(false);
                     onQuote?.(message);
                   }}
-                  className="w-full px-3 py-2 text-left text-sm hover:bg-base-200 active:bg-base-300 flex items-center gap-2.5 text-base-content transition-all duration-150 rounded-md mx-1"
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-base-200 active:bg-base-300 flex items-center gap-2.5 text-base-content transition-colors duration-150 rounded-md"
                 >
                   <Quote className="w-4 h-4 flex-shrink-0" />
                   <span className="font-medium">Quote</span>
@@ -450,7 +531,7 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
                 {isOwnMessage && message.text && (
                   <button
                     onClick={handleEditClick}
-                    className="w-full px-3 py-2 text-left text-sm hover:bg-base-200 active:bg-base-300 flex items-center gap-2.5 text-base-content transition-all duration-150 rounded-md mx-1"
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-base-200 active:bg-base-300 flex items-center gap-2.5 text-base-content transition-colors duration-150 rounded-md"
                   >
                     <Edit className="w-4 h-4 flex-shrink-0" />
                     <span className="font-medium">Edit</span>
@@ -461,12 +542,32 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
                 {isOwnMessage && (
                   <button
                     onClick={handleDeleteClick}
-                    className="w-full px-3 py-2 text-left text-sm hover:bg-error/10 active:bg-error/20 flex items-center gap-2.5 text-error transition-all duration-150 rounded-md mx-1"
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-error/10 active:bg-error/20 flex items-center gap-2.5 text-error transition-colors duration-150 rounded-md"
                   >
                     <Trash2 className="w-4 h-4 flex-shrink-0" />
                     <span className="font-medium">Delete</span>
                   </button>
                 )}
+              </div>
+            )}
+
+            {/* Floating emoji picker for reactions (from dropdown or add reaction button) */}
+            {showEmojiPicker && !showDropdown && (
+              <div className={`emoji-picker-container absolute ${dropdownPosition === 'top' ? 'bottom-7' : 'top-7'} ${isOwnMessage ? 'right-0' : 'left-0'} bg-base-100 border border-base-300 rounded-lg shadow-xl p-3 z-[60] grid grid-cols-6 gap-2 w-[240px]`}>
+                {['👍', '❤️', '😂', '😢', '😡', '🔥', '👏', '🙏', '✨', '🎉', '😍', '🤔'].map(emoji => (
+                  <button
+                    key={emoji}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleReactToMessage(emoji);
+                    }}
+                    className="text-2xl hover:scale-125 transition-transform duration-150 cursor-pointer p-2 rounded-lg hover:bg-base-200 flex items-center justify-center"
+                    title={emoji}
+                    disabled={isReactingToMessage}
+                  >
+                    {emoji}
+                  </button>
+                ))}
               </div>
             )}
           </div>
@@ -640,13 +741,13 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
                         onClick={(e) => {
                           e.stopPropagation();
                           
-                          // Check positioning before opening
+                          // Check positioning before opening - also consider isNearBottom
                           if (messageRef.current && imageMenuOpen !== 'main') {
                             const rect = messageRef.current.getBoundingClientRect();
                             const viewportHeight = window.innerHeight;
                             const spaceBelow = viewportHeight - rect.bottom;
                             
-                            if (spaceBelow < 200) {
+                            if (spaceBelow < 200 || isNearBottom) {
                               setDropdownPosition('top');
                             } else {
                               setDropdownPosition('bottom');
@@ -1024,45 +1125,24 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
                     {reacts.length > 1 && <span className="text-xs font-medium">{reacts.length}</span>}
                   </button>
                 ))}
-                {/* Add reaction button */}
-                <div className="relative">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowEmojiPicker(!showEmojiPicker);
-                    }}
-                    className={`px-1.5 py-0.5 rounded-full text-sm transition-colors ${
-                      showEmojiPicker
-                        ? 'bg-primary text-primary-content'
-                        : isOwnMessage
-                          ? 'bg-primary-content/10 hover:bg-primary-content/20 text-primary-content/60'
-                          : 'bg-base-200 hover:bg-base-300 text-base-content/60'
-                    }`}
-                    title="Add reaction"
-                    disabled={isReactingToMessage}
-                  >
-                    <Smile className="w-4 h-4" />
-                  </button>
-                  
-                  {/* Quick emoji picker */}
-                  {showEmojiPicker && (
-                    <div className="absolute bottom-full right-0 mb-2 bg-base-100 border border-base-300 rounded-lg shadow-xl p-2 z-50 grid grid-cols-6 gap-1">
-                      {['👍', '❤️', '😂', '😢', '😡', '🔥', '👏', '🙏', '✨', '🎉', '😍', '🤔'].map(emoji => (
-                        <button
-                          key={emoji}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleReactToMessage(emoji);
-                          }}
-                          className="text-xl hover:scale-125 transition-transform duration-150 cursor-pointer"
-                          title={emoji}
-                        >
-                          {emoji}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                {/* Add reaction button - opens the wider emoji picker */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowEmojiPicker(!showEmojiPicker);
+                  }}
+                  className={`px-1.5 py-0.5 rounded-full text-sm transition-colors ${
+                    showEmojiPicker
+                      ? 'bg-primary text-primary-content'
+                      : isOwnMessage
+                        ? 'bg-primary-content/10 hover:bg-primary-content/20 text-primary-content/60'
+                        : 'bg-base-200 hover:bg-base-300 text-base-content/60'
+                  }`}
+                  title="Add reaction"
+                  disabled={isReactingToMessage}
+                >
+                  <Smile className="w-4 h-4" />
+                </button>
               </div>
             )}
           </div>

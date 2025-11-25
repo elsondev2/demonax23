@@ -833,16 +833,13 @@ hin scrollbar styles - nearly invisible */
   transform-origin: bottom;
 }
 
-/* Smooth transitions for dropdown items */
+/* Smooth transitions for dropdown items - simple highlight only */
 .dropdown-menu-animate button,
 .dropdown-menu-animate-up button {
-  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background-color 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.dropdown-menu-animate button:hover,
-.dropdown-menu-animate-up button:hover {
-  transform: translateX(2px);
-}
+/* No transform animation - just background highlight */
 
 /* Back to Bottom button animation */
 @keyframes backToBottomSlideIn {
@@ -858,6 +855,26 @@ hin scrollbar styles - nearly invisible */
 
 .back-to-bottom-animate {
   animation: backToBottomSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Emoji reaction animation */
+@keyframes emojiReactionPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+
+.animate-ping-once {
+  animation: emojiReactionPop 1s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
 /* Shimmer animation for announcement cards */
