@@ -314,8 +314,8 @@ export const endGame = async (req, res) => {
       return res.status(404).json({ message: "Game not found" });
     }
 
-    if (game.status === "completed") {
-      return res.status(400).json({ message: "Game already completed" });
+    if (game.status === "completed" || game.status === "abandoned") {
+      return res.status(400).json({ message: "Game already finished" });
     }
 
     game.status = "completed";
@@ -395,8 +395,8 @@ export const abandonGame = async (req, res) => {
       return res.status(404).json({ message: "Game not found" });
     }
 
-    if (game.status === "completed") {
-      return res.status(400).json({ message: "Game already completed" });
+    if (game.status === "completed" || game.status === "abandoned") {
+      return res.status(400).json({ message: "Game already finished" });
     }
 
     // Check if user is in the game

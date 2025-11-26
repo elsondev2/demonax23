@@ -10,6 +10,7 @@ import Avatar from '../components/Avatar';
 import { useAuthStore } from '../store/useAuthStore';
 import ResizableSidebar from '../components/ResizableSidebar';
 import ChatsView from '../components/ChatsView';
+import { useCheckersGame } from '../hooks/useCheckersGame';
 import '../styles/checkers-animations.css';
 
 export default function CheckersGamePage() {
@@ -29,6 +30,18 @@ export default function CheckersGamePage() {
   const [liveMatches, setLiveMatches] = useState([]);
   const [spectators, setSpectators] = useState([]);
   const [isSpectating, setIsSpectating] = useState(false);
+
+  // Use the custom hook
+  const {
+    board,
+    turn,
+    selectedPos,
+    validMoves,
+    winner,
+    lastMove,
+    handleSquareClick,
+    applyRemoteMove
+  } = useCheckersGame();
 
   const fetchProfile = useCallback(async () => {
     if (!authUser) return;
@@ -69,6 +82,31 @@ export default function CheckersGamePage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlGameId, socket]);
+
+  // Sync hook with game state when game is loaded
+  useEffect(() => {
+    if (game && game.board) {
+      // Only apply if the board is different to avoid loops, 
+      // but applyRemoteMove is cheap and we want to ensure sync.
+      // However, we should be careful not to overwrite local optimistic moves if we are ahead?
+      // For now, trust the backend/game state on load.
+      applyRemoteMove(game.board, game.currentPlayer);
+    }
+  }, [game?.board, game?.currentPlayer]); // Be careful with dependencies
+
+  // Watch for local moves and send them
+  useEffect(() => {
+    if (lastMove && game) {
+      // Calculate scores locally to send
+      const scores = {
+        red: board.flat().filter(p => p && p.player === 'red').length,
+        black: board.flat().filter(p => p && p.player === 'black').length
+      };
+
+      // Send move
+      handleMoveSubmit(board, turn, scores);
+    }
+  }, [lastMove]);
 
   const loadGame = async (gameId) => {
     try {
@@ -153,12 +191,18 @@ export default function CheckersGamePage() {
 
       const handleGameMove = (data) => {
         if (data.gameId === game._id) {
+          // Update game state
           setGame(prev => ({
             ...prev,
             board: data.board,
             currentPlayer: data.currentPlayer,
             players: prev.players.map(p => ({ ...p, score: data.scores[p.color] }))
           }));
+
+          // Update hook state if it wasn't us who moved (or to ensure sync)
+          if (data.movedBy !== authUser._id) {
+            applyRemoteMove(data.board, data.currentPlayer);
+          }
         }
       };
 
@@ -290,7 +334,7 @@ export default function CheckersGamePage() {
     }
   };
 
-  const handleMove = async (newBoard, nextPlayer, scores) => {
+  const handleMoveSubmit = async (newBoard, nextPlayer, scores) => {
     try {
       const moveData = {
         board: newBoard,
@@ -353,8 +397,14 @@ export default function CheckersGamePage() {
       await axiosInstance.post(`/api/checkers/games/${game._id}/abandon`);
       toast.success('Game abandoned');
       handleNewGame();
-    } catch {
-      toast.error('Failed to abandon game');
+    } catch (error) {
+      console.error('Abandon error:', error.response?.data);
+      const errorMsg = error.response?.data?.message || 'Failed to abandon game';
+      toast.error(errorMsg);
+      // If the game is already finished, just navigate away
+      if (error.response?.status === 400 && error.response?.data?.message?.includes('finished')) {
+        handleNewGame();
+      }
     }
   };
 
@@ -413,8 +463,15 @@ export default function CheckersGamePage() {
             handleNewGame={handleNewGame}
             handleSelectPlayer={handleSelectPlayer}
             handleSpectateGame={handleSpectateGame}
-            handleMove={handleMove}
+            handleMove={handleMoveSubmit}
             handleAbandon={handleAbandon}
+
+            // Pass hook state to content
+            board={board}
+            validMoves={validMoves}
+            selectedPos={selectedPos}
+            lastMove={lastMove}
+            onSquareClick={handleSquareClick}
           />
         </div>
       </div>
@@ -440,8 +497,15 @@ export default function CheckersGamePage() {
           handleNewGame={handleNewGame}
           handleSelectPlayer={handleSelectPlayer}
           handleSpectateGame={handleSpectateGame}
-          handleMove={handleMove}
+          handleMove={handleMoveSubmit}
           handleAbandon={handleAbandon}
+
+          // Pass hook state to content
+          board={board}
+          validMoves={validMoves}
+          selectedPos={selectedPos}
+          lastMove={lastMove}
+          onSquareClick={handleSquareClick}
         />
       </div>
     </div>
@@ -466,10 +530,16 @@ function CheckersContent({
   handleSelectDifficulty,
   handleNewGame,
   handleSelectPlayer,
-  handleSpectateGame,
-  handleMove,
-  handleAbandon
+  handleAbandon,
+  // New props
+  board,
+  validMoves,
+  selectedPos,
+  lastMove,
+  onSquareClick
 }) {
+  const myColor = game?.players?.find(p => p.userId._id === authUser?._id)?.color;
+
   return (
     <div className="w-full h-full flex flex-col bg-base-100 overflow-hidden">
       <div className="flex-shrink-0 border-b border-base-300 bg-base-200">
@@ -564,7 +634,7 @@ function CheckersContent({
         )}
 
         {gameState === 'difficulty' && (
-          <DifficultySelector onSelect={handleSelectDifficulty} onBack={() => {}} />
+          <DifficultySelector onSelect={handleSelectDifficulty} onBack={() => { }} />
         )}
 
         {gameState === 'lobby' && (
@@ -577,7 +647,7 @@ function CheckersContent({
                 </h2>
                 <p className="text-sm text-base-content/60">Watch ongoing games</p>
               </div>
-              <button onClick={() => {}} className="btn btn-ghost btn-sm">
+              <button onClick={() => { }} className="btn btn-ghost btn-sm">
                 <ArrowLeft className="w-4 h-4" /> Back
               </button>
             </div>
@@ -586,7 +656,7 @@ function CheckersContent({
               <div className="text-center py-12">
                 <Gamepad2 className="w-16 h-16 mx-auto mb-4 text-base-content/30" />
                 <p className="text-base-content/70">No live matches at the moment</p>
-                <button onClick={() => {}} className="btn btn-primary mt-4">Start a Game</button>
+                <button onClick={() => { }} className="btn btn-primary mt-4">Start a Game</button>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -664,12 +734,14 @@ function CheckersContent({
             </div>
 
             <CheckersBoard
-              board={game.board}
-              onMove={handleMove}
-              currentPlayer={game.currentPlayer}
+              board={board || game.board}
+              validMoves={validMoves}
+              selectedPos={selectedPos}
+              lastMove={lastMove}
+              onSquareClick={onSquareClick}
               isMyTurn={isMyTurn}
-              gameType={game.gameType}
               disabled={isSpectating}
+              playerColor={myColor}
             />
 
             {/* Spectators Section */}
@@ -706,7 +778,7 @@ function CheckersContent({
                         const myPlayer = game.players.find(p => p.userId._id === authUser._id);
                         const isWinner = myPlayer && myPlayer.color === game.winner;
                         return isWinner ? 'You Won!' : 'You Lost';
-                      })()()}
+                      })()}
                     </p>
                     {game.gameType === 'arena' && game.pointsBet > 0 && (
                       <p className={`text-lg font-bold ${(() => {
@@ -717,7 +789,7 @@ function CheckersContent({
                           const myPlayer = game.players.find(p => p.userId._id === authUser._id);
                           const isWinner = myPlayer && myPlayer.color === game.winner;
                           return isWinner ? `+${game.pointsBet} Scones` : `-${game.pointsBet} Scones`;
-                        })()()}
+                        })()}
                       </p>
                     )}
                   </div>

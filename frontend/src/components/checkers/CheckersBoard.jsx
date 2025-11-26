@@ -1,199 +1,109 @@
-import { useState, useEffect } from 'react';
 import { Eye } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
-const CheckersBoard = ({ board, onMove, currentPlayer, isMyTurn, gameType, disabled = false }) => {
-  const [selectedPiece, setSelectedPiece] = useState(null);
-  const [validMoves, setValidMoves] = useState([]);
-  const [animatingPiece, setAnimatingPiece] = useState(null);
+const CheckersBoard = ({
+  board,
+  validMoves = [],
+  selectedPos,
+  lastMove,
+  onSquareClick,
+  isMyTurn,
+  disabled = false,
+  playerColor // 'red' or 'black' (the user's color)
+}) => {
 
-  useEffect(() => {
-    if (selectedPiece) {
-      const moves = getValidMoves(selectedPiece.row, selectedPiece.col);
-      setValidMoves(moves);
-    } else {
-      setValidMoves([]);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPiece, board]);
-
-  const getValidMoves = (row, col) => {
-    const piece = board[row][col];
-    if (!piece || piece.player !== currentPlayer) return [];
-
-    const moves = [];
-    const direction = piece.player === 'red' ? -1 : 1;
-    const isKing = piece.type === 'king';
-
-    // Regular moves
-    const checkMove = (newRow, newCol) => {
-      if (newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8) {
-        if (!board[newRow][newCol]) {
-          moves.push({ row: newRow, col: newCol, type: 'move' });
-        }
-      }
-    };
-
-    // Check forward moves
-    checkMove(row + direction, col - 1);
-    checkMove(row + direction, col + 1);
-
-    // Kings can move backward
-    if (isKing) {
-      checkMove(row - direction, col - 1);
-      checkMove(row - direction, col + 1);
-    }
-
-    // Check for jumps
-    const checkJump = (newRow, newCol, jumpRow, jumpCol) => {
-      if (newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8) {
-        const jumpedPiece = board[jumpRow][jumpCol];
-        if (jumpedPiece && jumpedPiece.player !== piece.player && !board[newRow][newCol]) {
-          moves.push({ row: newRow, col: newCol, type: 'jump', jumpedRow: jumpRow, jumpedCol: jumpCol });
-        }
-      }
-    };
-
-    // Forward jumps
-    checkJump(row + direction * 2, col - 2, row + direction, col - 1);
-    checkJump(row + direction * 2, col + 2, row + direction, col + 1);
-
-    // Backward jumps for kings
-    if (isKing) {
-      checkJump(row - direction * 2, col - 2, row - direction, col - 1);
-      checkJump(row - direction * 2, col + 2, row - direction, col + 1);
-    }
-
-    return moves;
-  };
-
-  const handleSquareClick = (row, col) => {
-    if (disabled) return;
-    if (!isMyTurn && gameType !== 'local' && gameType !== 'ai') return;
-
-    const piece = board[row][col];
-
-    // If clicking on own piece, select it
-    if (piece && piece.player === currentPlayer) {
-      setSelectedPiece({ row, col });
-      return;
-    }
-
-    // If a piece is selected and clicking on valid move
-    if (selectedPiece) {
-      const move = validMoves.find(m => m.row === row && m.col === col);
-      if (move) {
-        // Animate the move
-        setAnimatingPiece({ from: selectedPiece, to: { row, col } });
-        setTimeout(() => {
-          makeMove(move);
-          setAnimatingPiece(null);
-        }, 300);
-      }
-      setSelectedPiece(null);
-    }
-  };
-
-  const makeMove = (move) => {
-    const newBoard = board.map(row => row.map(cell => cell ? { ...cell } : null));
-    const piece = newBoard[selectedPiece.row][selectedPiece.col];
-
-    // Move piece
-    newBoard[move.row][move.col] = piece;
-    newBoard[selectedPiece.row][selectedPiece.col] = null;
-
-    // Remove jumped piece
-    if (move.type === 'jump') {
-      newBoard[move.jumpedRow][move.jumpedCol] = null;
-    }
-
-    // Promote to king
-    if ((piece.player === 'red' && move.row === 0) || (piece.player === 'black' && move.row === 7)) {
-      newBoard[move.row][move.col].type = 'king';
-    }
-
-    // Calculate scores
-    const scores = {
-      red: newBoard.flat().filter(p => p && p.player === 'red').length,
-      black: newBoard.flat().filter(p => p && p.player === 'black').length
-    };
-
-    // Switch player
-    const nextPlayer = currentPlayer === 'red' ? 'black' : 'red';
-
-    onMove(newBoard, nextPlayer, scores);
-  };
-
-  const isValidMove = (row, col) => {
-    return validMoves.some(m => m.row === row && m.col === col);
+  const getSquareStatus = (row, col) => {
+    const isSelected = selectedPos?.row === row && selectedPos?.col === col;
+    const isValid = validMoves.some(m => m.to.row === row && m.to.col === col);
+    const isLastMoveFrom = lastMove?.from.row === row && lastMove?.from.col === col;
+    const isLastMoveTo = lastMove?.to.row === row && lastMove?.to.col === col;
+    return { isSelected, isValid, isLastMoveFrom, isLastMoveTo };
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto">
-      <div className="aspect-square w-full bg-base-300 rounded-lg overflow-hidden shadow-2xl relative">
-        <div className="grid grid-cols-8 h-full">
+    <div className="w-full max-w-2xl mx-auto p-4">
+      <div className="relative aspect-square w-full bg-[#2e2e2e] rounded-lg shadow-2xl border-8 border-[#3e3e3e] overflow-hidden">
+        <div className="grid grid-cols-8 h-full w-full">
           {board.map((row, rowIndex) =>
             row.map((cell, colIndex) => {
-              const isLight = (rowIndex + colIndex) % 2 === 0;
-              const isSelected = selectedPiece?.row === rowIndex && selectedPiece?.col === colIndex;
-              const isValid = isValidMove(rowIndex, colIndex);
-              const isFromSquare = animatingPiece?.from.row === rowIndex && animatingPiece?.from.col === colIndex;
-              const isToSquare = animatingPiece?.to.row === rowIndex && animatingPiece?.to.col === colIndex;
+              const isDark = (rowIndex + colIndex) % 2 === 1;
+              const { isSelected, isValid, isLastMoveFrom, isLastMoveTo } = getSquareStatus(rowIndex, colIndex);
 
               return (
                 <div
                   key={`${rowIndex}-${colIndex}`}
-                  onClick={() => handleSquareClick(rowIndex, colIndex)}
+                  onClick={() => onSquareClick(rowIndex, colIndex)}
                   className={`
-                    relative flex items-center justify-center transition-all duration-200 overflow-hidden
-                    ${isLight ? 'bg-amber-100' : 'bg-amber-800'}
-                    ${isSelected ? 'border-4 border-primary' : ''}
-                    ${isValid ? 'shadow-inset shadow-success' : ''}
-                    ${disabled ? 'cursor-not-allowed' : 'cursor-pointer hover:brightness-110'}
+                    relative flex items-center justify-center
+                    ${isDark ? 'bg-[#769656]' : 'bg-[#eeeed2]'}
+                    ${isSelected ? 'ring-inset ring-4 ring-yellow-400' : ''}
+                    ${isLastMoveFrom || isLastMoveTo ? 'bg-opacity-80 bg-yellow-200/50' : ''}
+                    ${isValid ? 'cursor-pointer' : ''}
+                    ${!isDark ? 'pointer-events-none' : ''} 
                   `}
                 >
-                  {cell && !isFromSquare && (
-                                          <div
-                                            className={`
-                                              w-[70%] h-[70%] rounded-full flex items-center justify-center
-                                              shadow-lg transition-all duration-200
-                                              ${cell.player === 'red' ? 'bg-gradient-to-br from-red-500 to-red-700' : 'bg-gradient-to-br from-gray-800 to-black'}
-                                              ${cell.type === 'king' ? 'ring-4 ring-yellow-400' : ''}
-                                              ${!disabled && 'hover:scale-110'}
-                                            `}
-                                          >                      {cell.type === 'king' && (
-                        <span className="text-yellow-400 text-xl md:text-2xl font-bold">♔</span>
-                      )}
-                    </div>
+                  {/* Valid Move Indicator */}
+                  {isValid && (
+                    <div className="absolute w-4 h-4 rounded-full bg-green-500/50 z-10 animate-pulse" />
                   )}
-                  {isToSquare && animatingPiece && (
-                    <div
-                      className={`
-                        w-[70%] h-[70%] rounded-full flex items-center justify-center
-                        shadow-lg
-                        ${board[animatingPiece.from.row][animatingPiece.from.col]?.player === 'red' ? 'bg-gradient-to-br from-red-500 to-red-700' : 'bg-gradient-to-br from-gray-800 to-black'}
-                        ${board[animatingPiece.from.row][animatingPiece.from.col]?.type === 'king' ? 'ring-4 ring-yellow-400' : ''}
-                        animate-[slideIn_0.4s_cubic-bezier(0.34,1.56,0.64,1)]
-                      `}
-                    >
-                      {board[animatingPiece.from.row][animatingPiece.from.col]?.type === 'king' && (
-                        <span className="text-yellow-400 text-xl md:text-2xl font-bold">♔</span>
-                      )}
-                    </div>
+
+                  {/* Piece */}
+                  <AnimatePresence mode='popLayout'>
+                    {cell && (
+                      <motion.div
+                        layoutId={`piece-${rowIndex}-${colIndex}`} // This might need a stable ID if pieces move, but for now simple layout animation
+                        initial={{ scale: 0.8, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0.8, opacity: 0 }}
+                        transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                        className={`
+                          w-[80%] h-[80%] rounded-full shadow-[0_4px_6px_rgba(0,0,0,0.4),inset_0_-4px_4px_rgba(0,0,0,0.2),inset_0_4px_4px_rgba(255,255,255,0.3)]
+                          flex items-center justify-center relative z-20
+                          ${cell.player === 'red'
+                            ? 'bg-gradient-to-br from-red-500 to-red-700 border-2 border-red-800'
+                            : 'bg-gradient-to-br from-slate-700 to-black border-2 border-black'}
+                          ${cell.type === 'king' ? 'ring-2 ring-yellow-400' : ''}
+                          ${!disabled && isMyTurn && cell.player === playerColor ? 'hover:scale-105 cursor-pointer' : ''}
+                        `}
+                      >
+                        {/* Inner detail for 3D effect */}
+                        <div className="w-[70%] h-[70%] rounded-full border-2 border-white/10" />
+
+                        {cell.type === 'king' && (
+                          <motion.span
+                            initial={{ scale: 0, rotate: -180 }}
+                            animate={{ scale: 1, rotate: 0 }}
+                            className="absolute text-yellow-400 text-2xl font-bold drop-shadow-md"
+                          >
+                            ♔
+                          </motion.span>
+                        )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Coordinate labels (optional, for aesthetics) */}
+                  {colIndex === 0 && isDark && (
+                    <span className="absolute left-0.5 top-0.5 text-[10px] font-bold opacity-50 text-white mix-blend-difference">
+                      {8 - rowIndex}
+                    </span>
                   )}
-                  {/* {isValid && !cell && (
-                    <div className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-success opacity-70 animate-pulse"></div>
-                  )} */}
+                  {rowIndex === 7 && isDark && (
+                    <span className="absolute right-0.5 bottom-0 text-[10px] font-bold opacity-50 text-white mix-blend-difference">
+                      {String.fromCharCode(97 + colIndex)}
+                    </span>
+                  )}
                 </div>
               );
             })
           )}
         </div>
-        
-        {/* Spectator overlay */}
+
+        {/* Spectator Overlay */}
         {disabled && (
-          <div className="absolute inset-0 bg-black/10 pointer-events-none flex items-center justify-center">
-            <div className="bg-base-200/90 px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2">
-              <Eye size={16} /> Spectating
+          <div className="absolute inset-0 bg-black/20 pointer-events-none flex items-center justify-center z-30">
+            <div className="bg-black/60 backdrop-blur-sm px-6 py-3 rounded-full text-white font-semibold flex items-center gap-3 shadow-xl border border-white/10">
+              <Eye size={20} /> Spectating Mode
             </div>
           </div>
         )}

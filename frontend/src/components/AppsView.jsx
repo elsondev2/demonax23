@@ -168,6 +168,8 @@ export default function AppsView() {
         if (app.status === 'active') {
             if (app.id === 'checkers') {
                 navigate('/games/checkers');
+            } else if (app.id === 'piano') {
+                navigate('/piano');
             } else if (app.url) {
                 window.open(app.url, '_blank');
             }

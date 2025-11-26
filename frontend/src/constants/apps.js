@@ -1,4 +1,4 @@
-import { Music, Youtube, MessageSquare, Gamepad2 } from 'lucide-react';
+import { Music, Youtube, MessageSquare, Gamepad2, Piano } from 'lucide-react';
 
 // Template apps - ready for integration
 export const TEMPLATE_APPS = [
@@ -10,6 +10,15 @@ export const TEMPLATE_APPS = [
         status: 'active',
         url: '/games/checkers',
         category: 'Games'
+    },
+    {
+        id: 'piano',
+        name: 'Piano Room',
+        icon: Piano,
+        description: 'Play piano & stream live',
+        status: 'active',
+        url: '/piano',
+        category: 'Music'
     },
     {
         id: 'spotify',

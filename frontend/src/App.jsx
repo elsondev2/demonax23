@@ -12,11 +12,13 @@ import Eulapage from "./pages/Eulapage";
 import LandingPage from "./pages/LandingPage";
 import AuthChoicePage from "./pages/AuthChoicePage";
 import CheckersGamePage from "./pages/CheckersGamePage";
+import PianoPage from "./pages/PianoPage";
 import { useAuthStore } from "./store/useAuthStore";
 import { useEffect } from "react";
 import PageLoader from "./components/PageLoader";
 import "./styles/formatted-message.css";
 import "./styles/link-embeds.css";
+import "./styles/piano.css";
 import ThemeProvider from "./components/ThemeProvider";
 import AppearanceModal from "./components/AppearanceModal";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -157,6 +159,11 @@ function AppContent() {
           <Route path="/games/checkers/:gameId" element={
             <ProtectedRoute>
               <CheckersGamePage />
+            </ProtectedRoute>
+          } />
+          <Route path="/piano" element={
+            <ProtectedRoute>
+              <PianoPage />
             </ProtectedRoute>
           } />
           <Route path="/payment-instructions" element={

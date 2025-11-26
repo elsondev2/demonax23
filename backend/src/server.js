@@ -23,6 +23,7 @@ import linkPreviewRoutes from "./routes/linkPreview.route.js";
 import paymentRoutes from "./routes/payment.route.js";
 import agoraRoutes from "./routes/agora.route.js";
 import checkersRoutes from "./routes/checkers.route.js";
+import pianoRoutes from "./routes/piano.route.js";
 import voteRoutes from "./routes/vote.route.js";
 import { app, server } from "./lib/socket.js";
 import { startStatusCleanupJob } from "./lib/statusCleanup.js";
@@ -87,6 +88,7 @@ app.use("/api/link", linkPreviewRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/agora", agoraRoutes);
 app.use("/api/checkers", checkersRoutes);
+app.use("/api/piano", pianoRoutes);
 app.use("/api/votes", voteRoutes);
 
 if (ENV.NODE_ENV === "production") {
