@@ -53,12 +53,19 @@ const TypingIndicator = ({ typingUsers = [], isInline = false }) => {
   // Don't render anything if no one is typing
   if (displayUsers.length === 0) return null;
 
-  // Generate display text based on number of users
-  const displayText = displayUsers.length === 1
-    ? `${displayUsers[0]} is typing`
-    : displayUsers.length === 2
-    ? `${displayUsers[0]} and ${displayUsers[1]} are typing`
-    : `${displayUsers[0]} and ${displayUsers.length - 1} others are typing`;
+  // Generate display text based on number of users (works for both 1-on-1 and groups)
+  const displayText = (() => {
+    if (displayUsers.length === 1) {
+      return `${displayUsers[0]} is typing`;
+    } else if (displayUsers.length === 2) {
+      return `${displayUsers[0]} and ${displayUsers[1]} are typing`;
+    } else if (displayUsers.length === 3) {
+      return `${displayUsers[0]}, ${displayUsers[1]}, and ${displayUsers[2]} are typing`;
+    } else {
+      // More than 3 users
+      return `${displayUsers[0]}, ${displayUsers[1]}, ${displayUsers[2]}, and ${displayUsers.length - 3} others are typing`;
+    }
+  })();
 
   // Inline version for sidebar (compact)
   if (isInline) {

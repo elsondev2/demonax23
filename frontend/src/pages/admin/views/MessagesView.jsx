@@ -3,6 +3,7 @@ import { Search, Edit2, Trash2, X, MessageSquare, Camera, FileText } from "lucid
 import { axiosInstance } from "../../../lib/axios";
 import toast from "react-hot-toast";
 import { exportCSV } from "../utils";
+import PremiumBadge from "../../../components/PremiumBadge";
 
 export default function MessagesView({ messagesSubTab, setMessagesSubTab, messages, conversations, selectedConversation, threadMessages, onSelectConversation, setEditModal, setDeleteModal, q, setQ, page, setPage, perPage, setPerPage, convPage, setConvPage, convPerPage, setConvPerPage, dmThreadQ, setDmThreadQ, loading }) {
   const [selectedMessages, setSelectedMessages] = useState([]);
@@ -235,10 +236,22 @@ export default function MessagesView({ messagesSubTab, setMessagesSubTab, messag
                         </div>
                       </td>
                       <td className={`font-medium ${!msg.senderId?.fullName ? 'italic text-base-content/50' : ''}`}>
-                        {msg.senderId?.fullName || 'Deleted User'}
+                        <div className="flex items-center gap-1">
+                          <span className="truncate">{msg.senderId?.fullName || 'Deleted User'}</span>
+                          <PremiumBadge 
+                            tier={msg.senderId?.subscriptionPlan || msg.senderId?.premiumTier} 
+                            size="xs" 
+                          />
+                        </div>
                       </td>
                       <td className={`font-medium ${!msg.receiverId?.fullName ? 'italic text-base-content/50' : ''}`}>
-                        {msg.receiverId?.fullName || 'Deleted User'}
+                        <div className="flex items-center gap-1">
+                          <span className="truncate">{msg.receiverId?.fullName || 'Deleted User'}</span>
+                          <PremiumBadge 
+                            tier={msg.receiverId?.subscriptionPlan || msg.receiverId?.premiumTier} 
+                            size="xs" 
+                          />
+                        </div>
                       </td>
                       <td className="max-w-md">
                         <div className="truncate">

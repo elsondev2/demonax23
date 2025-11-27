@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Image, Trash2 } from "lucide-react";
 import { exportCSV } from "../utils";
 import { StatusDetailsModal } from "../components/modals";
+import PremiumBadge from "../../../components/PremiumBadge";
 
 export default function StatusesView({ statuses, setDeleteModal }) {
   const [selectedStatus, setSelectedStatus] = useState(null);
@@ -73,8 +74,12 @@ export default function StatusesView({ statuses, setDeleteModal }) {
                     </div>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className={`font-semibold text-sm truncate ${!status.userId?.fullName ? 'italic text-base-content/50' : ''}`}>
-                      {status.userId?.fullName || 'Deleted User'}
+                    <h3 className={`font-semibold text-sm truncate flex items-center gap-1 ${!status.userId?.fullName ? 'italic text-base-content/50' : ''}`}>
+                      <span className="truncate">{status.userId?.fullName || 'Deleted User'}</span>
+                      <PremiumBadge 
+                        tier={status.userId?.subscriptionPlan || status.userId?.premiumTier} 
+                        size="xs" 
+                      />
                     </h3>
                   </div>
                   <div className={`badge badge-sm ${status.mediaType === 'image' ? 'badge-secondary' :

@@ -87,6 +87,13 @@ const PaymentNotificationModal = () => {
             </div>
           </div>
 
+          <div className="alert alert-success">
+            <div className="text-sm">
+              🎅 <strong>Christmas Activation Promise!</strong> For those who pay before Christmas, your accounts will be 
+              <strong> automatically activated on Christmas Day (December 25th)</strong>. Don't worry - we've got you covered! 🎁
+            </div>
+          </div>
+
           <div className="space-y-2">
             <h3 className="font-bold">What happens next?</h3>
             <ul className="text-sm space-y-1 list-disc list-inside">

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Search, Download, FileText, Trash2, Heart, MessageCircle } from "lucide-react";
 import { exportCSV } from "../utils";
 import { PostDetailsModal, CommentsModal } from "../components/modals";
+import PremiumBadge from "../../../components/PremiumBadge";
 
 export default function PostsView({ posts, q, setQ, page, setPage, perPage, setPerPage, total, visibility, setVisibility, onRefresh, loading, setDeleteModal }) {
   const [selectedPost, setSelectedPost] = useState(null);
@@ -157,7 +158,13 @@ export default function PostsView({ posts, q, setQ, page, setPage, perPage, setP
                     </div>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm truncate">{post.postedBy?.fullName}</div>
+                    <div className="font-medium text-sm truncate flex items-center gap-1">
+                      <span className="truncate">{post.postedBy?.fullName}</span>
+                      <PremiumBadge 
+                        tier={post.postedBy?.subscriptionPlan || post.postedBy?.premiumTier} 
+                        size="xs" 
+                      />
+                    </div>
                     <div className="text-xs text-base-content/60">
                       {new Date(post.createdAt).toLocaleDateString()}
                     </div>

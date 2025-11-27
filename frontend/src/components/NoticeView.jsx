@@ -200,12 +200,6 @@ export default function NoticeView() {
                     </a>
                   </li>
                   <li>
-                    <a onClick={() => setActiveTab('network')} className="flex items-center gap-2">
-                      <UserCheck className="w-4 h-4" />
-                      My Network
-                    </a>
-                  </li>
-                  <li>
                     <a onClick={() => navigate('/apps')} className="flex items-center gap-2">
                       <Grid3x3 className="w-4 h-4" />
                       App Integrations
@@ -236,6 +230,13 @@ export default function NoticeView() {
               >
                 <Users className="w-4 h-4 mr-2" />
                 <span className="hidden sm:inline">Rankings</span>
+              </a>
+              <a
+                className={`tab flex-1 ${activeTab === 'network' ? 'tab-active' : ''}`}
+                onClick={() => setActiveTab('network')}
+              >
+                <UserCheck className="w-4 h-4 mr-2" />
+                <span className="hidden sm:inline">My Network</span>
               </a>
             </div>
           </div>

@@ -69,8 +69,21 @@ const PaymentInstructionsPage = () => {
         <div className="alert alert-warning shadow-lg">
           <FaMoneyBillWave size={24} />
           <div>
-            <h3 className="font-bold">Free Trial Ending Soon!</h3>
-            <div className="text-sm">Your free access ends on <strong>November 28, 2025</strong>. Subscribe now to continue using Demonax.</div>
+            <h3 className="font-bold">🎄 Free Trial Extended Until Christmas!</h3>
+            <div className="text-sm">Your free access ends on <strong>December 25, 2025</strong>. Subscribe now to continue using Demonax.</div>
+          </div>
+        </div>
+
+        {/* Christmas Activation Promise */}
+        <div className="alert alert-success shadow-lg">
+          <div className="text-2xl">🎅</div>
+          <div>
+            <h3 className="font-bold">Christmas Activation Promise!</h3>
+            <div className="text-sm">
+              <strong>Don't worry!</strong> For those who pay before Christmas, your accounts will be 
+              <strong> automatically activated on Christmas Day (December 25th, 2025)</strong>. 
+              We'll verify all payments and activate your subscription as our Christmas gift to you! 🎁
+            </div>
           </div>
         </div>
 

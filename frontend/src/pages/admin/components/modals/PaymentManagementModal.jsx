@@ -28,12 +28,23 @@ export default function PaymentManagementModal({ user: initialUser, onClose, onU
   
   // Notes state
   const [paymentNotes, setPaymentNotes] = useState(user.paymentNotes || '');
+  
+  // Edit days modal state
+  const [showEditDaysModal, setShowEditDaysModal] = useState(false);
+  const [newDaysRemaining, setNewDaysRemaining] = useState('');
 
   // Update local user state when operations complete
   useEffect(() => {
     setUser(initialUser);
     setEditSupporterTier(initialUser.supporterTier || 'bronze');
     setEditTotalDonated(initialUser.totalDonated?.toString() || '0');
+    
+    // Calculate days remaining
+    if (initialUser.premiumEndDate && initialUser.premiumTier !== 'lifetime') {
+      const days = Math.ceil((new Date(initialUser.premiumEndDate) - new Date()) / (1000 * 60 * 60 * 24));
+      const daysValue = days > 0 ? days : 0;
+      setNewDaysRemaining(daysValue.toString());
+    }
   }, [initialUser]);
 
   // Supporter tier templates with smart amounts
@@ -396,6 +407,42 @@ export default function PaymentManagementModal({ user: initialUser, onClose, onU
     }
   };
 
+  const handleUpdateDaysRemaining = async () => {
+    const days = parseInt(newDaysRemaining);
+    
+    if (isNaN(days) || days < 0) {
+      toast.error('Please enter a valid number of days');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Calculate new end date based on days from now
+      const newEndDate = new Date();
+      newEndDate.setDate(newEndDate.getDate() + days);
+      
+      const response = await axiosInstance.put(`/api/payments/${user._id}/premium/set-end-date`, {
+        endDate: newEndDate.toISOString()
+      });
+      
+      // Update local state immediately
+      setUser(prev => ({
+        ...prev,
+        premiumEndDate: response.data.user.premiumEndDate,
+        paymentStatus: days > 0 ? 'active' : 'expired'
+      }));
+      
+      toast.success(`Subscription updated to ${days} days remaining`);
+      setShowEditDaysModal(false);
+      onUpdate();
+    } catch (error) {
+      console.error('Error updating days:', error);
+      toast.error(error.response?.data?.message || 'Failed to update subscription days');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const formatDate = (date) => {
     if (!date) return 'N/A';
     return new Date(date).toLocaleDateString();
@@ -524,17 +571,32 @@ export default function PaymentManagementModal({ user: initialUser, onClose, onU
               {/* Current Status */}
               {user.isPremium && (
                 <div className="alert alert-info mb-4">
-                  <div className="flex-col items-start w-full">
-                    <div className="font-semibold">Current Subscription Status</div>
-                    <div className="text-sm mt-1">
-                      <div>Plan: <span className="font-medium capitalize">{user.subscriptionPlan || user.premiumTier}</span></div>
-                      {user.premiumStartDate && (
-                        <div>Started: {formatDate(user.premiumStartDate)}</div>
-                      )}
-                      {user.premiumEndDate && (
-                        <div>Expires: {formatDate(user.premiumEndDate)}</div>
-                      )}
+                  <div className="flex items-start justify-between w-full gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold mb-2">Current Subscription Status</div>
+                      <div className="text-sm space-y-1">
+                        <div>Plan: <span className="font-medium capitalize">{user.subscriptionPlan || user.premiumTier}</span></div>
+                        {user.premiumStartDate && (
+                          <div>Started: {formatDate(user.premiumStartDate)}</div>
+                        )}
+                        {user.premiumEndDate && (
+                          <div>Expires: {formatDate(user.premiumEndDate)}</div>
+                        )}
+                        {daysRemaining !== null && (
+                          <div className={`font-semibold ${daysRemaining <= 7 ? 'text-warning' : 'text-success'}`}>
+                            {daysRemaining} days remaining
+                          </div>
+                        )}
+                      </div>
                     </div>
+                    <button
+                      className="btn btn-sm btn-ghost gap-1 flex-shrink-0"
+                      onClick={() => setShowEditDaysModal(true)}
+                      disabled={loading}
+                    >
+                      <Clock className="w-4 h-4" />
+                      Edit Days
+                    </button>
                   </div>
                 </div>
               )}
@@ -897,6 +959,95 @@ export default function PaymentManagementModal({ user: initialUser, onClose, onU
           </div>
         </div>
       </div>
+
+      {/* Edit Days Remaining Modal */}
+      {showEditDaysModal && (
+        <div className="modal modal-open z-[60]" onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setShowEditDaysModal(false);
+          }
+        }}>
+          <div className="modal-box w-full max-w-md bg-base-100" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold">Edit Subscription Days</h3>
+              <button
+                className="btn btn-sm btn-circle btn-ghost"
+                onClick={() => setShowEditDaysModal(false)}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="alert alert-info">
+                <Clock className="w-5 h-5" />
+                <div className="text-sm">
+                  <div className="font-semibold">Current Status</div>
+                  <div>Expires: {formatDate(user.premiumEndDate)}</div>
+                  <div>Days remaining: {daysRemaining}</div>
+                </div>
+              </div>
+
+              <div className="form-control">
+                <label className="label">
+                  <span className="label-text font-semibold">New Days Remaining</span>
+                </label>
+                <input
+                  type="number"
+                  className="input input-bordered"
+                  value={newDaysRemaining}
+                  onChange={(e) => setNewDaysRemaining(e.target.value)}
+                  min="0"
+                  placeholder="Enter days"
+                />
+                <label className="label">
+                  <span className="label-text-alt text-xs">
+                    New expiry: {newDaysRemaining && !isNaN(parseInt(newDaysRemaining)) 
+                      ? new Date(Date.now() + parseInt(newDaysRemaining) * 24 * 60 * 60 * 1000).toLocaleDateString()
+                      : 'N/A'}
+                  </span>
+                </label>
+              </div>
+
+              <div className="form-control">
+                <label className="label">
+                  <span className="label-text font-semibold text-xs">Quick Options</span>
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <button className="btn btn-sm btn-outline" onClick={() => setNewDaysRemaining('7')}>7 days</button>
+                  <button className="btn btn-sm btn-outline" onClick={() => setNewDaysRemaining('30')}>30 days</button>
+                  <button className="btn btn-sm btn-outline" onClick={() => setNewDaysRemaining('90')}>90 days</button>
+                  <button className="btn btn-sm btn-outline" onClick={() => setNewDaysRemaining('180')}>6 months</button>
+                  <button className="btn btn-sm btn-outline" onClick={() => setNewDaysRemaining('365')}>1 year</button>
+                  <button className="btn btn-sm btn-error btn-outline" onClick={() => setNewDaysRemaining('0')}>Expire Now</button>
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-action">
+              <button
+                className="btn btn-ghost"
+                onClick={() => setShowEditDaysModal(false)}
+                disabled={loading}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary gap-2"
+                onClick={handleUpdateDaysRemaining}
+                disabled={loading}
+              >
+                {loading ? (
+                  <span className="loading loading-spinner loading-sm"></span>
+                ) : (
+                  <Save className="w-4 h-4" />
+                )}
+                Update Days
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Edit Supporter Status Modal */}
       {showSupporterEditModal && (() => {
