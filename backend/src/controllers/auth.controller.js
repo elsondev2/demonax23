@@ -7,37 +7,53 @@ import { cacheInvalidate } from "../lib/cache.js";
 
 export const signup = async (req, res) => {
   // Handle both FormData (with file) and JSON (without file)
-  let fullName, email, password, usernameRaw, profilePic;
+  let fullName, email, phoneNumber, password, usernameRaw, profilePic;
 
   if (req.file) {
     // FormData with file upload
     fullName = req.body.fullName;
     email = req.body.email;
+    phoneNumber = req.body.phoneNumber;
     password = req.body.password;
     usernameRaw = req.body.username;
     profilePic = req.file ? req.file.buffer.toString('base64') : null;
   } else {
     // Regular JSON request
-    ({ fullName, email, password, username: usernameRaw, profilePic } = req.body);
+    ({ fullName, email, phoneNumber, password, username: usernameRaw, profilePic } = req.body);
   }
 
   try {
-    if (!fullName || !email || !password) {
-      return res.status(400).json({ message: "All fields are required" });
+    if (!fullName || (!email && !phoneNumber) || !password) {
+      return res.status(400).json({ message: "Full name, email or phone number, and password are required" });
     }
 
     if (password.length < 6) {
       return res.status(400).json({ message: "Password must be at least 6 characters" });
     }
 
-    // check if emailis valid: regex
+    // Validate email if provided
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (email && !emailRegex.test(email)) {
       return res.status(400).json({ message: "Invalid email format" });
     }
 
-    const user = await User.findOne({ email });
-    if (user) return res.status(400).json({ message: "Email already exists" });
+    // Validate phone number if provided (basic validation)
+    const phoneRegex = /^\+?[1-9]\d{6,14}$/;
+    if (phoneNumber && !phoneRegex.test(phoneNumber.replace(/[\s\-\(\)]/g, ''))) {
+      return res.status(400).json({ message: "Invalid phone number format" });
+    }
+
+    // Check if email already exists
+    if (email) {
+      const userByEmail = await User.findOne({ email });
+      if (userByEmail) return res.status(400).json({ message: "Email already exists" });
+    }
+
+    // Check if phone number already exists
+    if (phoneNumber) {
+      const userByPhone = await User.findOne({ phoneNumber: phoneNumber.replace(/[\s\-\(\)]/g, '') });
+      if (userByPhone) return res.status(400).json({ message: "Phone number already exists" });
+    }
 
     // 123456 => $dnjasdkasj_?dmsakmk
     const salt = await bcrypt.genSalt(10);
@@ -64,7 +80,8 @@ export const signup = async (req, res) => {
 
     const newUser = new User({
       fullName,
-      email,
+      email: email || undefined,
+      phoneNumber: phoneNumber ? phoneNumber.replace(/[\s\-\(\)]/g, '') : undefined,
       username,
       password: hashedPassword,
     });
@@ -125,6 +142,7 @@ export const signup = async (req, res) => {
         _id: savedUser._id,
         fullName: savedUser.fullName,
         email: savedUser.email,
+        phoneNumber: savedUser.phoneNumber,
         username: savedUser.username,
         profilePic: savedUser.profilePic,
         isVerified: savedUser.isVerified,
@@ -142,16 +160,23 @@ export const signup = async (req, res) => {
 };
 
 export const login = async (req, res) => {
-  const { email, password, profilePic } = req.body;
+  const { email, phoneNumber, password, profilePic } = req.body;
 
-  if (!email || !password) {
-    return res.status(400).json({ message: "Email and password are required" });
+  if ((!email && !phoneNumber) || !password) {
+    return res.status(400).json({ message: "Email or phone number and password are required" });
   }
 
   try {
-    const user = await User.findOne({ email });
+    // Find user by email or phone number
+    let user;
+    if (email) {
+      user = await User.findOne({ email });
+    } else if (phoneNumber) {
+      const cleanPhone = phoneNumber.replace(/[\s\-\(\)]/g, '');
+      user = await User.findOne({ phoneNumber: cleanPhone });
+    }
     if (!user) return res.status(400).json({ message: "Invalid credentials" });
-    // never tell the client which one is incorrect: password or email
+    // never tell the client which one is incorrect: password or email/phone
 
     const isPasswordCorrect = await bcrypt.compare(password, user.password);
     if (!isPasswordCorrect) return res.status(400).json({ message: "Invalid credentials" });
@@ -191,6 +216,7 @@ export const login = async (req, res) => {
       _id: user._id,
       fullName: user.fullName,
       email: user.email,
+      phoneNumber: user.phoneNumber,
       username: user.username,
       profilePic: user.profilePic,
       isBanned: user.isBanned || false,
@@ -200,6 +226,7 @@ export const login = async (req, res) => {
 
     console.log('🔍 Login Response - User Data:', {
       email: responseData.email,
+      phoneNumber: responseData.phoneNumber,
       isBanned: responseData.isBanned,
       role: responseData.role
     });
@@ -541,18 +568,24 @@ export const checkVerificationStatus = async (req, res) => {
 };
 
 /**
- * Check if user exists by email
+ * Check if user exists by email or phone number
  * POST /api/auth/check-user
  */
 export const checkUserExists = async (req, res) => {
   try {
-    const { email } = req.body;
+    const { email, phoneNumber } = req.body;
 
-    if (!email) {
-      return res.status(400).json({ message: "Email is required" });
+    if (!email && !phoneNumber) {
+      return res.status(400).json({ message: "Email or phone number is required" });
     }
 
-    const user = await User.findOne({ email: email.trim().toLowerCase() });
+    let user;
+    if (email) {
+      user = await User.findOne({ email: email.trim().toLowerCase() });
+    } else if (phoneNumber) {
+      const cleanPhone = phoneNumber.replace(/[\s\-\(\)]/g, '');
+      user = await User.findOne({ phoneNumber: cleanPhone });
+    }
 
     return res.status(200).json({
       exists: !!user,

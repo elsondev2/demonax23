@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuthStore } from "../store/useAuthStore";
-import { MailIcon, LockIcon, EyeIcon, EyeOffIcon } from "lucide-react";
+import { MailIcon, LockIcon, EyeIcon, EyeOffIcon, PhoneIcon } from "lucide-react";
 import { Link, useNavigate, useLocation } from "react-router";
 import GoogleSignIn from "../components/GoogleSignIn";
 import ThemeIcons from "../components/ThemeDots";
@@ -9,8 +9,9 @@ import { useThemeStore } from "../store/useThemeStore";
 
 function LoginPageNew() {
   const location = useLocation();
-  const [formData, setFormData] = useState({ email: "", password: "" });
+  const [formData, setFormData] = useState({ email: "", phoneNumber: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
+  const [usePhone, setUsePhone] = useState(false);
   const { login, isLoggingIn } = useAuthStore();
   const navigate = useNavigate();
 
@@ -38,16 +39,24 @@ function LoginPageNew() {
     return '0 2px 10px rgba(0,0,0,0.3), 0 0 20px rgba(0,0,0,0.2)';
   };
 
-  // Pre-fill email if coming from signup
+  // Pre-fill email or phone if coming from signup
   useEffect(() => {
     if (location.state?.email) {
       setFormData(prev => ({ ...prev, email: location.state.email }));
+      setUsePhone(false);
+    } else if (location.state?.phoneNumber) {
+      setFormData(prev => ({ ...prev, phoneNumber: location.state.phoneNumber }));
+      setUsePhone(true);
     }
   }, [location.state]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const result = await login(formData);
+    const loginData = {
+      password: formData.password,
+      ...(usePhone ? { phoneNumber: formData.phoneNumber } : { email: formData.email })
+    };
+    const result = await login(loginData);
     if (result?.success) {
       navigate("/chat");
     }
@@ -88,23 +97,46 @@ function LoginPageNew() {
                 <p className="text-sm text-base-content/60">Welcome back! Please sign in to continue</p>
               </div>
 
-              {/* Email / Password form - FIRST */}
+              {/* Email/Phone / Password form - FIRST */}
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="form-control w-full">
                   <label className="label">
-                    <span className="label-text text-base-content/70">Email Address</span>
+                    <span className="label-text text-base-content/70">
+                      {usePhone ? 'Phone Number' : 'Email Address'}
+                    </span>
+                    <button
+                      type="button"
+                      className="label-text-alt text-primary hover:underline cursor-pointer"
+                      onClick={() => setUsePhone(!usePhone)}
+                    >
+                      Use {usePhone ? 'email' : 'phone'} instead
+                    </button>
                   </label>
-                  <label className="input input-bordered flex items-center gap-2 bg-base-200 w-full">
-                    <MailIcon className="w-4 h-4 opacity-70" />
-                    <input
-                      type="email"
-                      className="grow"
-                      placeholder="Enter your email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      required
-                    />
-                  </label>
+                  {usePhone ? (
+                    <label className="input input-bordered flex items-center gap-2 bg-base-200 w-full">
+                      <PhoneIcon className="w-4 h-4 opacity-70" />
+                      <input
+                        type="tel"
+                        className="grow"
+                        placeholder="Enter your phone number"
+                        value={formData.phoneNumber}
+                        onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                        required
+                      />
+                    </label>
+                  ) : (
+                    <label className="input input-bordered flex items-center gap-2 bg-base-200 w-full">
+                      <MailIcon className="w-4 h-4 opacity-70" />
+                      <input
+                        type="email"
+                        className="grow"
+                        placeholder="Enter your email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        required
+                      />
+                    </label>
+                  )}
                 </div>
 
                 <div className="form-control w-full">

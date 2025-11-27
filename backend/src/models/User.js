@@ -4,8 +4,13 @@ const userSchema = new mongoose.Schema(
   {
     email: {
       type: String,
-      required: true,
       unique: true,
+      sparse: true, // Allows null for phone-only users
+    },
+    phoneNumber: {
+      type: String,
+      unique: true,
+      sparse: true, // Allows null for email-only users
     },
     fullName: {
       type: String,

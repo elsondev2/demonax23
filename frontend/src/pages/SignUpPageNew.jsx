@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuthStore } from "../store/useAuthStore";
-import { AtSignIcon, MailIcon, LockIcon, EyeIcon, EyeOffIcon, UserIcon, ArrowRightIcon, ArrowLeftIcon } from "lucide-react";
+import { AtSignIcon, MailIcon, LockIcon, EyeIcon, EyeOffIcon, UserIcon, ArrowRightIcon, ArrowLeftIcon, PhoneIcon } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 import GoogleSignIn from "../components/GoogleSignIn";
 import ProfilePicUpload from "../components/ProfilePicUpload";
@@ -15,6 +15,7 @@ function SignUpPageNew() {
     fullName: "",
     username: "",
     email: "",
+    phoneNumber: "",
     password: "",
     profilePic: null
   });
@@ -22,6 +23,7 @@ function SignUpPageNew() {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [currentStep, setCurrentStep] = useState(1); // Step 1 or 2
+  const [usePhone, setUsePhone] = useState(false); // Toggle between email and phone
   const { signup, isSigningUp } = useAuthStore();
   const navigate = useNavigate();
   const currentTheme = useThemeStore((state) => state.currentTheme);
@@ -62,10 +64,19 @@ function SignUpPageNew() {
     return emailRegex.test(email);
   };
 
+  const validatePhone = (phone) => {
+    const phoneRegex = /^\+?[1-9]\d{6,14}$/;
+    return phoneRegex.test(phone.replace(/[\s\-\(\)]/g, ''));
+  };
+
   const isStep1Valid = () => {
+    const hasValidContact = usePhone 
+      ? validatePhone(formData.phoneNumber)
+      : validateEmail(formData.email);
+    
     return (
       formData.fullName.trim().length >= 3 &&
-      validateEmail(formData.email) &&
+      hasValidContact &&
       formData.password.length >= 6
     );
   };
@@ -75,15 +86,20 @@ function SignUpPageNew() {
 
     try {
       // Check if user already exists
-      const response = await axiosInstance.post('/api/auth/check-user', {
-        email: formData.email.trim()
-      });
+      const checkData = usePhone 
+        ? { phoneNumber: formData.phoneNumber.trim() }
+        : { email: formData.email.trim() };
+      
+      const response = await axiosInstance.post('/api/auth/check-user', checkData);
 
       if (response.data.exists) {
-        toast.error('An account with this email already exists. Redirecting to login...');
+        const contactType = usePhone ? 'phone number' : 'email';
+        toast.error(`An account with this ${contactType} already exists. Redirecting to login...`);
         setTimeout(() => {
           navigate('/login', {
-            state: { email: formData.email.trim() }
+            state: usePhone 
+              ? { phoneNumber: formData.phoneNumber.trim() }
+              : { email: formData.email.trim() }
           });
         }, 1500);
       } else {
@@ -112,8 +128,14 @@ function SignUpPageNew() {
     const submitData = new FormData();
     submitData.append('fullName', formData.fullName.trim());
     submitData.append('username', formData.username.trim());
-    submitData.append('email', formData.email.trim());
     submitData.append('password', formData.password);
+
+    // Add email or phone number based on selection
+    if (usePhone) {
+      submitData.append('phoneNumber', formData.phoneNumber.trim());
+    } else {
+      submitData.append('email', formData.email.trim());
+    }
 
     if (formData.profilePic) {
       submitData.append('profilePic', formData.profilePic);
@@ -198,19 +220,42 @@ function SignUpPageNew() {
 
                   <div className="form-control w-full">
                     <label className="label">
-                      <span className="label-text text-base-content/70">Email Address</span>
+                      <span className="label-text text-base-content/70">
+                        {usePhone ? 'Phone Number' : 'Email Address'}
+                      </span>
+                      <button
+                        type="button"
+                        className="label-text-alt text-primary hover:underline cursor-pointer"
+                        onClick={() => setUsePhone(!usePhone)}
+                      >
+                        Use {usePhone ? 'email' : 'phone'} instead
+                      </button>
                     </label>
-                    <label className="input input-bordered flex items-center gap-2 bg-base-200 w-full">
-                      <MailIcon className="w-4 h-4 opacity-70" />
-                      <input
-                        type="email"
-                        placeholder="Enter your email"
-                        className="grow"
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        required
-                      />
-                    </label>
+                    {usePhone ? (
+                      <label className="input input-bordered flex items-center gap-2 bg-base-200 w-full">
+                        <PhoneIcon className="w-4 h-4 opacity-70" />
+                        <input
+                          type="tel"
+                          placeholder="Enter your phone number (e.g., +1234567890)"
+                          className="grow"
+                          value={formData.phoneNumber}
+                          onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                          required
+                        />
+                      </label>
+                    ) : (
+                      <label className="input input-bordered flex items-center gap-2 bg-base-200 w-full">
+                        <MailIcon className="w-4 h-4 opacity-70" />
+                        <input
+                          type="email"
+                          placeholder="Enter your email"
+                          className="grow"
+                          value={formData.email}
+                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                          required
+                        />
+                      </label>
+                    )}
                   </div>
 
                   <div className="form-control w-full">
@@ -246,13 +291,16 @@ function SignUpPageNew() {
                     <ArrowRightIcon className="w-4 h-4 ml-2" />
                   </button>
 
-                  {!isStep1Valid() && (formData.fullName || formData.email || formData.password) && (
+                  {!isStep1Valid() && (formData.fullName || formData.email || formData.phoneNumber || formData.password) && (
                     <div className="text-xs text-error mt-2 space-y-1">
                       {formData.fullName && formData.fullName.trim().length < 3 && (
                         <p>• Name must be at least 3 characters</p>
                       )}
-                      {formData.email && !validateEmail(formData.email) && (
+                      {!usePhone && formData.email && !validateEmail(formData.email) && (
                         <p>• Please enter a valid email address</p>
+                      )}
+                      {usePhone && formData.phoneNumber && !validatePhone(formData.phoneNumber) && (
+                        <p>• Please enter a valid phone number (e.g., +1234567890)</p>
                       )}
                       {formData.password && formData.password.length < 6 && (
                         <p>• Password must be at least 6 characters</p>
