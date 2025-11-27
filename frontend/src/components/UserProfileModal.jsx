@@ -1,5 +1,6 @@
 import { XIcon, Mail, User, Calendar, Activity, MessageCircle, Phone, MapPin, UserPlus, UserMinus, Users } from "lucide-react";
 import Avatar from "./Avatar";
+import PremiumBadge from "./PremiumBadge";
 import FollowButton, { FollowerCount } from "./FollowButton";
 import IOSModal from "./IOSModal";
 import { useAuthStore } from "../store/useAuthStore";
@@ -85,7 +86,14 @@ function UserProfileModal({ user, isOpen, onClose }) {
           </div>
 
           {/* Name and Status */}
-          <h2 className="text-2xl font-bold text-base-content mb-1">{user?.fullName || "Unknown User"}</h2>
+          <h2 className="text-2xl font-bold text-base-content mb-1 flex items-center gap-2">
+            {user?.fullName || "Unknown User"}
+            <PremiumBadge 
+              tier={user?.subscriptionPlan || user?.premiumTier} 
+              size="md"
+              showLabel
+            />
+          </h2>
           {user?.status && (
             <p className="text-sm text-base-content/70 italic mb-2">" {user.status} "</p>
           )}

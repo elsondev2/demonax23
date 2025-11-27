@@ -3,6 +3,7 @@ import Message from "../models/Message.js";
 import User from "../models/User.js";
 import Group from "../models/Group.js";
 import { uploadBase64ImageToSupabase, removeFromSupabase } from "../lib/supabase.js";
+import { USER_PUBLIC_FIELDS } from "../lib/userFields.js";
 
 export const getAllContacts = async (req, res) => {
   try {
@@ -41,8 +42,8 @@ export const getMessagesByUserId = async (req, res) => {
       ],
       groupId: { $exists: false } // Only individual messages
     })
-    .populate("senderId", "fullName profilePic")
-    .populate("quotedMessage.senderId", "fullName profilePic")
+    .populate("senderId", USER_PUBLIC_FIELDS)
+    .populate("quotedMessage.senderId", USER_PUBLIC_FIELDS)
     .sort({ createdAt: -1 }) // Newest first
     .skip(skip)
     .limit(limit);
@@ -87,8 +88,8 @@ export const getGroupMessages = async (req, res) => {
 
     // Get messages with pagination (newest first for recent messages)
     const messages = await Message.find({ groupId })
-      .populate("senderId", "fullName profilePic")
-      .populate("quotedMessage.senderId", "fullName profilePic")
+      .populate("senderId", USER_PUBLIC_FIELDS)
+      .populate("quotedMessage.senderId", USER_PUBLIC_FIELDS)
       .sort({ createdAt: -1 }) // Newest first
       .skip(skip)
       .limit(limit);
@@ -176,8 +177,8 @@ export const sendMessage = async (req, res) => {
       await newMessage.save();
 
       // Populate sender details and quoted message sender
-      await newMessage.populate("senderId", "fullName profilePic");
-      await newMessage.populate("quotedMessage.senderId", "fullName profilePic");
+      await newMessage.populate("senderId", USER_PUBLIC_FIELDS);
+      await newMessage.populate("quotedMessage.senderId", USER_PUBLIC_FIELDS);
 
       // Emit the message to ALL group members INCLUDING the sender
       // This ensures the sender sees the message even if optimistic update fails
@@ -252,8 +253,8 @@ export const sendMessage = async (req, res) => {
       await newMessage.save();
 
       // Populate sender details and quoted message sender before emitting
-      await newMessage.populate("senderId", "fullName profilePic");
-      await newMessage.populate("quotedMessage.senderId", "fullName profilePic");
+      await newMessage.populate("senderId", USER_PUBLIC_FIELDS);
+      await newMessage.populate("quotedMessage.senderId", USER_PUBLIC_FIELDS);
 
       // Emit to both receiver and sender for consistency
       // This ensures message appears even if optimistic update fails
@@ -746,7 +747,7 @@ export const reactToMessage = async (req, res) => {
     }
 
     await message.save();
-    await message.populate("reactions.userId", "fullName profilePic");
+    await message.populate("reactions.userId", USER_PUBLIC_FIELDS);
 
     // Emit reaction update to relevant users
     const { io, getReceiverSocketId } = await import("../lib/socket.js");

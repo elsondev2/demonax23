@@ -32,6 +32,7 @@
     "daisyui": "^5.1.26",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.23.24",
+    "jszip": "^3.10.1",
     "lexical": "^0.38.2",
     "lucide-react": "^0.542.0",
     "react": "^19.1.1",

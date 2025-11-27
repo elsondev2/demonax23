@@ -1,11 +1,15 @@
-import { useState } from "react";
-import { Search, Download, FileText, Trash2, Image as ImageIcon, Video, Music, Users, MessageSquare, Folder, AlertCircle } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Search, Download, FileText, Trash2, Image as ImageIcon, Video, Music, Users, MessageSquare, Folder, AlertCircle, CheckSquare, Square, Package } from "lucide-react";
 import { formatFileSize, exportCSV } from "../utils";
 import UploadDetailsModal from "../components/modals/UploadDetailsModal";
+import JSZip from "jszip";
 
 export default function UploadsView({ uploads, q, setQ, page, setPage, perPage, setPerPage, total, onRefresh, loading }) {
   const [activeTab, setActiveTab] = useState('all');
   const [selectedUpload, setSelectedUpload] = useState(null);
+  const [selectedFiles, setSelectedFiles] = useState(new Set());
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0 });
 
   // Map uploads to Supabase folders
   const getFolderFromUpload = (upload) => {
@@ -20,15 +24,19 @@ export default function UploadsView({ uploads, q, setQ, page, setPage, perPage, 
   };
 
   // Group uploads by folder
-  const uploadsByFolder = uploads.reduce((acc, upload) => {
-    const folder = getFolderFromUpload(upload);
-    if (!acc[folder]) acc[folder] = [];
-    acc[folder].push(upload);
-    return acc;
-  }, {});
+  const uploadsByFolder = useMemo(() => {
+    return uploads.reduce((acc, upload) => {
+      const folder = getFolderFromUpload(upload);
+      if (!acc[folder]) acc[folder] = [];
+      acc[folder].push(upload);
+      return acc;
+    }, {});
+  }, [uploads]);
 
   // Filter uploads based on active tab
-  const filteredUploads = activeTab === 'all' ? uploads : (uploadsByFolder[activeTab] || []);
+  const filteredUploads = useMemo(() => {
+    return activeTab === 'all' ? uploads : (uploadsByFolder[activeTab] || []);
+  }, [activeTab, uploads, uploadsByFolder]);
 
   // Folder tabs configuration
   const folderTabs = [
@@ -46,6 +54,114 @@ export default function UploadsView({ uploads, q, setQ, page, setPage, perPage, 
   const handleDeleteUpload = (upload) => {
     window.dispatchEvent(new CustomEvent('admin:deleteUpload', { detail: upload }));
     setSelectedUpload(null);
+  };
+
+  // Selection handlers
+  const toggleFileSelection = (uploadId) => {
+    setSelectedFiles(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(uploadId)) {
+        newSet.delete(uploadId);
+      } else {
+        newSet.add(uploadId);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAllInCategory = (category) => {
+    const categoryUploads = category === 'all' ? uploads : (uploadsByFolder[category] || []);
+    const allSelected = categoryUploads.every(u => selectedFiles.has(u._id));
+    
+    setSelectedFiles(prev => {
+      const newSet = new Set(prev);
+      if (allSelected) {
+        // Deselect all in category
+        categoryUploads.forEach(u => newSet.delete(u._id));
+      } else {
+        // Select all in category
+        categoryUploads.forEach(u => newSet.add(u._id));
+      }
+      return newSet;
+    });
+  };
+
+  const clearSelection = () => {
+    setSelectedFiles(new Set());
+  };
+
+  // Check if all files in current view are selected
+  const allCurrentSelected = useMemo(() => {
+    return filteredUploads.length > 0 && filteredUploads.every(u => selectedFiles.has(u._id));
+  }, [filteredUploads, selectedFiles]);
+
+  // Get selected uploads data
+  const selectedUploadsData = useMemo(() => {
+    return uploads.filter(u => selectedFiles.has(u._id));
+  }, [uploads, selectedFiles]);
+
+  // Mass download handler
+  const handleMassDownload = async () => {
+    if (selectedFiles.size === 0) return;
+    
+    setIsDownloading(true);
+    setDownloadProgress({ current: 0, total: selectedFiles.size });
+    
+    try {
+      const zip = new JSZip();
+      const uploadsToDownload = selectedUploadsData;
+      
+      // Group files by folder for organization
+      const folderGroups = {};
+      uploadsToDownload.forEach(upload => {
+        const folder = getFolderFromUpload(upload);
+        if (!folderGroups[folder]) folderGroups[folder] = [];
+        folderGroups[folder].push(upload);
+      });
+
+      let processed = 0;
+      
+      for (const [folder, files] of Object.entries(folderGroups)) {
+        const zipFolder = zip.folder(folder);
+        
+        for (const upload of files) {
+          try {
+            const response = await fetch(upload.url);
+            if (response.ok) {
+              const blob = await response.blob();
+              const filename = upload.filename || upload.url?.split('/').pop() || `file_${upload._id}`;
+              // Ensure unique filenames
+              const uniqueFilename = `${upload._id}_${filename}`;
+              zipFolder.file(uniqueFilename, blob);
+            }
+          } catch (err) {
+            console.error(`Failed to download ${upload.url}:`, err);
+          }
+          processed++;
+          setDownloadProgress({ current: processed, total: selectedFiles.size });
+        }
+      }
+
+      // Generate and download ZIP
+      const content = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(content);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `uploads_${activeTab}_${new Date().toISOString().split('T')[0]}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      // Clear selection after successful download
+      clearSelection();
+    } catch (error) {
+      console.error('Mass download failed:', error);
+      alert('Failed to create download. Please try again.');
+    } finally {
+      setIsDownloading(false);
+      setDownloadProgress({ current: 0, total: 0 });
+    }
   };
 
   return (
@@ -116,6 +232,78 @@ export default function UploadsView({ uploads, q, setQ, page, setPage, perPage, 
         </div>
       </div>
 
+      {/* Selection Toolbar */}
+      <div className="card bg-base-100 shadow">
+        <div className="card-body p-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <button
+                className="btn btn-sm btn-ghost gap-2"
+                onClick={() => selectAllInCategory(activeTab)}
+              >
+                {allCurrentSelected ? (
+                  <CheckSquare className="w-4 h-4 text-primary" />
+                ) : (
+                  <Square className="w-4 h-4" />
+                )}
+                {allCurrentSelected ? 'Deselect All' : 'Select All'} ({filteredUploads.length})
+              </button>
+              
+              {selectedFiles.size > 0 && (
+                <div className="badge badge-primary badge-lg gap-1">
+                  <CheckSquare className="w-3 h-3" />
+                  {selectedFiles.size} selected
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              {selectedFiles.size > 0 && (
+                <>
+                  <button
+                    className="btn btn-sm btn-ghost"
+                    onClick={clearSelection}
+                  >
+                    Clear Selection
+                  </button>
+                  <button
+                    className={`btn btn-sm btn-primary gap-2 ${isDownloading ? 'loading' : ''}`}
+                    onClick={handleMassDownload}
+                    disabled={isDownloading}
+                  >
+                    {isDownloading ? (
+                      <>
+                        <span className="loading loading-spinner loading-xs"></span>
+                        Downloading ({downloadProgress.current}/{downloadProgress.total})
+                      </>
+                    ) : (
+                      <>
+                        <Package className="w-4 h-4" />
+                        Download as ZIP ({selectedFiles.size})
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Download Progress */}
+          {isDownloading && (
+            <div className="mt-3">
+              <progress 
+                className="progress progress-primary w-full" 
+                value={downloadProgress.current} 
+                max={downloadProgress.total}
+              ></progress>
+              <p className="text-xs text-base-content/60 mt-1 text-center">
+                Downloading file {downloadProgress.current} of {downloadProgress.total}...
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Folder Distribution Cards */}
       <div className="card bg-base-100 shadow">
         <div className="card-body p-4 md:p-6">
@@ -175,9 +363,31 @@ export default function UploadsView({ uploads, q, setQ, page, setPage, perPage, 
       {/* Upload Cards Grid */}
       {!loading && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredUploads.map(upload => (
-            <div key={upload._id} className="card bg-base-100 shadow hover:shadow-xl transition-all duration-200 border border-base-200">
+          {filteredUploads.map(upload => {
+            const isSelected = selectedFiles.has(upload._id);
+            return (
+            <div 
+              key={upload._id} 
+              className={`card bg-base-100 shadow hover:shadow-xl transition-all duration-200 border-2 relative ${
+                isSelected ? 'border-primary ring-2 ring-primary/20' : 'border-base-200'
+              }`}
+            >
               <div className="card-body p-4">
+                {/* Selection Checkbox */}
+                <div className="absolute top-2 left-2 z-10">
+                  <button
+                    className={`btn btn-sm btn-circle ${isSelected ? 'btn-primary' : 'btn-ghost bg-base-100/80'}`}
+                    onClick={() => toggleFileSelection(upload._id)}
+                    title={isSelected ? 'Deselect' : 'Select for download'}
+                  >
+                    {isSelected ? (
+                      <CheckSquare className="w-4 h-4" />
+                    ) : (
+                      <Square className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+
                 {/* Preview */}
                 <div className="aspect-square bg-base-200 rounded-lg overflow-hidden mb-3 relative group">
                   {upload.contentType?.startsWith('image/') || upload.kind.includes('picture') ? (
@@ -285,7 +495,8 @@ export default function UploadsView({ uploads, q, setQ, page, setPage, perPage, 
                 </div>
               </div>
             </div>
-          ))}
+          );
+          })}
         </div>
       )}
 

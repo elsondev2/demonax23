@@ -6,6 +6,7 @@ import { AlertCircle, RotateCcw, Edit, Trash2, Quote, FileText, MoreVertical, Ph
 import useLongPress from "../hooks/useLongPress";
 import { hapticMedium, hapticLight } from "../utils/haptic";
 import Avatar from "./Avatar";
+import PremiumBadge from "./PremiumBadge";
 import AudioPlayer from "./AudioPlayer";
 import ImagePreviewModal from "./ImagePreviewModal";
 import MessageWithLinkPreviews from "./MessageWithLinkPreviews";
@@ -97,16 +98,16 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
   const senderObj = typeof message.senderId === 'object' && message.senderId ? message.senderId : null;
   const isOwnMessage = senderId === authUser?._id;
 
-  // Get sender info
+  // Get sender info including premium status
   const getSenderInfo = () => {
     // Check if sender was deleted
     if (message.senderDeleted) {
-      return { name: 'Deleted User', avatar: null, isDeleted: true };
+      return { name: 'Deleted User', avatar: null, isDeleted: true, user: null };
     }
 
-    if (isOwnMessage) return { name: 'You', avatar: authUser?.profilePic };
-    if (senderObj) return { name: senderObj.fullName, avatar: senderObj.profilePic };
-    if (selectedUser) return { name: selectedUser.fullName, avatar: selectedUser.profilePic };
+    if (isOwnMessage) return { name: 'You', avatar: authUser?.profilePic, user: authUser };
+    if (senderObj) return { name: senderObj.fullName, avatar: senderObj.profilePic, user: senderObj };
+    if (selectedUser) return { name: selectedUser.fullName, avatar: selectedUser.profilePic, user: selectedUser };
     if (selectedGroup) {
       // Check if sender is the admin
       const adminId = typeof selectedGroup.admin === 'object' ? selectedGroup.admin._id : selectedGroup.admin;
@@ -114,20 +115,21 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
         const adminInfo = typeof selectedGroup.admin === 'object' ? selectedGroup.admin : null;
         return { 
           name: adminInfo?.fullName || 'Admin', 
-          avatar: adminInfo?.profilePic || null 
+          avatar: adminInfo?.profilePic || null,
+          user: adminInfo
         };
       }
       // Check in members array
       if (Array.isArray(selectedGroup.members)) {
         const member = selectedGroup.members.find(m => m._id === senderId);
         if (member) {
-          return { name: member.fullName, avatar: member.profilePic };
+          return { name: member.fullName, avatar: member.profilePic, user: member };
         }
       }
       // If member not found in group, they might be deleted
-      return { name: 'Deleted User', avatar: null, isDeleted: true };
+      return { name: 'Deleted User', avatar: null, isDeleted: true, user: null };
     }
-    return { name: 'Deleted User', avatar: null, isDeleted: true };
+    return { name: 'Deleted User', avatar: null, isDeleted: true, user: null };
   };
 
   const senderInfo = getSenderInfo();
@@ -574,10 +576,16 @@ const MessageItem = ({ message, onEdit, onDelete, onQuote, selectedUser, selecte
 
           {/* Sender name for group chats (received messages only) */}
           {!isOwnMessage && selectedGroup && showAvatar && (
-            <div className="text-xs font-semibold mb-1 opacity-70">
+            <div className="text-xs font-semibold mb-1 opacity-70 flex items-center gap-1">
               <span className={senderInfo.isDeleted ? 'italic text-base-content/50' : ''}>
                 {senderInfo.name}
               </span>
+              {senderInfo.user && (
+                <PremiumBadge 
+                  tier={senderInfo.user.subscriptionPlan || senderInfo.user.premiumTier} 
+                  size="xs" 
+                />
+              )}
               {message.isGroupAdmin && !senderInfo.isDeleted && (
                 <span className="ml-1 text-xs bg-primary/20 text-primary px-1 py-0.5 rounded">
                   Admin

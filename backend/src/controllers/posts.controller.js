@@ -1,6 +1,7 @@
 import Post from "../models/Post.js";
 import { uploadBase64ImageToSupabase, removeFromSupabase } from "../lib/supabase.js";
 import { io } from "../lib/socket.js";
+import { USER_PUBLIC_FIELDS } from "../lib/userFields.js";
 
 const MAX_ITEMS = 10;
 const MAX_ITEM_SIZE = 5 * 1024 * 1024; // 5MB
@@ -64,7 +65,7 @@ export async function createPost(req, res) {
       expiresAt: new Date(Date.now() + TTL_MS),
     });
 
-    await doc.populate('postedBy', 'fullName profilePic role');
+    await doc.populate('postedBy', USER_PUBLIC_FIELDS + ' role');
     try { io.emit('postCreated', doc); } catch {}
     return res.status(201).json(doc);
   } catch (e) {
@@ -104,7 +105,7 @@ export async function getFeed(req, res) {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .populate('postedBy', 'fullName profilePic role');
+      .populate('postedBy', USER_PUBLIC_FIELDS + ' role');
 
     return res.status(200).json(posts.map(p => ({
       ...p.toObject(),

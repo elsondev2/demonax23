@@ -11,6 +11,7 @@ import useStatusStore from "../store/useStatusStore";
 import { Search as SearchIcon } from "lucide-react";
 import { hapticLight } from "../utils/haptic";
 import Avatar from "./Avatar";
+import PremiumBadge from "./PremiumBadge";
 
 // Status Stories Strip Component
 const StatusStoriesStrip = memo(({ authUser, quickAccessChats, handleChatSelect, onlineUsers, onCreatePulse, onViewStatus }) => {
@@ -250,7 +251,7 @@ function ChatsList() {
   const [searchTerm, setSearchTerm] = useState("");
   const [, setIsRefreshing] = useState(false);
   const scrollContainerRef = useRef(null);
-  const [, forceUpdate] = useState({});
+  
 
   // Removed interval-based force updates to prevent flickering
   // Natural state updates from Zustand will handle typing indicator changes
@@ -745,8 +746,14 @@ function ChatsList() {
                     isOnline={!chat.isGroup && onlineUsers.includes(chat._id)}
                   />
                   <div className="flex-1 min-w-0">
-                    <h4 className="text-base-content font-medium truncate text-sm md:text-base">
-                      {chat.isGroup ? chat.name : (chat.fullName || 'Deleted User')}
+                    <h4 className="text-base-content font-medium truncate text-sm md:text-base flex items-center gap-1">
+                      <span className="truncate">{chat.isGroup ? chat.name : (chat.fullName || 'Deleted User')}</span>
+                      {!chat.isGroup && (
+                        <PremiumBadge 
+                          tier={chat.subscriptionPlan || chat.premiumTier} 
+                          size="xs" 
+                        />
+                      )}
                     </h4>
                     <div className="text-xs truncate">
                       {(() => {

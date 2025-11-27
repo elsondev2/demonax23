@@ -7,6 +7,7 @@ import AccountSettingsModal from "./AccountSettingsModal";
 import FriendsModal from "./FriendsModal";
 import useFriendStore from "../store/useFriendStore";
 import Avatar from "./Avatar";
+import PremiumBadge from "./PremiumBadge";
 import { UsersIcon } from "lucide-react";
 
 function ProfileHeader({ onShowTour }) {
@@ -94,8 +95,12 @@ function ProfileHeader({ onShowTour }) {
 
           {/* USERNAME & ONLINE TEXT */}
           <div className="cursor-pointer min-w-0 flex-1" onClick={() => setShowSettings(true)}>
-            <h3 className="text-base-content font-medium text-base truncate">
-              {authUser.fullName}
+            <h3 className="text-base-content font-medium text-base truncate flex items-center gap-1">
+              <span className="truncate">{authUser.fullName}</span>
+              <PremiumBadge 
+                tier={authUser.subscriptionPlan || authUser.premiumTier} 
+                size="sm" 
+              />
             </h3>
             <p className="text-base-content/60 text-sm">Online</p>
           </div>

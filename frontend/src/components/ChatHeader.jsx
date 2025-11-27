@@ -7,6 +7,7 @@ import { useNavigate } from "react-router";
 import { useGroupInfo } from "../hooks/useGroupInfo";
 
 import Avatar from "./Avatar";
+import PremiumBadge from "./PremiumBadge";
 
 function ChatHeader({ onGroupInfoClick, onUserInfoClick }) {
   const { selectedUser, selectedGroup, setSelectedUser, setSelectedGroup, refreshCurrentConversation, isMessagesLoading, messages } = useChatStore();
@@ -85,8 +86,14 @@ function ChatHeader({ onGroupInfoClick, onUserInfoClick }) {
             className="online"
           />
           <div>
-            <h3 className="text-base-content font-medium text-base max-w-[180px] truncate">
+            <h3 className="text-base-content font-medium text-base max-w-[180px] truncate flex items-center gap-1">
               {getDisplayName()}
+              {selectedUser && (
+                <PremiumBadge 
+                  tier={selectedUser.subscriptionPlan || selectedUser.premiumTier} 
+                  size="sm" 
+                />
+              )}
             </h3>
             <p className="text-base-content/60 text-xs">{getDisplayStatus()}</p>
           </div>
