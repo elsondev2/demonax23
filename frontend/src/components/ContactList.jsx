@@ -4,6 +4,7 @@ import UsersLoadingSkeleton from "./UsersLoadingSkeleton";
 import { useAuthStore } from "../store/useAuthStore";
 import { RefreshCwIcon } from "lucide-react";
 import Avatar from "./Avatar";
+import PremiumBadge from "./PremiumBadge";
 
 function ContactList() {
   const { getAllContacts, allContacts, setSelectedUser, isUsersLoading } = useChatStore();
@@ -98,8 +99,12 @@ function ContactList() {
                   {/* Contact info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline justify-between">
-                      <h4 className="text-base-content font-medium truncate">
-                        {contact.fullName}
+                      <h4 className="text-base-content font-medium truncate flex items-center gap-1">
+                        <span className="truncate">{contact.fullName}</span>
+                        <PremiumBadge 
+                          tier={contact.subscriptionPlan || contact.premiumTier} 
+                          size="xs" 
+                        />
                         {isCurrentUser && (
                           <span className="ml-2 badge badge-neutral badge-sm">You</span>
                         )}

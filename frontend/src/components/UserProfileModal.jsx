@@ -1,13 +1,10 @@
-import { XIcon, Mail, User, Calendar, Activity, MessageCircle, Phone, MapPin, UserPlus, UserMinus, Users } from "lucide-react";
+import { XIcon, Mail, User, Calendar, Activity, MessageCircle, Phone, MapPin, Users } from "lucide-react";
 import Avatar from "./Avatar";
 import PremiumBadge from "./PremiumBadge";
 import FollowButton, { FollowerCount } from "./FollowButton";
 import IOSModal from "./IOSModal";
 import { useAuthStore } from "../store/useAuthStore";
 import { useCallStore } from "../store/useCallStore";
-import { axiosInstance } from "../lib/axios";
-import { useState, useEffect } from "react";
-import toast from "react-hot-toast";
 
 function UserProfileModal({ user, isOpen, onClose }) {
   const { onlineUsers, authUser } = useAuthStore();

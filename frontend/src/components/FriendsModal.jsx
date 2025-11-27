@@ -4,8 +4,9 @@ import useFriendStore from "../store/useFriendStore";
 import { useChatStore } from "../store/useChatStore";
 import IOSModal from "./IOSModal";
 import Avatar from "./Avatar";
+import PremiumBadge from "./PremiumBadge";
 
-const Row = ({ avatar, title, subtitle, right }) => (
+const Row = ({ avatar, title, subtitle, right, premiumTier }) => (
   <div className="flex items-center justify-between p-3 rounded-xl bg-base-200/40 hover:bg-base-200/60 transition mb-2">
     <div className="flex items-center gap-3 min-w-0">
       <Avatar
@@ -15,7 +16,10 @@ const Row = ({ avatar, title, subtitle, right }) => (
         size="w-10 h-10"
       />
       <div className="min-w-0">
-        <div className="text-sm font-medium text-base-content truncate">{title}</div>
+        <div className="text-sm font-medium text-base-content truncate flex items-center gap-1">
+          <span className="truncate">{title}</span>
+          <PremiumBadge tier={premiumTier} size="xs" />
+        </div>
         {subtitle && <div className="text-xs text-base-content/70 truncate">{subtitle}</div>}
       </div>
     </div>
@@ -105,6 +109,7 @@ const FriendsModal = ({ isOpen, onClose }) => {
                 avatar={req.from?.profilePic}
                 title={req.from?.fullName || "Unknown User"}
                 subtitle={req.from?.email || ""}
+                premiumTier={req.from?.subscriptionPlan || req.from?.premiumTier}
                 right={
                   <div className="flex gap-2">
                     <button className={`btn btn-xs btn-primary ${isLoading(req._id) ? 'btn-disabled' : ''}`} disabled={isLoading(req._id)} onClick={async () => { setLoading(req._id, 'Accepting...'); await acceptRequest(req._id, req.from._id); await fetchRequests(); clearLoading(req._id); }}>
@@ -140,6 +145,7 @@ const FriendsModal = ({ isOpen, onClose }) => {
                 avatar={req.to?.profilePic}
                 title={req.to?.fullName || "Unknown User"}
                 subtitle="Waiting for response"
+                premiumTier={req.to?.subscriptionPlan || req.to?.premiumTier}
                 right={
                   <button className={`btn btn-xs btn-ghost ${isLoading(req._id) ? 'btn-disabled' : ''}`} disabled={isLoading(req._id)} onClick={async () => { setLoading(req._id, 'Cancelling...'); await cancelRequest(req._id, req.to._id); await fetchRequests(); clearLoading(req._id); }}>
                     {isLoading(req._id) ? (
@@ -166,6 +172,7 @@ const FriendsModal = ({ isOpen, onClose }) => {
                 avatar={user.profilePic}
                 title={user.fullName || "Unknown User"}
                 subtitle={user.email || ""}
+                premiumTier={user.subscriptionPlan || user.premiumTier}
                 right={
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-success" />
@@ -191,6 +198,7 @@ const FriendsModal = ({ isOpen, onClose }) => {
                   avatar={user?.profilePic}
                   title={user?.fullName}
                   subtitle="Rejected request"
+                  premiumTier={user?.subscriptionPlan || user?.premiumTier}
                   right={
                     <div className="flex items-center gap-2">
                       <XCircle className="w-4 h-4 text-error" />
@@ -261,6 +269,7 @@ const FriendsModal = ({ isOpen, onClose }) => {
                   avatar={user.profilePic}
                   title={user.fullName || "Unknown User"}
                   subtitle={user.email || ""}
+                  premiumTier={user.subscriptionPlan || user.premiumTier}
                   right={rightContent}
                 />
               );

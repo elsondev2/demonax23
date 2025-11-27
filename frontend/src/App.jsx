@@ -42,8 +42,8 @@ function AppContent() {
   // Check if user is banned (but allow admins to bypass)
   const isBanned = authUser?.isBanned === true && authUser?.role !== 'admin';
   
-  // Check if trial has ended (Nov 28, 2025)
-  const TRIAL_END_DATE = new Date("2025-11-28T23:59:59");
+  // Check if trial has ended (Dec 25, 2025 - Extended to Christmas!)
+  const TRIAL_END_DATE = new Date("2025-12-25T23:59:59");
   const hasTrialEnded = new Date() > TRIAL_END_DATE;
   
   // Check if user has active subscription

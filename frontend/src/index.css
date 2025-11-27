@@ -34,6 +34,36 @@
 .animate-slide-down {
   animation: slide-down 0.5s ease-out;
 }
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-out-down {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.typing-fade-in {
+  animation: fade-in-up 0.3s ease-out forwards;
+}
+
+.typing-fade-out {
+  animation: fade-out-down 0.3s ease-in forwards;
+}
 /* stylelint-enable at-rule-no-unknown */
 
 /* Custom Font System Optimizations */

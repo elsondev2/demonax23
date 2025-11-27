@@ -27,7 +27,7 @@ const PaymentBlockScreen = () => {
               <FaMoneyBillWave size={24} />
               <div>
                 <h3 className="font-bold">Free Trial Ended</h3>
-                <div className="text-sm">Your free access ended on November 28, 2025</div>
+                <div className="text-sm">Your free access ended on December 25, 2025</div>
               </div>
             </div>
 

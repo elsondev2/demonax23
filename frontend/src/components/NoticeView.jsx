@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { axiosInstance } from '../lib/axios';
 import { useAuthStore } from '../store/useAuthStore';
-import { Bell, TrendingUp, TrendingDown, Users, X, ChevronDown, Grid3x3, Heart, RefreshCw } from 'lucide-react';
+import { Bell, TrendingUp, TrendingDown, Users, X, ChevronDown, Grid3x3, Heart, RefreshCw, UserCheck } from 'lucide-react';
 import Avatar from './Avatar';
 import FollowButton, { FollowerCount } from './FollowButton';
 import { useChatStore } from '../store/useChatStore';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import IOSModal from './IOSModal';
+import PremiumBadge from './PremiumBadge';
+import FollowersFollowingView from './FollowersFollowingView';
 
 function NoticeBackground() {
   const { chatBackground } = useChatStore();
@@ -26,7 +28,7 @@ export default function NoticeView() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { authUser } = useAuthStore();
-  const [activeTab, setActiveTab] = useState('announcements'); // 'announcements' | 'rankings'
+  const [activeTab, setActiveTab] = useState('announcements'); // 'announcements' | 'rankings' | 'network'
   const [announcements, setAnnouncements] = useState([]);
   const [rankings, setRankings] = useState([]);
   const [previousRankings, setPreviousRankings] = useState([]);
@@ -83,6 +85,7 @@ export default function NoticeView() {
     } else if (activeTab === 'rankings') {
       loadRankings();
     }
+    // No loading needed for 'network' tab as it has its own component
   }, [activeTab, loadAnnouncements, loadRankings]);
 
   // Real-time updates for rankings when follow/unfollow events occur
@@ -197,6 +200,12 @@ export default function NoticeView() {
                     </a>
                   </li>
                   <li>
+                    <a onClick={() => setActiveTab('network')} className="flex items-center gap-2">
+                      <UserCheck className="w-4 h-4" />
+                      My Network
+                    </a>
+                  </li>
+                  <li>
                     <a onClick={() => navigate('/apps')} className="flex items-center gap-2">
                       <Grid3x3 className="w-4 h-4" />
                       App Integrations
@@ -235,7 +244,9 @@ export default function NoticeView() {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4 pb-20 md:pb-4 relative z-10">
-        {loading ? (
+        {activeTab === 'network' ? (
+          <FollowersFollowingView onBack={() => setActiveTab('announcements')} />
+        ) : loading ? (
           <div className="flex justify-center items-center h-full">
             <span className="loading loading-spinner loading-lg"></span>
           </div>
@@ -538,7 +549,13 @@ export default function NoticeView() {
 
                           {/* User Info */}
                           <div className="flex-1 min-w-0">
-                            <h4 className="font-semibold text-base sm:text-lg truncate">{user.fullName}</h4>
+                            <h4 className="font-semibold text-base sm:text-lg truncate flex items-center gap-1">
+                              <span className="truncate">{user.fullName}</span>
+                              <PremiumBadge 
+                                tier={user.subscriptionPlan || user.premiumTier} 
+                                size="xs" 
+                              />
+                            </h4>
                             <p className="text-sm text-base-content/60 truncate">@{user.email?.split('@')[0]}</p>
                           </div>
 

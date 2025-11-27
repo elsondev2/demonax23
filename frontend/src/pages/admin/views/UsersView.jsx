@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Users, Edit2, Trash2, Shield, Ban, CheckCircle, Mail, Calendar, Download, AlertCircle, User } from "lucide-react";
 import { exportCSV } from "../utils";
 import UserDetailsModal from "../components/modals/UserDetailsModal";
+import PremiumBadge from "../../../components/PremiumBadge";
 
 export default function UsersView({ users, setEditModal, setDeleteModal }) {
   const [selectedUser, setSelectedUser] = useState(null);
@@ -75,8 +76,12 @@ export default function UsersView({ users, setEditModal, setDeleteModal }) {
               {/* User Info */}
               <div className="text-center space-y-2">
                 {/* Name */}
-                <h3 className="font-semibold text-base truncate" title={user.fullName}>
-                  {user.fullName}
+                <h3 className="font-semibold text-base truncate flex items-center justify-center gap-1" title={user.fullName}>
+                  <span className="truncate">{user.fullName}</span>
+                  <PremiumBadge 
+                    tier={user.subscriptionPlan || user.premiumTier} 
+                    size="xs" 
+                  />
                 </h3>
 
                 {/* Badges */}

@@ -1,7 +1,12 @@
-import { Users } from "lucide-react";
+import { useState } from "react";
+import { Users, Eye } from "lucide-react";
 import Avatar from "../../../components/Avatar";
+import PremiumBadge from "../../../components/PremiumBadge";
+import UserFollowDetailsModal from "../components/modals/UserFollowDetailsModal";
 
 export default function FollowLeaderboardView({ leaderboard, limit, setLimit, onRefresh, loading }) {
+  const [selectedUser, setSelectedUser] = useState(null);
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -54,6 +59,7 @@ export default function FollowLeaderboardView({ leaderboard, limit, setLimit, on
                     <th className="text-xs md:text-sm">Username</th>
                     <th className="text-xs md:text-sm text-right">Followers</th>
                     <th className="text-xs md:text-sm text-right">Following</th>
+                    <th className="text-xs md:text-sm text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -76,7 +82,13 @@ export default function FollowLeaderboardView({ leaderboard, limit, setLimit, on
                             size="w-10 h-10"
                           />
                           <div>
-                            <div className="font-semibold text-sm">{user.fullName}</div>
+                            <div className="font-semibold text-sm flex items-center gap-1">
+                              <span>{user.fullName}</span>
+                              <PremiumBadge 
+                                tier={user.subscriptionPlan || user.premiumTier} 
+                                size="xs" 
+                              />
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -93,6 +105,15 @@ export default function FollowLeaderboardView({ leaderboard, limit, setLimit, on
                         <span className="badge badge-ghost badge-lg">
                           {user.followingCount}
                         </span>
+                      </td>
+                      <td className="text-right">
+                        <button
+                          className="btn btn-xs btn-ghost"
+                          onClick={() => setSelectedUser(user)}
+                          title="View followers/following"
+                        >
+                          <Eye className="w-3 h-3" />
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -134,6 +155,14 @@ export default function FollowLeaderboardView({ leaderboard, limit, setLimit, on
             </div>
           </div>
         </div>
+      )}
+
+      {/* User Follow Details Modal */}
+      {selectedUser && (
+        <UserFollowDetailsModal
+          user={selectedUser}
+          onClose={() => setSelectedUser(null)}
+        />
       )}
     </div>
   );

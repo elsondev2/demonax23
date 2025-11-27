@@ -6,6 +6,7 @@ import useStatusStore from '../store/useStatusStore';
 import { useChatStore } from '../store/useChatStore';
 import { useAuthStore } from '../store/useAuthStore';
 import Avatar from './Avatar';
+import PremiumBadge from './PremiumBadge';
 import StatusAnalytics from './StatusAnalytics';
 import IOSModal from './IOSModal';
 import CaptionImageModal from './CaptionImageModal';
@@ -286,7 +287,13 @@ function StatusViewer({ user, onClose }) {
             textSize="text-xs"
           />
           <div>
-            <p className="text-white font-semibold">{user?.fullName}</p>
+            <p className="text-white font-semibold flex items-center gap-1">
+              <span>{user?.fullName}</span>
+              <PremiumBadge 
+                tier={user?.subscriptionPlan || user?.premiumTier} 
+                size="xs" 
+              />
+            </p>
             <p className="text-white/70 text-sm">{formatTimeAgo(cur.createdAt)}</p>
           </div>
         </div>
@@ -464,7 +471,13 @@ function StatusViewer({ user, onClose }) {
                         textSize="text-xs"
                       />
                       <div className="flex-1">
-                        <p className="font-semibold text-sm">{userName}</p>
+                        <p className="font-semibold text-sm flex items-center gap-1">
+                          <span>{userName}</span>
+                          <PremiumBadge 
+                            tier={commentUser?.subscriptionPlan || commentUser?.premiumTier} 
+                            size="xs" 
+                          />
+                        </p>
                         <p className="text-sm text-base-content/80">{comment.text}</p>
                         {comment.createdAt && (
                           <p className="text-xs text-base-content/50 mt-1">
