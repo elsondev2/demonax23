@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { axiosInstance } from "../../lib/axios";
 import { useAuthStore } from "../../store/useAuthStore";
-import { useNavigate, useLocation, Routes, Route, Navigate } from "react-router";
-import { Users, MessageSquare, Layers, Image, LayoutDashboard, Download, FileText, Megaphone, MessageCircle, DollarSign, Vote } from "lucide-react";
+import { useNavigate, useLocation, Routes, Route } from "react-router";
+import { Users, MessageSquare, Layers, Image, LayoutDashboard, Download, FileText, Megaphone, MessageCircle, DollarSign, Vote, Grid3x3 } from "lucide-react";
 import toast from "react-hot-toast";
 import AnnouncementModal from "../../components/AnnouncementModal";
 import AppearanceModal from "../../components/AppearanceModal";
@@ -23,7 +23,8 @@ import {
   AnnouncementsView,
   FeatureRequestsView,
   FollowLeaderboardView,
-  PaymentsView
+  PaymentsView,
+  AppRequestsView
 } from "./views";
 
 export default function AdminPage() {
@@ -481,6 +482,7 @@ export default function AdminPage() {
     { id: "community", label: "Community", icon: Users },
     { id: "posts", label: "Posts", icon: FileText },
     { id: "feature-requests", label: "Feature Requests", icon: MessageCircle },
+    { id: "app-requests", label: "App Requests", icon: Grid3x3 },
     { id: "announcements", label: "Announcements", icon: Megaphone },
     { id: "follow-leaderboard", label: "Follow Leaders", icon: Users },
     { id: "uploads", label: "Uploads", icon: Download },
@@ -648,6 +650,7 @@ export default function AdminPage() {
                     setDeleteModal={setDeleteModal}
                   />
                 } />
+                <Route path="app-requests" element={<AppRequestsView />} />
                 <Route path="votes" element={<VotingDashboard />} />
               </Routes>
             )}

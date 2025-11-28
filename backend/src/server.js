@@ -25,6 +25,7 @@ import agoraRoutes from "./routes/agora.route.js";
 import checkersRoutes from "./routes/checkers.route.js";
 import pianoRoutes from "./routes/piano.route.js";
 import voteRoutes from "./routes/vote.route.js";
+import appRequestRoutes from "./routes/appRequest.route.js";
 import { app, server } from "./lib/socket.js";
 import { startStatusCleanupJob } from "./lib/statusCleanup.js";
 import { startPostCleanupJob } from "./lib/postCleanup.js";
@@ -90,6 +91,7 @@ app.use("/api/agora", agoraRoutes);
 app.use("/api/checkers", checkersRoutes);
 app.use("/api/piano", pianoRoutes);
 app.use("/api/votes", voteRoutes);
+app.use("/api/app-requests", appRequestRoutes);
 
 if (ENV.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "../frontend/dist")));

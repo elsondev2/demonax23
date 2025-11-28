@@ -11,3 +11,4 @@ export { default as AnnouncementsView } from './AnnouncementsView';
 export { default as FeatureRequestsView } from './FeatureRequestsView';
 export { default as FollowLeaderboardView } from './FollowLeaderboardView';
 export { default as PaymentsView } from './PaymentsView';
+export { default as AppRequestsView } from './AppRequestsView';

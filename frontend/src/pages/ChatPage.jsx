@@ -16,7 +16,7 @@ import { useSwipeable } from "react-swipeable";
 
 import BorderAnimatedContainer from "../components/BorderAnimatedContainer";
 import ChatsView from "../components/ChatsView";
-import AppsView from "../components/AppsView";
+import AppsView from "../components/AppsViewEnhanced";
 import DonateView from "../components/DonateView";
 import FeedView from "../components/FeedView";
 import PostsView from "../components/PostsView";
