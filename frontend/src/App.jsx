@@ -32,6 +32,8 @@ import VotingPage from "./pages/VotingPage";
 
 import { Toaster } from "react-hot-toast";
 import { SocketProvider } from "./contexts/SocketContext.jsx";
+import CallScreen from "./components/CallScreen";
+import IncomingCall from "./components/IncomingCall";
 
 function AppContent() {
   const location = useLocation();
@@ -183,6 +185,14 @@ function AppContent() {
             <Toaster />
             <AppearanceModal />
             {authUser && !hasTrialEnded && !hasActiveSubscription && <PaymentNotificationModal />}
+          </>
+        )}
+
+        {/* Call UI - Global overlays */}
+        {authUser && (
+          <>
+            <IncomingCall />
+            <CallScreen />
           </>
         )}
       </div>

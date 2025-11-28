@@ -54,6 +54,10 @@ const VirtualPiano = ({ onNoteEvent, disabled = false }) => {
   const [pressedKeys, setPressedKeys] = useState(new Set());
   const keyboardPressedRef = useRef(new Set());
   const touchActiveRef = useRef(new Map()); // Track active touches by identifier
+  const lastTouchNoteRef = useRef(new Map()); // Track last note per touch for slide playing
+  const mouseDownRef = useRef(false); // Track mouse state for slide playing
+  const lastMouseNoteRef = useRef(null); // Track last note for mouse slide
+  const pianoKeyboardRef = useRef(null); // Ref to piano keyboard for touch detection
   const audioContextStartedRef = useRef(false);
   
   const { socket } = useAuthStore();
@@ -207,37 +211,126 @@ const VirtualPiano = ({ onNoteEvent, disabled = false }) => {
     };
   }, [disabled, handleNoteOn, handleNoteOff, handleSustain]);
 
-  // Optimized touch handlers for multi-touch support and low latency
+  // Helper function to find which key element is at a given point
+  const getKeyAtPoint = useCallback((x, y) => {
+    const element = document.elementFromPoint(x, y);
+    if (element && element.dataset && element.dataset.note) {
+      return element.dataset.note;
+    }
+    // Check parent for nested elements (like labels)
+    if (element && element.parentElement && element.parentElement.dataset && element.parentElement.dataset.note) {
+      return element.parentElement.dataset.note;
+    }
+    return null;
+  }, []);
+
+  // Optimized touch handlers for multi-touch support, slide playing, and low latency
   const handleTouchStart = useCallback((e, note) => {
     e.preventDefault();
     // Track each touch by its identifier
     for (const touch of e.changedTouches) {
       touchActiveRef.current.set(touch.identifier, note);
+      lastTouchNoteRef.current.set(touch.identifier, note);
     }
     handleNoteOn(note);
   }, [handleNoteOn]);
 
-  const handleTouchEnd = useCallback((e, note) => {
+  const handleTouchEnd = useCallback((e) => {
     e.preventDefault();
-    // Only release if this touch was for this note
+    // Release all notes associated with ended touches
     for (const touch of e.changedTouches) {
       const touchNote = touchActiveRef.current.get(touch.identifier);
-      if (touchNote === note) {
+      if (touchNote) {
         touchActiveRef.current.delete(touch.identifier);
-        handleNoteOff(note);
+        lastTouchNoteRef.current.delete(touch.identifier);
+        handleNoteOff(touchNote);
       }
     }
   }, [handleNoteOff]);
 
-  const handleTouchCancel = useCallback((e, note) => {
+  const handleTouchCancel = useCallback((e) => {
     e.preventDefault();
     for (const touch of e.changedTouches) {
       const touchNote = touchActiveRef.current.get(touch.identifier);
-      if (touchNote === note) {
+      if (touchNote) {
         touchActiveRef.current.delete(touch.identifier);
-        handleNoteOff(note);
+        lastTouchNoteRef.current.delete(touch.identifier);
+        handleNoteOff(touchNote);
       }
     }
+  }, [handleNoteOff]);
+
+  // Handle touch move for slide/glissando playing
+  const handleTouchMove = useCallback((e) => {
+    if (disabled) return;
+    e.preventDefault();
+    
+    for (const touch of e.changedTouches) {
+      const newNote = getKeyAtPoint(touch.clientX, touch.clientY);
+      const lastNote = lastTouchNoteRef.current.get(touch.identifier);
+      
+      if (newNote && newNote !== lastNote) {
+        // Release old note
+        if (lastNote) {
+          handleNoteOff(lastNote);
+        }
+        // Play new note
+        handleNoteOn(newNote);
+        touchActiveRef.current.set(touch.identifier, newNote);
+        lastTouchNoteRef.current.set(touch.identifier, newNote);
+      }
+    }
+  }, [disabled, getKeyAtPoint, handleNoteOn, handleNoteOff]);
+
+  // Mouse slide playing handlers
+  const handleMouseDown = useCallback((e, note) => {
+    e.preventDefault();
+    mouseDownRef.current = true;
+    lastMouseNoteRef.current = note;
+    handleNoteOn(note);
+  }, [handleNoteOn]);
+
+  const handleMouseUp = useCallback((e) => {
+    e.preventDefault();
+    mouseDownRef.current = false;
+    if (lastMouseNoteRef.current) {
+      handleNoteOff(lastMouseNoteRef.current);
+      lastMouseNoteRef.current = null;
+    }
+  }, [handleNoteOff]);
+
+  const handleMouseEnter = useCallback((e, note) => {
+    if (mouseDownRef.current && !disabled) {
+      // Release previous note if different
+      if (lastMouseNoteRef.current && lastMouseNoteRef.current !== note) {
+        handleNoteOff(lastMouseNoteRef.current);
+      }
+      // Play new note
+      handleNoteOn(note);
+      lastMouseNoteRef.current = note;
+    }
+  }, [disabled, handleNoteOn, handleNoteOff]);
+
+  const handleMouseLeave = useCallback((e, note) => {
+    if (pressedKeys.has(note) && !mouseDownRef.current) {
+      handleNoteOff(note);
+    }
+  }, [pressedKeys, handleNoteOff]);
+
+  // Global mouse up handler to catch mouse release outside piano
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      if (mouseDownRef.current) {
+        mouseDownRef.current = false;
+        if (lastMouseNoteRef.current) {
+          handleNoteOff(lastMouseNoteRef.current);
+          lastMouseNoteRef.current = null;
+        }
+      }
+    };
+
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
   }, [handleNoteOff]);
 
   // Memoize black key positions to avoid recalculating on every render
@@ -278,8 +371,14 @@ const VirtualPiano = ({ onNoteEvent, disabled = false }) => {
   }
 
   return (
-    <div className="piano-container select-none flex justify-center items-center">
-      <div className={`piano-keyboard ${sustainActive ? 'sustain-active' : ''}`}>
+    <div 
+      className="piano-container select-none flex justify-center items-center"
+      onTouchMove={handleTouchMove}
+    >
+      <div 
+        ref={pianoKeyboardRef}
+        className={`piano-keyboard ${sustainActive ? 'sustain-active' : ''}`}
+      >
         {/* White Keys */}
         <div className="piano-white-keys">
           {WHITE_KEYS.map((key) => {
@@ -289,12 +388,13 @@ const VirtualPiano = ({ onNoteEvent, disabled = false }) => {
               <div
                 key={key.note}
                 className={`piano-key-white ${isPressed ? 'pressed' : ''}`}
-                onMouseDown={(e) => { e.preventDefault(); handleNoteOn(key.note); }}
-                onMouseUp={(e) => { e.preventDefault(); handleNoteOff(key.note); }}
-                onMouseLeave={() => { if (pressedKeys.has(key.note)) handleNoteOff(key.note); }}
+                onMouseDown={(e) => handleMouseDown(e, key.note)}
+                onMouseUp={handleMouseUp}
+                onMouseEnter={(e) => handleMouseEnter(e, key.note)}
+                onMouseLeave={(e) => handleMouseLeave(e, key.note)}
                 onTouchStart={(e) => handleTouchStart(e, key.note)}
-                onTouchEnd={(e) => handleTouchEnd(e, key.note)}
-                onTouchCancel={(e) => handleTouchCancel(e, key.note)}
+                onTouchEnd={handleTouchEnd}
+                onTouchCancel={handleTouchCancel}
                 data-note={key.note}
               >
                 {key.octaveLabel && (
@@ -318,12 +418,13 @@ const VirtualPiano = ({ onNoteEvent, disabled = false }) => {
                 key={key.note}
                 className={`piano-key-black ${isPressed ? 'pressed' : ''}`}
                 style={blackKeyStyles[index]}
-                onMouseDown={(e) => { e.preventDefault(); handleNoteOn(key.note); }}
-                onMouseUp={(e) => { e.preventDefault(); handleNoteOff(key.note); }}
-                onMouseLeave={() => { if (pressedKeys.has(key.note)) handleNoteOff(key.note); }}
+                onMouseDown={(e) => handleMouseDown(e, key.note)}
+                onMouseUp={handleMouseUp}
+                onMouseEnter={(e) => handleMouseEnter(e, key.note)}
+                onMouseLeave={(e) => handleMouseLeave(e, key.note)}
                 onTouchStart={(e) => handleTouchStart(e, key.note)}
-                onTouchEnd={(e) => handleTouchEnd(e, key.note)}
-                onTouchCancel={(e) => handleTouchCancel(e, key.note)}
+                onTouchEnd={handleTouchEnd}
+                onTouchCancel={handleTouchCancel}
                 data-note={key.note}
               >
                 {key.label && (

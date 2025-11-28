@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { PhoneOffIcon, MicIcon, MicOffIcon, VideoIcon, VideoOffIcon } from 'lucide-react';
 import { useCallStore } from '../store/useCallStore';
 import Avatar from './Avatar';
@@ -23,6 +23,9 @@ const CallScreen = () => {
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const remoteAudioRef = useRef(null);
+  const [audioLevel, setAudioLevel] = useState(0);
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
 
   // Play local stream
   useEffect(() => {
@@ -32,7 +35,7 @@ const CallScreen = () => {
     }
   }, [localStream]);
 
-  // Play remote stream
+  // Play remote stream and setup audio level monitoring
   useEffect(() => {
     if (remoteStream) {
       // Video
@@ -49,11 +52,43 @@ const CallScreen = () => {
         });
         console.log('🔊 Playing remote audio stream');
       }
+
+      // Setup audio level monitoring
+      try {
+        if (!audioContextRef.current) {
+          audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        const audioContext = audioContextRef.current;
+        const source = audioContext.createMediaStreamSource(remoteStream);
+        analyserRef.current = audioContext.createAnalyser();
+        analyserRef.current.fftSize = 256;
+        source.connect(analyserRef.current);
+
+        const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+        
+        const updateLevel = () => {
+          if (analyserRef.current && callStatus === 'connected') {
+            analyserRef.current.getByteFrequencyData(dataArray);
+            const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+            setAudioLevel(average);
+            requestAnimationFrame(updateLevel);
+          }
+        };
+        updateLevel();
+      } catch (err) {
+        console.warn('Audio level monitoring not available:', err);
+      }
     }
-  }, [remoteStream]);
+
+    return () => {
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close().catch(() => {});
+      }
+    };
+  }, [remoteStream, callStatus]);
 
   // Don't render if not in call or showCallScreen is false
-  if (!showCallScreen || (callStatus !== 'connected' && callStatus !== 'connecting')) {
+  if (!showCallScreen || (callStatus !== 'connected' && callStatus !== 'connecting' && callStatus !== 'calling' && callStatus !== 'initiating')) {
     return null;
   }
 
@@ -64,13 +99,22 @@ const CallScreen = () => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Get display information
+  // Get display information based on call direction
   const getDisplayInfo = () => {
-    if (callerInfo && calleeInfo) {
+    // For incoming calls, show caller info
+    if (callerInfo) {
       return {
-        name: callerInfo.fullName,
+        name: callerInfo.fullName || 'Unknown',
         avatar: callerInfo.profilePic,
-        subtitle: calleeInfo.fullName
+        subtitle: callStatus === 'connected' ? 'Connected' : 'Incoming call'
+      };
+    }
+    // For outgoing calls, show callee info if available
+    if (calleeInfo) {
+      return {
+        name: calleeInfo.fullName || 'Unknown',
+        avatar: calleeInfo.profilePic,
+        subtitle: callStatus === 'connected' ? 'Connected' : 'Calling...'
       };
     }
     return {
@@ -140,7 +184,19 @@ const CallScreen = () => {
                 {displayInfo.name}
               </h2>
               <p className="text-base-content/60">
-                {callType === 'video' ? 'Video call' : 'Voice call'}
+                {callStatus === 'calling' || callStatus === 'initiating' ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="loading loading-dots loading-sm"></span>
+                    Calling...
+                  </span>
+                ) : callStatus === 'connecting' ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="loading loading-spinner loading-sm"></span>
+                    Connecting...
+                  </span>
+                ) : (
+                  callType === 'video' ? 'Video call' : 'Voice call'
+                )}
               </p>
             </div>
           </div>

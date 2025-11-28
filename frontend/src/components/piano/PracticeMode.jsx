@@ -1,14 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePianoStore } from '../../store/usePianoStore';
+import { useAuthStore } from '../../store/useAuthStore';
 import VirtualPiano from './VirtualPiano';
 import RecordingControls from './RecordingControls';
 import { INSTRUMENTS } from '../../hooks/usePianoAudio';
+import toast from 'react-hot-toast';
 import {
   ChevronLeft,
   ChevronRight,
   Volume2,
   Users,
   Radio as RadioIcon,
+  RotateCcw,
+  X,
 } from 'lucide-react';
 
 const PracticeMode = () => {
@@ -22,15 +26,47 @@ const PracticeMode = () => {
     instrument,
     setInstrument,
   } = usePianoStore();
+  const { socket } = useAuthStore();
 
   const [isLive, setIsLive] = useState(false);
-  const [audienceCount] = useState(0);
+  const [streamId, setStreamId] = useState(null);
+  const [audienceCount, setAudienceCount] = useState(0);
   const [reverb, setReverb] = useState(20);
   const [pan, setPan] = useState(50);
   const [treble, setTreble] = useState(50);
 
   const currentInstrument = INSTRUMENTS[instrument] || INSTRUMENTS['grand-piano'];
   const categories = [...new Set(Object.values(INSTRUMENTS).map((i) => i.category))];
+
+  // Listen for audience count updates
+  useEffect(() => {
+    if (!socket || !isLive || !streamId) return;
+
+    const handleListenerCount = ({ streamId: sid, count }) => {
+      if (sid === streamId) {
+        setAudienceCount(count);
+      }
+    };
+
+    socket.on('piano:listenerCount', handleListenerCount);
+
+    return () => {
+      socket.off('piano:listenerCount', handleListenerCount);
+    };
+  }, [socket, isLive, streamId]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (isLive && streamId && socket) {
+        fetch('/api/piano/streams/end', {
+          method: 'POST',
+          credentials: 'include'
+        }).catch(console.error);
+        socket.emit('piano:endStream', { streamId });
+      }
+    };
+  }, [isLive, streamId, socket]);
 
   // Knob component
   const Knob = ({ label, value, onChange, min = 0, max = 100 }) => {
@@ -58,15 +94,106 @@ const PracticeMode = () => {
     );
   };
 
-  const handleGoLive = () => {
-    setIsLive(!isLive);
-    // TODO: Implement streaming logic
+  const handleGoLive = async () => {
+    const { socket } = useAuthStore.getState();
+    const { setIsStreaming, setIsPracticeMode } = usePianoStore.getState();
+    
+    if (!isLive) {
+      // Start streaming
+      try {
+        const res = await fetch('/api/piano/streams/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ instrument })
+        });
+        
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || 'Failed to start stream');
+        }
+        
+        const stream = await res.json();
+        setStreamId(stream._id);
+        setIsLive(true);
+        
+        // Update store for VirtualPiano to broadcast events
+        setIsStreaming(true);
+        setIsPracticeMode(false);
+        
+        // Join socket room
+        if (socket) {
+          socket.emit('piano:startStream', { 
+            instrument, 
+            streamId: stream._id 
+          });
+        }
+        
+        toast.success('You are now live!');
+      } catch (error) {
+        console.error('Error starting stream:', error);
+        toast.error(error.message || 'Failed to go live');
+      }
+    } else {
+      // End streaming
+      try {
+        // Emit socket event first for immediate response
+        if (socket) {
+          socket.emit('piano:endStream', { streamId });
+          socket.emit('piano:stopStream'); // Also emit stopStream for compatibility
+        }
+        
+        await fetch('/api/piano/streams/end', {
+          method: 'POST',
+          credentials: 'include'
+        });
+        
+        // Update store
+        setIsStreaming(false);
+        setIsPracticeMode(true);
+        
+        setIsLive(false);
+        setStreamId(null);
+        setAudienceCount(0);
+        toast.success('Stream ended');
+      } catch (error) {
+        console.error('Error ending stream:', error);
+        // Still update local state even if API fails
+        setIsStreaming(false);
+        setIsPracticeMode(true);
+        setIsLive(false);
+        setStreamId(null);
+        setAudienceCount(0);
+        toast.error('Failed to end stream properly');
+      }
+    }
   };
 
   return (
-    <div className="h-full flex flex-col bg-base-100">
-      {/* Instrument Panel */}
-      <div className="flex items-center justify-between px-6 py-4 bg-base-200 border-b border-base-300">
+    <div className="h-full flex flex-col bg-base-100 relative piano-fullscreen-mobile">
+      {/* Mobile Landscape Lock Overlay */}
+      <div className="piano-landscape-lock">
+        <RotateCcw className="rotate-icon text-primary" />
+        <h3>Rotate Your Device</h3>
+        <p>Please rotate your phone to landscape mode for the best piano playing experience</p>
+      </div>
+
+      {/* Main Piano Content */}
+      <div className="piano-main-content h-full flex flex-col">
+      
+      {/* Mobile End Stream Button - Fixed position for easy access when streaming */}
+      {isLive && (
+        <button
+          onClick={handleGoLive}
+          className="md:hidden fixed top-2 right-2 z-50 flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-semibold bg-error text-error-content hover:bg-error/90 active:scale-95 transition-all shadow-lg"
+        >
+          <X className="w-4 h-4" />
+          <span>End</span>
+        </button>
+      )}
+
+      {/* Instrument Panel - Hidden on mobile landscape */}
+      <div className="flex items-center justify-between px-6 py-4 bg-base-200 border-b border-base-300 piano-hide-landscape">
         {/* Instrument Selector */}
         <div className="flex items-center gap-3">
           <button
@@ -129,73 +256,148 @@ const PracticeMode = () => {
         </div>
       </div>
 
-      {/* Controls Bar */}
-      <div className="flex items-center justify-between px-6 py-3 bg-base-200 border-b border-base-300">
+      {/* Controls Bar - Compact on mobile landscape */}
+      <div className="flex items-center justify-between px-6 py-3 bg-base-200 border-b border-base-300 piano-controls-compact">
         {/* Left: Sustain & Octave */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 md:gap-4">
           <button
             onClick={() => setSustainActive(!sustainActive)}
-            className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+            className={`px-3 py-1.5 md:px-4 md:py-2 rounded-lg text-xs font-semibold transition-all ${
               sustainActive
                 ? 'bg-primary/20 text-primary border border-primary/50 shadow-lg shadow-primary/20'
                 : 'bg-base-300 opacity-60 border border-base-300 hover:opacity-100'
             }`}
           >
-            Sustain
+            Sus
           </button>
 
-          <div className="flex items-center gap-2 px-3 py-2 bg-base-300 rounded-lg border border-base-300">
+          <div className="flex items-center gap-1 px-2 py-1 md:px-3 md:py-2 bg-base-300 rounded-lg border border-base-300">
             <button
               onClick={() => setOctaveShift(octaveShift - 1)}
               disabled={octaveShift <= -2}
-              className="p-1 opacity-60 hover:opacity-100 disabled:opacity-30 transition-opacity"
+              className="p-0.5 md:p-1 opacity-60 hover:opacity-100 disabled:opacity-30 transition-opacity"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="w-3 h-3 md:w-4 md:h-4" />
             </button>
-            <div className="flex flex-col items-center min-w-[60px]">
-              <span className="text-[10px] opacity-60 font-medium">Octave</span>
-              <span className="text-sm font-semibold">{octaveShift > 0 ? `+${octaveShift}` : octaveShift}</span>
+            <div className="flex flex-col items-center min-w-[40px] md:min-w-[60px]">
+              <span className="text-[8px] md:text-[10px] opacity-60 font-medium">Oct</span>
+              <span className="text-xs md:text-sm font-semibold">{octaveShift > 0 ? `+${octaveShift}` : octaveShift}</span>
             </div>
             <button
               onClick={() => setOctaveShift(octaveShift + 1)}
               disabled={octaveShift >= 2}
-              className="p-1 opacity-60 hover:opacity-100 disabled:opacity-30 transition-opacity"
+              className="p-0.5 md:p-1 opacity-60 hover:opacity-100 disabled:opacity-30 transition-opacity"
             >
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-3 h-3 md:w-4 md:h-4" />
             </button>
           </div>
         </div>
 
         {/* Right: Go Live & Audience */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3">
           <button
             onClick={handleGoLive}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+            className={`flex items-center gap-1 md:gap-2 px-2 py-1.5 md:px-4 md:py-2 rounded-lg text-[10px] md:text-xs font-semibold transition-all ${
               isLive
                 ? 'bg-error/20 text-error border border-error/50 shadow-lg shadow-error/20 animate-pulse'
                 : 'bg-primary/20 text-primary border border-primary/50 hover:bg-primary/30'
             }`}
           >
-            <RadioIcon className="w-4 h-4" />
+            <RadioIcon className="w-3 h-3 md:w-4 md:h-4" />
             {isLive ? 'Live' : 'Go Live'}
           </button>
 
           {isLive && (
-            <div className="flex items-center gap-2 px-3 py-2 bg-base-300 rounded-lg border border-base-300">
-              <Users className="w-4 h-4 opacity-60" />
-              <span className="text-sm font-semibold">{audienceCount}</span>
-            </div>
+            <>
+              <div className="flex items-center gap-1 px-2 py-1 md:px-3 md:py-2 bg-base-300 rounded-lg border border-base-300">
+                <Users className="w-3 h-3 md:w-4 md:h-4 opacity-60" />
+                <span className="text-xs md:text-sm font-semibold">{audienceCount}</span>
+              </div>
+              <button
+                onClick={handleGoLive}
+                className="hidden md:block px-4 py-2 rounded-lg text-xs font-semibold bg-error text-error-content hover:bg-error/80 transition-all"
+              >
+                End Stream
+              </button>
+            </>
           )}
         </div>
       </div>
 
       {/* Piano */}
-      <div className="flex-1 flex items-end justify-center px-6 pb-12 bg-gradient-to-b from-base-100 to-base-200 overflow-hidden relative">
+      <div className="flex-1 flex items-end justify-center px-2 md:px-6 pb-2 md:pb-12 bg-gradient-to-b from-base-100 to-base-200 overflow-hidden relative piano-area-landscape">
         <VirtualPiano />
+        
+        {/* Mobile Landscape Floating Controls - Left Side */}
+        <div className="hidden piano-floating-controls-left">
+          <button
+            onClick={() => setSustainActive(!sustainActive)}
+            className={`touch-manipulation ${
+              sustainActive
+                ? 'bg-primary text-primary-content'
+                : 'bg-base-300 text-base-content opacity-70'
+            }`}
+            title="Sustain"
+          >
+            <span className="text-[10px] font-bold">SUS</span>
+          </button>
+          <div className="flex flex-col items-center gap-1">
+            <button
+              onClick={() => setOctaveShift(octaveShift + 1)}
+              disabled={octaveShift >= 2}
+              className="bg-base-300 text-base-content disabled:opacity-30 touch-manipulation"
+              title="Octave Up"
+            >
+              <ChevronRight className="w-4 h-4 rotate-[-90deg]" />
+            </button>
+            <span className="text-[10px] text-white font-bold">{octaveShift > 0 ? `+${octaveShift}` : octaveShift}</span>
+            <button
+              onClick={() => setOctaveShift(octaveShift - 1)}
+              disabled={octaveShift <= -2}
+              className="bg-base-300 text-base-content disabled:opacity-30 touch-manipulation"
+              title="Octave Down"
+            >
+              <ChevronLeft className="w-4 h-4 rotate-[-90deg]" />
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Landscape Floating Controls - Right Side */}
+        <div className="hidden piano-floating-controls-right">
+          <button
+            onClick={handleGoLive}
+            className={`touch-manipulation ${
+              isLive
+                ? 'bg-error text-error-content animate-pulse'
+                : 'bg-primary text-primary-content'
+            }`}
+            title={isLive ? 'End Stream' : 'Go Live'}
+          >
+            {isLive ? <X className="w-4 h-4" /> : <RadioIcon className="w-4 h-4" />}
+          </button>
+          {isLive && (
+            <div className="flex flex-col items-center bg-base-300 rounded-lg px-2 py-1">
+              <Users className="w-3 h-3 opacity-60" />
+              <span className="text-[10px] font-bold text-white">{audienceCount}</span>
+            </div>
+          )}
+          <button
+            onClick={() => {
+              const keys = Object.keys(INSTRUMENTS);
+              const currentIndex = keys.indexOf(instrument);
+              const nextIndex = (currentIndex + 1) % keys.length;
+              setInstrument(keys[nextIndex]);
+            }}
+            className="bg-base-300 text-base-content touch-manipulation"
+            title="Change Instrument"
+          >
+            <span className="text-lg">🎹</span>
+          </button>
+        </div>
       </div>
 
-      {/* Bottom Transport Bar */}
-      <div className="flex items-center justify-between px-6 py-3 bg-base-200 border-t border-base-300">
+      {/* Bottom Transport Bar - Hidden on mobile landscape */}
+      <div className="flex items-center justify-between px-6 py-3 bg-base-200 border-t border-base-300 piano-hide-landscape">
         {/* Volume */}
         <div className="flex items-center gap-3">
           <Volume2 className="w-4 h-4 opacity-60" />
@@ -220,6 +422,8 @@ const PracticeMode = () => {
           <span>4/4</span>
         </div>
       </div>
+      
+      </div>{/* End piano-main-content */}
     </div>
   );
 };

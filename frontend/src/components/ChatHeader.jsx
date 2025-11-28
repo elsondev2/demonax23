@@ -12,7 +12,7 @@ import PremiumBadge from "./PremiumBadge";
 function ChatHeader({ onGroupInfoClick, onUserInfoClick }) {
   const { selectedUser, selectedGroup, setSelectedUser, setSelectedGroup, refreshCurrentConversation, isMessagesLoading, messages } = useChatStore();
   const { onlineUsers } = useAuthStore();
-  const { startCall, callStatus } = useCallStore();
+  const { initiateCall, callStatus } = useCallStore();
   const [isMobile, setIsMobile] = useState(false);
   const navigate = useNavigate();
   const groupInfo = useGroupInfo(selectedGroup);
@@ -105,7 +105,7 @@ function ChatHeader({ onGroupInfoClick, onUserInfoClick }) {
           {/* Call button - only for individual users who are online */}
           {selectedUser && onlineUsers.includes(selectedUser._id) && callStatus === 'idle' && (
             <button
-              onClick={() => startCall(selectedUser, 'voice')}
+              onClick={() => initiateCall(selectedUser._id, 'voice')}
               className="btn btn-ghost btn-sm btn-circle"
               title="Start voice call"
             >

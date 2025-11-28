@@ -696,84 +696,151 @@ io.on("connection", (socket) => {
 
   // ===== PIANO ROOM EVENTS =====
   
+  // Initialize global piano streams map if not exists
+  if (!global.pianoStreams) global.pianoStreams = new Map();
+  
+  // Helper function to clean up stale streams
+  const cleanupStaleStreams = () => {
+    if (!global.pianoStreams) return;
+    const now = Date.now();
+    const maxStreamAge = 4 * 60 * 60 * 1000; // 4 hours max stream duration
+    
+    global.pianoStreams.forEach((stream, streamerId) => {
+      const streamAge = now - new Date(stream.startedAt).getTime();
+      const streamerOnline = !!getReceiverSocketId(streamerId);
+      
+      // Remove if stream is too old or streamer is offline
+      if (streamAge > maxStreamAge || !streamerOnline) {
+        console.log('🎹 BACKEND - Cleaning up stale stream:', { streamerId, reason: !streamerOnline ? 'offline' : 'expired' });
+        global.pianoStreams.delete(streamerId);
+        io.emit("piano:streamStopped", { streamerId });
+      }
+    });
+  };
+  
   // Start streaming
   socket.on("piano:startStream", (data) => {
-    const { instrument } = data;
-    const streamId = `stream_${socket.userId}_${Date.now()}`;
-    
-    console.log('🎹 BACKEND - Piano stream started:', {
-      userId: socket.userId,
-      streamId,
-      instrument
-    });
-    
-    // Store stream info
-    if (!global.pianoStreams) global.pianoStreams = new Map();
-    global.pianoStreams.set(socket.userId.toString(), {
-      streamId,
-      streamerId: socket.userId,
-      streamerName: socket.user.fullName,
-      streamerPic: socket.user.profilePic,
-      instrument,
-      listeners: [],
-      startedAt: new Date(),
-    });
-    
-    // Join stream room
-    socket.join(`piano_${socket.userId}`);
-    
-    // Broadcast to all users that a new stream started
-    io.emit("piano:streamStarted", {
-      streamId,
-      streamerId: socket.userId,
-      streamerName: socket.user.fullName,
-      streamerPic: socket.user.profilePic,
-      instrument,
-    });
-    
-    // Send confirmation to streamer
-    socket.emit("piano:streamConfirmed", { streamId });
-  });
-  
-  // Stop streaming
-  socket.on("piano:stopStream", () => {
-    console.log('🎹 BACKEND - Piano stream stopped:', { userId: socket.userId });
-    
-    if (global.pianoStreams?.has(socket.userId.toString())) {
-      const stream = global.pianoStreams.get(socket.userId.toString());
-      global.pianoStreams.delete(socket.userId.toString());
+    try {
+      const { instrument, streamId: providedStreamId } = data;
       
-      // Notify all listeners
-      io.to(`piano_${socket.userId}`).emit("piano:streamEnded", {
-        streamerId: socket.userId,
+      // Check if user already has an active stream
+      if (global.pianoStreams.has(socket.userId.toString())) {
+        console.log('🎹 BACKEND - User already streaming, ending previous stream');
+        const oldStream = global.pianoStreams.get(socket.userId.toString());
+        io.to(`piano_${socket.userId}`).emit("piano:streamEnded", { streamerId: socket.userId });
+        global.pianoStreams.delete(socket.userId.toString());
+      }
+      
+      const streamId = providedStreamId || `stream_${socket.userId}_${Date.now()}`;
+      
+      console.log('🎹 BACKEND - Piano stream started:', {
+        userId: socket.userId,
+        streamId,
+        instrument
       });
       
-      // Leave room
-      socket.leave(`piano_${socket.userId}`);
+      // Store stream info with enhanced metadata
+      global.pianoStreams.set(socket.userId.toString(), {
+        streamId,
+        streamerId: socket.userId,
+        streamerName: socket.user.fullName,
+        streamerPic: socket.user.profilePic,
+        instrument: instrument || 'grand-piano',
+        listeners: [],
+        startedAt: new Date(),
+        lastActivity: Date.now(),
+      });
       
-      // Broadcast to all
-      io.emit("piano:streamStopped", { streamerId: socket.userId });
+      // Join stream room
+      socket.join(`piano_${socket.userId}`);
+      
+      // Broadcast to all users that a new stream started
+      io.emit("piano:streamStarted", {
+        streamId,
+        streamerId: socket.userId,
+        streamerName: socket.user.fullName,
+        streamerPic: socket.user.profilePic,
+        instrument: instrument || 'grand-piano',
+      });
+      
+      // Send confirmation to streamer
+      socket.emit("piano:streamConfirmed", { streamId });
+      
+      // Clean up any stale streams
+      cleanupStaleStreams();
+    } catch (error) {
+      console.error('🎹 BACKEND - Error starting stream:', error);
+      socket.emit("piano:error", { message: "Failed to start stream" });
     }
   });
   
+  // End streaming (supports both stopStream and endStream events)
+  const handleEndStream = () => {
+    try {
+      console.log('🎹 BACKEND - Piano stream stopped:', { userId: socket.userId });
+      
+      if (global.pianoStreams?.has(socket.userId.toString())) {
+        const stream = global.pianoStreams.get(socket.userId.toString());
+        global.pianoStreams.delete(socket.userId.toString());
+        
+        // Notify all listeners
+        io.to(`piano_${socket.userId}`).emit("piano:streamEnded", {
+          streamerId: socket.userId,
+          reason: 'ended_by_streamer'
+        });
+        
+        // Leave room
+        socket.leave(`piano_${socket.userId}`);
+        
+        // Broadcast to all
+        io.emit("piano:streamStopped", { streamerId: socket.userId });
+        
+        console.log('🎹 BACKEND - Stream ended successfully, had', stream.listeners.length, 'listeners');
+      } else {
+        console.log('🎹 BACKEND - No active stream found for user');
+      }
+    } catch (error) {
+      console.error('🎹 BACKEND - Error ending stream:', error);
+    }
+  };
+  
+  socket.on("piano:stopStream", handleEndStream);
+  socket.on("piano:endStream", handleEndStream);
+  
   // Join stream as listener
   socket.on("piano:joinStream", (data) => {
-    const { streamerId } = data;
-    
-    console.log('🎹 BACKEND - User joining stream:', {
-      listener: socket.userId,
-      streamer: streamerId
-    });
-    
-    // Join stream room
-    socket.join(`piano_${streamerId}`);
-    
-    // Update listener count
-    if (global.pianoStreams?.has(streamerId.toString())) {
+    try {
+      // Support both streamId and streamerId for compatibility
+      const streamerId = data.streamerId || data.streamId;
+      
+      if (!streamerId) {
+        console.log('🎹 BACKEND - piano:joinStream missing streamerId/streamId');
+        socket.emit("piano:error", { message: "Stream ID required" });
+        return;
+      }
+      
+      console.log('🎹 BACKEND - User joining stream:', {
+        listener: socket.userId,
+        streamer: streamerId
+      });
+      
+      // Check if stream exists
+      if (!global.pianoStreams?.has(streamerId.toString())) {
+        console.log('🎹 BACKEND - Stream not found:', streamerId);
+        socket.emit("piano:streamNotFound", { streamerId });
+        return;
+      }
+      
+      // Join stream room
+      socket.join(`piano_${streamerId}`);
+      
       const stream = global.pianoStreams.get(streamerId.toString());
       if (!stream.listeners.includes(socket.userId.toString())) {
         stream.listeners.push(socket.userId.toString());
       }
+      
+      // Update last activity
+      stream.lastActivity = Date.now();
       
       // Notify streamer of new listener
       const streamerSocketId = getReceiverSocketId(streamerId);
@@ -788,47 +855,106 @@ io.on("connection", (socket) => {
       
       // Broadcast updated listener count
       io.to(`piano_${streamerId}`).emit("piano:listenerCount", {
+        streamId: stream.streamId,
         streamerId,
         count: stream.listeners.length,
       });
+      
+      // Send current stream info to the joining listener
+      socket.emit("piano:streamInfo", {
+        streamId: stream.streamId,
+        streamerId: stream.streamerId,
+        streamerName: stream.streamerName,
+        instrument: stream.instrument,
+        listenerCount: stream.listeners.length,
+      });
+    } catch (error) {
+      console.error('🎹 BACKEND - Error joining stream:', error);
+      socket.emit("piano:error", { message: "Failed to join stream" });
     }
   });
   
   // Leave stream
   socket.on("piano:leaveStream", (data) => {
-    const { streamerId } = data;
-    
-    console.log('🎹 BACKEND - User leaving stream:', {
-      listener: socket.userId,
-      streamer: streamerId
-    });
-    
-    socket.leave(`piano_${streamerId}`);
-    
-    if (global.pianoStreams?.has(streamerId.toString())) {
-      const stream = global.pianoStreams.get(streamerId.toString());
-      stream.listeners = stream.listeners.filter(id => id !== socket.userId.toString());
+    try {
+      // Support both streamId and streamerId for compatibility
+      const streamerId = data.streamerId || data.streamId;
       
-      // Notify streamer
-      const streamerSocketId = getReceiverSocketId(streamerId);
-      if (streamerSocketId) {
-        io.to(streamerSocketId).emit("piano:listenerLeft", {
-          userId: socket.userId,
-          listenerCount: stream.listeners.length,
-        });
+      if (!streamerId) {
+        console.log('🎹 BACKEND - piano:leaveStream missing streamerId/streamId');
+        return;
       }
       
-      // Broadcast updated count
-      io.to(`piano_${streamerId}`).emit("piano:listenerCount", {
-        streamerId,
-        count: stream.listeners.length,
+      console.log('🎹 BACKEND - User leaving stream:', {
+        listener: socket.userId,
+        streamer: streamerId
       });
+      
+      socket.leave(`piano_${streamerId}`);
+      
+      if (global.pianoStreams?.has(streamerId.toString())) {
+        const stream = global.pianoStreams.get(streamerId.toString());
+        stream.listeners = stream.listeners.filter(id => id !== socket.userId.toString());
+        
+        // Notify streamer
+        const streamerSocketId = getReceiverSocketId(streamerId);
+        if (streamerSocketId) {
+          io.to(streamerSocketId).emit("piano:listenerLeft", {
+            userId: socket.userId,
+            listenerCount: stream.listeners.length,
+          });
+        }
+        
+        // Broadcast updated count
+        io.to(`piano_${streamerId}`).emit("piano:listenerCount", {
+          streamId: stream.streamId,
+          streamerId,
+          count: stream.listeners.length,
+        });
+      }
+    } catch (error) {
+      console.error('🎹 BACKEND - Error leaving stream:', error);
     }
   });
   
-  // MIDI event from streamer
+  // MIDI/Note events from streamer - optimized for low latency
+  socket.on("piano:noteOn", (data) => {
+    const { note, velocity } = data;
+    
+    // Update last activity
+    if (global.pianoStreams?.has(socket.userId.toString())) {
+      global.pianoStreams.get(socket.userId.toString()).lastActivity = Date.now();
+    }
+    
+    // Broadcast to all listeners immediately
+    socket.to(`piano_${socket.userId}`).emit("piano:noteOn", {
+      note,
+      velocity: velocity || 100,
+    });
+  });
+  
+  socket.on("piano:noteOff", (data) => {
+    const { note } = data;
+    
+    // Broadcast to all listeners immediately
+    socket.to(`piano_${socket.userId}`).emit("piano:noteOff", { note });
+  });
+  
+  socket.on("piano:sustain", (data) => {
+    const { value } = data;
+    
+    // Broadcast to all listeners
+    socket.to(`piano_${socket.userId}`).emit("piano:sustain", { value });
+  });
+  
+  // Legacy MIDI event support
   socket.on("piano:midiEvent", (data) => {
     const { type, note, velocity, value } = data;
+    
+    // Update last activity
+    if (global.pianoStreams?.has(socket.userId.toString())) {
+      global.pianoStreams.get(socket.userId.toString()).lastActivity = Date.now();
+    }
     
     // Broadcast to all listeners
     socket.to(`piano_${socket.userId}`).emit("piano:midiEvent", {
@@ -841,41 +967,73 @@ io.on("connection", (socket) => {
     });
   });
   
+  // Instrument change during stream
+  socket.on("piano:instrumentChange", (data) => {
+    const { instrument } = data;
+    
+    if (global.pianoStreams?.has(socket.userId.toString())) {
+      const stream = global.pianoStreams.get(socket.userId.toString());
+      stream.instrument = instrument;
+      
+      // Broadcast to all listeners
+      io.to(`piano_${socket.userId}`).emit("piano:instrumentChange", { instrument });
+    }
+  });
+  
   // Send reaction
   socket.on("piano:reaction", (data) => {
-    const { streamerId, emoji } = data;
-    
-    console.log('🎹 BACKEND - Reaction sent:', {
-      from: socket.userId,
-      to: streamerId,
-      emoji
-    });
-    
-    // Broadcast to stream room (including streamer)
-    io.to(`piano_${streamerId}`).emit("piano:reaction", {
-      userId: socket.userId,
-      userName: socket.user.fullName,
-      emoji,
-    });
+    try {
+      // Support both streamId and streamerId for compatibility
+      const streamerId = data.streamerId || data.streamId;
+      const { emoji } = data;
+      
+      if (!streamerId) {
+        console.log('🎹 BACKEND - piano:reaction missing streamerId/streamId');
+        return;
+      }
+      
+      console.log('🎹 BACKEND - Reaction sent:', {
+        from: socket.userId,
+        to: streamerId,
+        emoji
+      });
+      
+      // Broadcast to stream room (including streamer)
+      io.to(`piano_${streamerId}`).emit("piano:reaction", {
+        userId: socket.userId,
+        userName: socket.user.fullName,
+        emoji,
+      });
+    } catch (error) {
+      console.error('🎹 BACKEND - Error sending reaction:', error);
+    }
   });
   
   // Get active streams
   socket.on("piano:getStreams", () => {
-    const streams = [];
-    if (global.pianoStreams) {
-      global.pianoStreams.forEach((stream) => {
-        streams.push({
-          streamId: stream.streamId,
-          streamerId: stream.streamerId,
-          streamerName: stream.streamerName,
-          streamerPic: stream.streamerPic,
-          instrument: stream.instrument,
-          listenerCount: stream.listeners.length,
-          startedAt: stream.startedAt,
+    try {
+      // Clean up stale streams first
+      cleanupStaleStreams();
+      
+      const streams = [];
+      if (global.pianoStreams) {
+        global.pianoStreams.forEach((stream) => {
+          streams.push({
+            streamId: stream.streamId,
+            streamerId: stream.streamerId,
+            streamerName: stream.streamerName,
+            streamerPic: stream.streamerPic,
+            instrument: stream.instrument,
+            listenerCount: stream.listeners.length,
+            startedAt: stream.startedAt,
+          });
         });
-      });
+      }
+      socket.emit("piano:streamsList", streams);
+    } catch (error) {
+      console.error('🎹 BACKEND - Error getting streams:', error);
+      socket.emit("piano:streamsList", []);
     }
-    socket.emit("piano:streamsList", streams);
   });
 
   socket.on("disconnect", () => {

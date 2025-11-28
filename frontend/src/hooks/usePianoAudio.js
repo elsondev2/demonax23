@@ -12,6 +12,7 @@ const NOTES = [
 ];
 
 // Keyboard mapping (like BandLab)
+// Note: '/' maps to same note as 'q' (E4) for convenience
 const KEYBOARD_MAP = {
   // Lower octave (C3-B3)
   'z': 'C3', 'x': 'D3', 'c': 'E3', 'v': 'F3', 'b': 'G3', 'n': 'A3', 'm': 'B3',
@@ -19,6 +20,7 @@ const KEYBOARD_MAP = {
   // Middle octave (C4-B4)
   ',': 'C4', '.': 'D4', 'q': 'E4', 'w': 'F4', 'e': 'G4', 'r': 'A4', 't': 'B4',
   'l': 'C#4', '1': 'D#4', '3': 'F#4', '4': 'G#4', '5': 'A#4',
+  '/': 'E4', // Same as 'q' key for convenience
   // Upper octave (C5-B5)
   'y': 'C5', 'u': 'D5', 'i': 'E5', 'o': 'F5', 'p': 'G5',
   '7': 'C#5', '8': 'D#5', '0': 'F#5',

@@ -5,3 +5,8 @@ export { default as InstrumentSelector } from './InstrumentSelector';
 export { default as MIDIDeviceSelector } from './MIDIDeviceSelector';
 export { default as RecordingControls } from './RecordingControls';
 export { default as PianoRecordings } from './PianoRecordings';
+export { default as PracticeMode } from './PracticeMode';
+export { default as PianoHall } from './PianoHall';
+export { default as ProfileStats } from './ProfileStats';
+export { default as StreamViewer } from './StreamViewer';
+export { default as EmojiReaction } from './EmojiReaction';

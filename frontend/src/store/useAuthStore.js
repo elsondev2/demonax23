@@ -227,6 +227,14 @@ export const useAuthStore = create((set, get) => ({
         console.warn("Failed to clear chat data on logout:", e);
       }
 
+      // Cleanup call system
+      try {
+        const { useCallStore } = await import("./useCallStore");
+        useCallStore.getState().cleanupCallSystem();
+      } catch (e) {
+        console.warn("Failed to cleanup call system on logout:", e);
+      }
+
       set({ authUser: null, socket: null, onlineUsers: [] });
       return { success: true };
     } catch (error) {
@@ -308,6 +316,21 @@ export const useAuthStore = create((set, get) => ({
 
       // Re-establish subscriptions
       get().reestablishSubscriptions();
+
+      // Initialize call system
+      try {
+        import("./useCallStore").then(mod => {
+          const callStore = mod.useCallStore;
+          if (callStore?.getState()?.initializeCallSystem) {
+            callStore.getState().initializeCallSystem();
+            console.log("📞 Call system initialized");
+          }
+        }).catch(err => {
+          console.warn("Failed to initialize call system:", err);
+        });
+      } catch (e) {
+        console.warn("Call system initialization error:", e);
+      }
     });
 
     newSocket.on("connect_error", (err) => {
@@ -379,8 +402,8 @@ export const useAuthStore = create((set, get) => ({
       import("./useFriendStore").then(mod => {
         const friendStore = mod.default.getState();
         if (friendStore.subscribeSocket) friendStore.subscribeSocket();
-      }).catch(() => { });
-    } catch (e) { }
+      }).catch(() => { /* ignore */ });
+    } catch { /* ignore */ }
 
     // Subscribe group message events so Groups panel updates live
     try {
@@ -388,8 +411,8 @@ export const useAuthStore = create((set, get) => ({
         const groupStore = mod.default.getState();
         if (groupStore.unsubscribeFromGroupMessages) groupStore.unsubscribeFromGroupMessages();
         if (groupStore.subscribeToGroupMessages) groupStore.subscribeToGroupMessages();
-      }).catch(() => { });
-    } catch (e) { /* empty */ }
+      }).catch(() => { /* ignore */ });
+    } catch { /* ignore */ }
 
     // Fetch online users
     socket.emit("getOnlineUsers");

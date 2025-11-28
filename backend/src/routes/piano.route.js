@@ -136,4 +136,51 @@ router.get('/stats/:userId', protectRoute, async (req, res) => {
   }
 });
 
+// Get leaderboard
+router.get('/leaderboard', protectRoute, async (req, res) => {
+  try {
+    const stats = await PianoStats.find()
+      .sort({ totalListeners: -1, totalPlayTime: -1 })
+      .limit(20)
+      .populate('userId', 'username fullName profilePic')
+      .lean();
+
+    // Transform to include user info at top level
+    const leaderboard = stats.map((stat) => ({
+      _id: stat.userId?._id,
+      username: stat.userId?.fullName || stat.userId?.username || 'Unknown',
+      profilePic: stat.userId?.profilePic,
+      totalPlayTime: stat.totalPlayTime || 0,
+      totalStreams: stat.totalStreams || 0,
+      totalListeners: stat.totalListeners || 0,
+    }));
+
+    res.json(leaderboard);
+  } catch (error) {
+    console.error('Error fetching leaderboard:', error);
+    res.status(500).json({ error: 'Failed to fetch leaderboard' });
+  }
+});
+
+// Update play time (called periodically while playing)
+router.post('/stats/playtime', protectRoute, async (req, res) => {
+  try {
+    const { seconds } = req.body;
+
+    await PianoStats.findOneAndUpdate(
+      { userId: req.user._id },
+      {
+        $inc: { totalPlayTime: seconds || 1 },
+        $set: { lastPlayedAt: new Date() },
+      },
+      { upsert: true }
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating play time:', error);
+    res.status(500).json({ error: 'Failed to update play time' });
+  }
+});
+
 export default router;

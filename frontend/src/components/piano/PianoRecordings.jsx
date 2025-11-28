@@ -1,31 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { usePianoStore } from '../../store/usePianoStore';
 import { usePianoAudio } from '../../hooks/usePianoAudio';
-import { Play, Pause, Trash2, Clock, Music, Cloud, CloudOff } from 'lucide-react';
-import { useAuthStore } from '../../store/useAuthStore';
+import {
+  Play,
+  Pause,
+  Trash2,
+  Clock,
+  Music,
+  Download,
+} from 'lucide-react';
 
 const PianoRecordings = () => {
-  const { authUser } = useAuthStore();
-  const { 
-    recordings, 
-    cloudRecordings,
-    loadLocalRecordings, 
-    deleteRecording,
-    uploadRecording,
-    fetchCloudRecordings,
-    isLoading
-  } = usePianoStore();
-  
-  const { playRecording, stopAllNotes } = usePianoAudio();
+  const { recordings, deleteRecording } = usePianoStore();
+  const { playNote, stopNote, setInstrument } = usePianoAudio();
   const [playingId, setPlayingId] = useState(null);
-  const [activeTab, setActiveTab] = useState('local');
-  const [playingNotes, setPlayingNotes] = useState(new Set());
-
-  // Load recordings on mount
-  useEffect(() => {
-    loadLocalRecordings();
-    fetchCloudRecordings();
-  }, [loadLocalRecordings, fetchCloudRecordings]);
+  const [playbackTimeout, setPlaybackTimeout] = useState(null);
 
   const formatDuration = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -33,192 +22,168 @@ const PianoRecordings = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const handlePlay = async (recording) => {
+  const playRecording = async (recording) => {
     if (playingId === recording.id) {
-      // Stop playing
-      stopAllNotes();
-      setPlayingId(null);
-      setPlayingNotes(new Set());
+      // Stop playback
+      stopPlayback();
       return;
     }
 
+    // Stop any current playback
+    stopPlayback();
+
     setPlayingId(recording.id);
-    
-    await playRecording(recording, (note, isOn) => {
-      setPlayingNotes(prev => {
-        const next = new Set(prev);
-        if (isOn) {
-          next.add(note);
-        } else {
-          next.delete(note);
-        }
-        return next;
-      });
-    });
-    
+    setInstrument(recording.instrument || 'grand-piano');
+
+    const events = recording.events || [];
+    let currentIndex = 0;
+
+    const playNextEvent = () => {
+      if (currentIndex >= events.length) {
+        setPlayingId(null);
+        return;
+      }
+
+      const event = events[currentIndex];
+      const nextEvent = events[currentIndex + 1];
+
+      if (event.type === 'noteOn') {
+        playNote(event.note, event.velocity / 127);
+      } else if (event.type === 'noteOff') {
+        stopNote(event.note);
+      }
+
+      currentIndex++;
+
+      if (nextEvent) {
+        const delay = nextEvent.timestamp - event.timestamp;
+        const timeout = setTimeout(playNextEvent, delay);
+        setPlaybackTimeout(timeout);
+      } else {
+        setPlayingId(null);
+      }
+    };
+
+    playNextEvent();
+  };
+
+  const stopPlayback = () => {
+    if (playbackTimeout) {
+      clearTimeout(playbackTimeout);
+      setPlaybackTimeout(null);
+    }
     setPlayingId(null);
-    setPlayingNotes(new Set());
   };
 
   const handleDelete = (id) => {
-    if (confirm('Delete this recording?')) {
-      deleteRecording(id);
-      if (playingId === id) {
-        stopAllNotes();
-        setPlayingId(null);
-      }
+    if (playingId === id) {
+      stopPlayback();
     }
+    deleteRecording(id);
   };
 
-  const handleUploadToCloud = async (recording) => {
-    if (!authUser?.isPremium) {
-      alert('Cloud storage is a premium feature. Upgrade to save recordings to the cloud!');
-      return;
-    }
-    
-    try {
-      await uploadRecording(recording);
-    } catch {
-      // Error handled in store
-    }
+  const downloadRecording = (recording) => {
+    const data = JSON.stringify(recording, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${recording.title || 'recording'}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
-  const currentRecordings = activeTab === 'local' ? recordings : cloudRecordings;
+  if (recordings.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary-focus/20 border border-primary/30 flex items-center justify-center mb-4">
+          <Music className="w-10 h-10 text-primary" />
+        </div>
+        <h3 className="text-xl font-semibold mb-2">No Recordings Yet</h3>
+        <p className="text-sm opacity-60 text-center max-w-xs">
+          Start recording in Practice mode to save your performances here.
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Tabs */}
-      <div className="tabs tabs-boxed bg-base-200 p-1 mb-4">
-        <button
-          className={`tab flex-1 gap-2 ${activeTab === 'local' ? 'tab-active' : ''}`}
-          onClick={() => setActiveTab('local')}
+    <div className="max-w-2xl mx-auto space-y-3">
+      <p className="text-sm opacity-60 mb-4">
+        {recordings.length} recording{recordings.length !== 1 ? 's' : ''} saved locally
+      </p>
+
+      {recordings.map((recording) => (
+        <div
+          key={recording.id}
+          className={`bg-base-200 rounded-xl p-4 border transition-all ${
+            playingId === recording.id
+              ? 'border-primary shadow-lg shadow-primary/20'
+              : 'border-base-300 hover:border-base-content/20'
+          }`}
         >
-          <CloudOff className="w-4 h-4" />
-          Local ({recordings.length})
-        </button>
-        <button
-          className={`tab flex-1 gap-2 ${activeTab === 'cloud' ? 'tab-active' : ''}`}
-          onClick={() => setActiveTab('cloud')}
-        >
-          <Cloud className="w-4 h-4" />
-          Cloud ({cloudRecordings.length})
-        </button>
-      </div>
+          <div className="flex items-center gap-4">
+            {/* Play Button */}
+            <button
+              onClick={() => playRecording(recording)}
+              className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                playingId === recording.id
+                  ? 'bg-primary text-primary-content'
+                  : 'bg-base-300 hover:bg-primary/20 hover:text-primary'
+              }`}
+            >
+              {playingId === recording.id ? (
+                <Pause className="w-5 h-5" />
+              ) : (
+                <Play className="w-5 h-5 ml-0.5" />
+              )}
+            </button>
 
-      {/* Recordings list */}
-      <div className="flex-1 overflow-y-auto space-y-2">
-        {currentRecordings.length === 0 ? (
-          <div className="text-center py-12 text-base-content/50">
-            <Music className="w-12 h-12 mx-auto mb-3 opacity-50" />
-            <p className="text-sm">No recordings yet</p>
-            <p className="text-xs mt-1">
-              {activeTab === 'local' 
-                ? 'Press the record button to start recording'
-                : 'Upload local recordings to save them to the cloud'}
-            </p>
-          </div>
-        ) : (
-          currentRecordings.map((recording) => {
-            const isPlaying = playingId === recording.id;
-            
-            return (
-              <div
-                key={recording.id}
-                className={`
-                  card bg-base-200 p-3 transition-all
-                  ${isPlaying ? 'ring-2 ring-primary' : ''}
-                `}
-              >
-                <div className="flex items-center gap-3">
-                  {/* Play button */}
-                  <button
-                    onClick={() => handlePlay(recording)}
-                    className={`
-                      btn btn-circle btn-sm
-                      ${isPlaying ? 'btn-primary' : 'btn-ghost'}
-                    `}
-                  >
-                    {isPlaying ? (
-                      <Pause className="w-4 h-4" />
-                    ) : (
-                      <Play className="w-4 h-4" />
-                    )}
-                  </button>
-
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm truncate">
-                      {recording.title}
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-base-content/50">
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {formatDuration(recording.duration)}
-                      </span>
-                      <span>{recording.instrument}</span>
-                      <span>{formatDate(recording.createdAt)}</span>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-1">
-                    {activeTab === 'local' && (
-                      <button
-                        onClick={() => handleUploadToCloud(recording)}
-                        className="btn btn-ghost btn-xs btn-circle"
-                        title={authUser?.isPremium ? 'Upload to cloud' : 'Premium feature'}
-                        disabled={isLoading}
-                      >
-                        <Cloud className={`w-4 h-4 ${!authUser?.isPremium ? 'opacity-50' : ''}`} />
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleDelete(recording.id)}
-                      className="btn btn-ghost btn-xs btn-circle text-error"
-                      title="Delete"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Playing visualization */}
-                {isPlaying && playingNotes.size > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {Array.from(playingNotes).map(note => (
-                      <span 
-                        key={note}
-                        className="badge badge-primary badge-sm animate-pulse"
-                      >
-                        {note}
-                      </span>
-                    ))}
-                  </div>
-                )}
+            {/* Info */}
+            <div className="flex-1 min-w-0">
+              <h4 className="font-medium truncate">{recording.title}</h4>
+              <div className="flex items-center gap-3 text-xs opacity-60">
+                <span className="flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  {formatDuration(recording.duration)}
+                </span>
+                <span>🎹 {recording.instrument || 'Piano'}</span>
+                <span>{new Date(recording.createdAt).toLocaleDateString()}</span>
               </div>
-            );
-          })
-        )}
-      </div>
+            </div>
 
-      {/* Premium upsell for cloud */}
-      {activeTab === 'cloud' && !authUser?.isPremium && (
-        <div className="mt-4 p-3 bg-warning/10 rounded-lg border border-warning/30">
-          <p className="text-sm text-warning">
-            ⭐ Upgrade to Premium to save unlimited recordings to the cloud!
-          </p>
+            {/* Actions */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => downloadRecording(recording)}
+                className="btn btn-ghost btn-sm btn-circle"
+                title="Download"
+              >
+                <Download className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => handleDelete(recording.id)}
+                className="btn btn-ghost btn-sm btn-circle text-error"
+                title="Delete"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Playback Progress */}
+          {playingId === recording.id && (
+            <div className="mt-3 pt-3 border-t border-base-300">
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-1 bg-base-300 rounded-full overflow-hidden">
+                  <div className="h-full bg-primary animate-pulse" style={{ width: '50%' }} />
+                </div>
+                <span className="text-xs opacity-60">Playing...</span>
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      ))}
     </div>
   );
 };

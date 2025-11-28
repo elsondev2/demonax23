@@ -1,5 +1,64 @@
 /* Piano Room Styles - BandLab Inspired Dark Theme */
 
+/* ============================================
+   MOBILE LANDSCAPE LOCK
+   ============================================ */
+/* Force landscape orientation message on mobile portrait */
+.piano-landscape-lock {
+  display: none;
+}
+
+@media (max-width: 768px) and (orientation: portrait) {
+  .piano-landscape-lock {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    padding: 2rem;
+    text-align: center;
+  }
+
+  .piano-landscape-lock .rotate-icon {
+    width: 80px;
+    height: 80px;
+    animation: rotatePhone 2s ease-in-out infinite;
+  }
+
+  .piano-landscape-lock h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: white;
+  }
+
+  .piano-landscape-lock p {
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.7);
+    max-width: 280px;
+  }
+
+  @keyframes rotatePhone {
+    0%, 100% {
+      transform: rotate(0deg);
+    }
+    25% {
+      transform: rotate(-15deg);
+    }
+    75% {
+      transform: rotate(90deg);
+    }
+  }
+
+  /* Hide piano content in portrait */
+  .piano-main-content {
+    display: none !important;
+  }
+}
+
 /* Piano Container */
 .piano-container {
   width: 100%;
@@ -8,40 +67,38 @@
   padding: 0;
 }
 
-/* Mobile rotation for better piano layout in portrait mode */
+/* Mobile portrait - horizontal scrollable piano */
 @media (max-width: 768px) and (orientation: portrait) {
   .piano-container {
-    transform: rotate(-90deg);
-    transform-origin: center center;
-    width: 100vh;
-    height: 100vw;
-    position: fixed;
-    left: 50%;
-    top: 50%;
-    margin-left: -50vh;
-    margin-top: -50vw;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    width: 100%;
+    padding: 0 4px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
   }
 
   .piano-keyboard {
-    width: 95%;
-    max-width: 95%;
-    padding: 8px 6px 6px 6px;
+    width: max-content;
+    min-width: 100%;
+    padding: 10px 8px 8px 8px;
   }
 
   .piano-key-white {
-    width: 100%;
-    height: 200px;
-    flex: 1;
+    min-width: 42px;
+    width: 42px;
+    height: 180px;
+    flex: none;
   }
 
   .piano-black-keys {
-    top: 8px;
-    left: 6px;
-    right: 6px;
-    height: 58%;
+    top: 10px;
+    left: 8px;
+    right: 8px;
+    height: 55%;
+  }
+
+  .piano-key-black {
+    min-width: 28px;
   }
 
   .piano-key-white .key-label {
@@ -54,6 +111,125 @@
 
   .piano-key-white .octave-label {
     font-size: 8px;
+  }
+}
+
+/* Mobile landscape - FULLSCREEN piano mode */
+@media (max-width: 932px) and (orientation: landscape) {
+  /* Make piano room take full viewport */
+  .piano-fullscreen-mobile {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 100 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background: var(--fallback-b1, oklch(var(--b1))) !important;
+  }
+
+  .piano-container {
+    width: 100%;
+    padding: 0 2px;
+  }
+
+  .piano-keyboard {
+    width: 100%;
+    padding: 4px 4px 4px 4px;
+  }
+
+  .piano-key-white {
+    height: calc(100vh - 60px);
+    max-height: 200px;
+  }
+
+  .piano-black-keys {
+    height: 55%;
+    top: 4px;
+    left: 4px;
+    right: 4px;
+  }
+
+  .piano-key-white .key-label {
+    font-size: 8px;
+  }
+
+  .piano-key-black .key-label {
+    font-size: 7px;
+  }
+
+  /* Hide non-essential elements in landscape */
+  .piano-hide-landscape {
+    display: none !important;
+  }
+
+  /* Show landscape-only controls */
+  .piano-show-landscape {
+    display: flex !important;
+  }
+
+  /* Compact top controls bar */
+  .piano-controls-compact {
+    padding: 2px 8px !important;
+    min-height: 36px !important;
+    gap: 4px !important;
+    background: rgba(0, 0, 0, 0.8) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  }
+
+  /* Minimize piano area padding */
+  .piano-area-landscape {
+    padding: 2px !important;
+    padding-bottom: 2px !important;
+    flex: 1 !important;
+  }
+
+  /* Floating controls on left side */
+  .piano-floating-controls-left {
+    position: fixed !important;
+    left: 8px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    z-index: 150 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    background: rgba(0, 0, 0, 0.7) !important;
+    padding: 8px !important;
+    border-radius: 12px !important;
+    backdrop-filter: blur(8px) !important;
+  }
+
+  /* Floating controls on right side */
+  .piano-floating-controls-right {
+    position: fixed !important;
+    right: 8px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    z-index: 150 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    background: rgba(0, 0, 0, 0.7) !important;
+    padding: 8px !important;
+    border-radius: 12px !important;
+    backdrop-filter: blur(8px) !important;
+  }
+
+  .piano-floating-controls-left button,
+  .piano-floating-controls-right button {
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 8px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 10px !important;
+    padding: 0 !important;
+  }
+
+  .piano-floating-controls-left .control-label,
+  .piano-floating-controls-right .control-label {
+    font-size: 8px !important;
+    text-align: center !important;
   }
 }
 

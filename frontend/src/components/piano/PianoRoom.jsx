@@ -63,8 +63,8 @@ const PianoRoom = () => {
 
       {/* Mobile Layout */}
       <div className="md:hidden w-full h-full flex flex-col overflow-hidden bg-base-100">
-        {/* Tabs */}
-        <div className="flex items-center gap-1 px-2 py-2 bg-base-200 border-b border-base-300">
+        {/* Tabs - Hidden on landscape for fullscreen piano */}
+        <div className="flex items-center gap-1 px-2 py-2 bg-base-200 border-b border-base-300 piano-hide-landscape">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (

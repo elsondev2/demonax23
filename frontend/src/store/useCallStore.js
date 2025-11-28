@@ -305,6 +305,25 @@ export const useCallStore = create((set, get) => ({
         throw new Error('Socket not connected');
       }
 
+      // Try to get callee info from chat store
+      let calleeInfo = null;
+      try {
+        const { useChatStore } = await import('./useChatStore');
+        const chatStore = useChatStore.getState();
+        // Look in allContacts or chats
+        calleeInfo = chatStore.allContacts?.find(c => c._id === calleeId) ||
+                     chatStore.chats?.find(c => c._id === calleeId);
+        if (calleeInfo) {
+          calleeInfo = {
+            _id: calleeInfo._id,
+            fullName: calleeInfo.fullName,
+            profilePic: calleeInfo.profilePic
+          };
+        }
+      } catch (e) {
+        console.warn('Could not get callee info:', e);
+      }
+
       // Generate channel name
       const channelName = `call_${authUser._id}_${calleeId}_${Date.now()}`;
 
@@ -314,6 +333,7 @@ export const useCallStore = create((set, get) => ({
         callDirection: 'outgoing',
         caller: authUser._id,
         callee: calleeId,
+        calleeInfo,
         channelName,
         showCallScreen: true
       });
@@ -474,7 +494,7 @@ export const useCallStore = create((set, get) => ({
     console.log('🔚 Ending call...', { reason });
 
     const { socket } = useAuthStore.getState();
-    const { caller, callee, callDirection, callStartTime, connectionTimeout, channelName } = get();
+    const { caller, callee, callDirection, callStartTime, connectionTimeout } = get();
 
     // Clear connection timeout
     if (connectionTimeout) {
