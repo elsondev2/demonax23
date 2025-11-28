@@ -4,21 +4,32 @@ import toast from "react-hot-toast";
 import { webrtcService } from "../lib/webrtcService";
 
 // Initialize call socket listeners
-export const initializeCallSocketListeners = (callStore) => {
+export const initializeCallSocketListeners = () => {
   const { socket } = useAuthStore.getState();
 
   if (!socket || !socket.connected) {
     console.warn('Socket not connected, cannot initialize call listeners');
-    return;
+    return false;
   }
 
   console.log('🎧 Initializing WebRTC call socket listeners...');
+
+  // Remove existing listeners first to prevent duplicates
+  socket.off("call-request");
+  socket.off("call-answer");
+  socket.off("call-reject");
+  socket.off("call-end");
+  socket.off("webrtc:offer");
+  socket.off("webrtc:answer");
+  socket.off("webrtc:iceCandidate");
+  socket.off("webrtc:userJoined");
+  socket.off("webrtc:userLeft");
 
   // Handle incoming call request
   socket.on("call-request", (data) => {
     try {
       console.log('📞 Received call-request:', data);
-      callStore.getState().handleIncomingCall(data);
+      useCallStore.getState().handleIncomingCall(data);
     } catch (error) {
       console.error("Error handling incoming call:", error);
     }
@@ -27,27 +38,27 @@ export const initializeCallSocketListeners = (callStore) => {
   // Handle call answer
   socket.on("call-answer", (data) => {
     console.log('✅ Received call-answer:', data);
-    callStore.getState().handleCallAnswer();
+    useCallStore.getState().handleCallAnswer();
   });
 
   // Handle call rejection
   socket.on("call-reject", (data) => {
     console.log('❌ Received call-reject:', data);
-    callStore.getState().endCall('rejected');
+    useCallStore.getState().endCall('rejected');
   });
 
   // Handle call end
   socket.on("call-end", (data) => {
     console.log('🔚 Received call-end:', data);
     const reason = data.reason || 'ended';
-    callStore.getState().endCall(reason);
+    useCallStore.getState().endCall(reason);
   });
 
   // WebRTC signaling events
   socket.on("webrtc:offer", async (data) => {
     console.log('📥 Received WebRTC offer:', data);
     try {
-      await callStore.getState().handleWebRTCOffer(data);
+      await useCallStore.getState().handleWebRTCOffer(data);
     } catch (error) {
       console.error('Error handling WebRTC offer:', error);
     }
@@ -56,7 +67,7 @@ export const initializeCallSocketListeners = (callStore) => {
   socket.on("webrtc:answer", async (data) => {
     console.log('📥 Received WebRTC answer:', data);
     try {
-      await callStore.getState().handleWebRTCAnswer(data);
+      await useCallStore.getState().handleWebRTCAnswer(data);
     } catch (error) {
       console.error('Error handling WebRTC answer:', error);
     }
@@ -65,7 +76,7 @@ export const initializeCallSocketListeners = (callStore) => {
   socket.on("webrtc:iceCandidate", async (data) => {
     console.log('🧊 Received ICE candidate:', data);
     try {
-      await callStore.getState().handleICECandidate(data);
+      await useCallStore.getState().handleICECandidate(data);
     } catch (error) {
       console.error('Error handling ICE candidate:', error);
     }
@@ -77,10 +88,11 @@ export const initializeCallSocketListeners = (callStore) => {
 
   socket.on("webrtc:userLeft", (data) => {
     console.log('👤 User left channel:', data);
-    callStore.getState().endCall('user_left');
+    useCallStore.getState().endCall('user_left');
   });
 
   console.log('✅ WebRTC call socket listeners initialized');
+  return true;
 };
 
 // Cleanup call socket listeners
@@ -128,6 +140,7 @@ export const useCallStore = create((set, get) => ({
   showCallModal: false,
   showCallScreen: false,
   showIncomingCall: false,
+  lastUpdate: Date.now(), // For triggering re-renders
 
   // Call Data
   incomingOffer: null,
@@ -399,13 +412,15 @@ export const useCallStore = create((set, get) => ({
         caller: from,
         callerInfo,
         channelName,
-        showIncomingCall: true
+        showIncomingCall: true,
+        showCallModal: true,
+        lastUpdate: Date.now() // Trigger re-render
       });
 
       // Play ringtone
       get().playRingtone();
 
-      console.log('✅ Incoming call handled');
+      console.log('✅ Incoming call handled, showIncomingCall:', true);
 
     } catch (error) {
       console.error('❌ Failed to handle incoming call:', error);
@@ -413,7 +428,7 @@ export const useCallStore = create((set, get) => ({
   },
 
   /**
-   * Answer incoming call
+   * Answer/Accept incoming call
    */
   answerCall: async () => {
     try {
@@ -450,6 +465,11 @@ export const useCallStore = create((set, get) => ({
       toast.error(`Failed to answer call: ${error.message}`);
       get().endCall('failed');
     }
+  },
+
+  // Alias for answerCall (used by CallModal)
+  acceptCall: async () => {
+    return get().answerCall();
   },
 
   /**
@@ -601,6 +621,15 @@ export const useCallStore = create((set, get) => ({
   },
 
   /**
+   * Format duration in MM:SS format
+   */
+  formatDuration: (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  },
+
+  /**
    * Play ringtone
    */
   playRingtone: () => {
@@ -685,8 +714,11 @@ export const useCallStore = create((set, get) => ({
    */
   initializeCallSystem: () => {
     console.log('🎧 Initializing call system...');
-    initializeCallSocketListeners(get());
-    console.log('✅ Call system initialized');
+    const result = initializeCallSocketListeners();
+    if (result) {
+      console.log('✅ Call system initialized');
+    }
+    return result;
   },
 
   /**
