@@ -17,7 +17,15 @@ mobile-app/
 .env.development.local
 .env.test.local
 .env.production.local
-*.env
+.env.production
+frontend/.env
+frontend/.env.production
+backend/.env
+backend/.env.production
+# Allow .env.example files (they contain no secrets)
+!*.env.example
+!frontend/.env.example
+!backend/.env.example
 
 # Build outputs
 dist/

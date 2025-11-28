@@ -8,26 +8,33 @@ import { generateToken } from "../lib/utils.js";
 import { cacheWrap, cacheInvalidate } from "../lib/cache.js";
 import { removeFromSupabase } from "../lib/supabase.js";
 
-// Hardcoded admin credentials
-const ADMIN_USERNAME = "elsondev26";
-const ADMIN_PASSWORD = "irenendonde";
+// Admin credentials from environment variables
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@demonax.com";
 
 export const adminLogin = async (req, res) => {
   try {
     const { username, password } = req.body;
 
-    // Check hardcoded credentials
+    // Validate environment variables are set
+    if (!ADMIN_USERNAME || !ADMIN_PASSWORD) {
+      console.error("Admin credentials not configured in environment variables");
+      return res.status(500).json({ message: "Admin login not configured" });
+    }
+
+    // Check credentials from environment
     if (username !== ADMIN_USERNAME || password !== ADMIN_PASSWORD) {
       return res.status(401).json({ message: "Invalid admin credentials" });
     }
 
     // Find or create admin user
-    let adminUser = await User.findOne({ email: "admin@demonax.com" });
+    let adminUser = await User.findOne({ email: ADMIN_EMAIL });
 
     if (!adminUser) {
       // Create admin user if doesn't exist
       adminUser = await User.create({
-        email: "admin@demonax.com",
+        email: ADMIN_EMAIL,
         fullName: "Admin",
         username: ADMIN_USERNAME,
         password: ADMIN_PASSWORD,
