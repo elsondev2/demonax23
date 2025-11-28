@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, UserPlus, UserCheck, ArrowLeft } from 'lucide-react';
+import { Users, UserPlus, UserCheck } from 'lucide-react';
 import { axiosInstance } from '../lib/axios';
 import { useAuthStore } from '../store/useAuthStore';
 import Avatar from './Avatar';
@@ -7,7 +7,7 @@ import PremiumBadge from './PremiumBadge';
 import FollowButton from './FollowButton';
 import UserProfileModal from './UserProfileModal';
 
-export default function FollowersFollowingView({ onBack }) {
+export default function FollowersFollowingView() {
   const { authUser } = useAuthStore();
   const [activeTab, setActiveTab] = useState('followers'); // 'followers' | 'following'
   const [followers, setFollowers] = useState([]);
@@ -57,22 +57,6 @@ export default function FollowersFollowingView({ onBack }) {
       {/* Header */}
       <div className="flex-shrink-0 border-b border-base-300 bg-base-200/80 backdrop-blur-sm">
         <div className="p-4">
-          <div className="flex items-center gap-3 mb-4">
-            <button
-              onClick={onBack}
-              className="btn btn-ghost btn-sm btn-circle"
-              aria-label="Go back"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <div className="flex-1">
-              <h1 className="text-xl md:text-2xl font-bold">My Network</h1>
-              <p className="text-xs md:text-sm text-base-content/60">
-                Manage your followers and following
-              </p>
-            </div>
-          </div>
-
           {/* Tabs */}
           <div className="tabs tabs-boxed w-full">
             <a
