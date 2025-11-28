@@ -1,8 +1,11 @@
 import AppRequest from "../models/AppRequest.js";
 
-const APP_REQUEST_WEBHOOK_URL = 'https://discord.com/api/webhooks/1443750264493445242/6f9KA-bPAYbhLKgYzmNP9Dy6S5Bpja1GOfC7_umy3w8bou5_bw349Mg6UM5sGEtkDVh-yh';
+// Discord webhook URL from environment variable
+const APP_REQUEST_WEBHOOK_URL = process.env.DISCORD_APP_REQUEST_WEBHOOK_URL;
 
 const sendAppRequestToDiscord = async (appRequest, user, isUpdate = false) => {
+  if (!APP_REQUEST_WEBHOOK_URL) return;
+  
   try {
     const embed = {
       title: `${isUpdate ? '📝' : '🆕'} App Integration Request: ${appRequest.appName}`,
@@ -34,8 +37,10 @@ export const createAppRequest = async (req, res) => {
       return res.status(400).json({ message: "App name and description are required" });
     }
 
+    const escapedAppName = appName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    
     const existingRequest = await AppRequest.findOne({
-      appName: { $regex: new RegExp(`^${appName}$`, 'i') },
+      appName: { $regex: new RegExp(`^${escapedAppName}$`, 'i') },
       requestedBy: userId
     });
 
@@ -44,7 +49,9 @@ export const createAppRequest = async (req, res) => {
     }
 
     const appRequest = new AppRequest({
-      appName, appDescription, appUrl,
+      appName,
+      appDescription,
+      appUrl,
       appCategory: appCategory || 'other',
       requestedBy: userId,
       votes: { upvotes: [userId], downvotes: [] }
@@ -52,7 +59,6 @@ export const createAppRequest = async (req, res) => {
 
     await appRequest.save();
     await appRequest.populate('requestedBy', 'fullName email username profilePic');
-
     await sendAppRequestToDiscord(appRequest, req.user);
 
     res.status(201).json({ success: true, message: "App request submitted successfully", appRequest });
@@ -61,6 +67,7 @@ export const createAppRequest = async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 };
+
 
 export const getAppRequests = async (req, res) => {
   try {
@@ -194,7 +201,7 @@ export const deleteAppRequest = async (req, res) => {
   }
 };
 
-export const getAppRequestStats = async (req, res) => {
+export const getAppRequestStats = async (_req, res) => {
   try {
     const total = await AppRequest.countDocuments();
     const pending = await AppRequest.countDocuments({ status: 'pending' });
