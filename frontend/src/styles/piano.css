@@ -3,59 +3,84 @@
 /* ============================================
    MOBILE LANDSCAPE LOCK
    ============================================ */
-/* Force landscape orientation message on mobile portrait */
 .piano-landscape-lock {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+.piano-landscape-lock--active {
+  display: flex;
+}
+
+.piano-landscape-lock .rotate-icon {
+  width: 80px;
+  height: 80px;
+  animation: rotatePhone 2s ease-in-out infinite;
+}
+
+.piano-landscape-lock h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: white;
+}
+
+.piano-landscape-lock p {
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.8);
+  max-width: 300px;
+}
+
+@keyframes rotatePhone {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-15deg);
+  }
+  75% {
+    transform: rotate(90deg);
+  }
+}
+
+@media (max-width: 900px) {
+  .piano-main-content-locked {
+    filter: blur(4px);
+    opacity: 0.25;
+    pointer-events: none;
+    user-select: none;
+/* Status chip + reaction tray helpers */
+.piano-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.piano-reaction-tray {
+  overflow-x: auto;
+  padding-bottom: 2px;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.piano-reaction-tray::-webkit-scrollbar {
   display: none;
 }
 
-@media (max-width: 768px) and (orientation: portrait) {
-  .piano-landscape-lock {
-    display: flex;
-    position: fixed;
-    inset: 0;
-    z-index: 9999;
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 1.5rem;
-    padding: 2rem;
-    text-align: center;
-  }
-
-  .piano-landscape-lock .rotate-icon {
-    width: 80px;
-    height: 80px;
-    animation: rotatePhone 2s ease-in-out infinite;
-  }
-
-  .piano-landscape-lock h3 {
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: white;
-  }
-
-  .piano-landscape-lock p {
-    font-size: 0.875rem;
-    color: rgba(255, 255, 255, 0.7);
-    max-width: 280px;
-  }
-
-  @keyframes rotatePhone {
-    0%, 100% {
-      transform: rotate(0deg);
-    }
-    25% {
-      transform: rotate(-15deg);
-    }
-    75% {
-      transform: rotate(90deg);
-    }
-  }
-
-  /* Hide piano content in portrait */
-  .piano-main-content {
-    display: none !important;
   }
 }
 

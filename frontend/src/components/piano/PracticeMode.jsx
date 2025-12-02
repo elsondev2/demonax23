@@ -4,6 +4,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import VirtualPiano from './VirtualPiano';
 import RecordingControls from './RecordingControls';
 import { INSTRUMENTS } from '../../hooks/usePianoAudio';
+import { useOrientationPrompt } from '../../hooks/useOrientationPrompt';
 import toast from 'react-hot-toast';
 import {
   ChevronLeft,
@@ -13,6 +14,7 @@ import {
   Radio as RadioIcon,
   RotateCcw,
   X,
+  ArrowLeftRight,
 } from 'lucide-react';
 
 const PracticeMode = () => {
@@ -34,6 +36,8 @@ const PracticeMode = () => {
   const [reverb, setReverb] = useState(20);
   const [pan, setPan] = useState(50);
   const [treble, setTreble] = useState(50);
+
+  const { showPrompt: enforceLandscape, dismissPrompt, isPortraitMobile } = useOrientationPrompt({ breakpoint: 900 });
 
   const currentInstrument = INSTRUMENTS[instrument] || INSTRUMENTS['grand-piano'];
   const categories = [...new Set(Object.values(INSTRUMENTS).map((i) => i.category))];
@@ -172,15 +176,32 @@ const PracticeMode = () => {
   return (
     <div className="h-full flex flex-col bg-base-100 relative piano-fullscreen-mobile">
       {/* Mobile Landscape Lock Overlay */}
-      <div className="piano-landscape-lock">
-        <RotateCcw className="rotate-icon text-primary" />
-        <h3>Rotate Your Device</h3>
-        <p>Please rotate your phone to landscape mode for the best piano playing experience</p>
-      </div>
+      {enforceLandscape && (
+        <div className="piano-landscape-lock piano-landscape-lock--active">
+          <RotateCcw className="rotate-icon text-primary" />
+          <h3>Rotate your phone</h3>
+          <p className="max-w-xs text-sm text-base-content/70">
+            Landscape gives you the full keyboard and controls. You can still continue in portrait if you need to.
+          </p>
+          <button
+            onClick={dismissPrompt}
+            className="px-5 py-2 rounded-full bg-base-100/20 border border-base-100/40 text-sm font-semibold hover:bg-base-100/30 transition"
+          >
+            Play in portrait
+          </button>
+        </div>
+      )}
 
       {/* Main Piano Content */}
-      <div className="piano-main-content h-full flex flex-col">
+      <div className={`piano-main-content h-full flex flex-col ${enforceLandscape ? 'piano-main-content-locked' : ''}`}>
       
+      {isPortraitMobile && (
+        <div className="md:hidden flex items-center justify-center gap-2 px-4 py-2 text-[11px] font-medium bg-base-200 border-b border-base-300 text-base-content/70">
+          <ArrowLeftRight className="w-4 h-4" />
+          <span>Scroll sideways to reach every key</span>
+        </div>
+      )}
+
       {/* Mobile End Stream Button - Fixed position for easy access when streaming */}
       {isLive && (
         <button
