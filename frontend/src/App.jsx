@@ -29,6 +29,7 @@ import PaymentNotificationModal from "./components/PaymentNotificationModal";
 import PaymentBlockScreen from "./components/PaymentBlockScreen";
 import PaymentInstructionsPage from "./pages/PaymentInstructionsPage";
 import VotingPage from "./pages/VotingPage";
+import MaintenanceScreen from "./components/MaintenanceScreen";
 
 import { Toaster } from "react-hot-toast";
 import { SocketProvider } from "./contexts/SocketContext.jsx";
@@ -85,6 +86,12 @@ function AppContent() {
   // Show banned screen if user is banned
   if (isBanned) {
     return <BannedAccountScreen />;
+  }
+
+  // Show maintenance screen for all logged-in users (except admins)
+  const isMaintenanceMode = true; // Set to false when maintenance is complete
+  if (authUser && isMaintenanceMode && authUser?.role !== 'admin') {
+    return <MaintenanceScreen />;
   }
 
   // Show payment block screen if trial ended and no subscription (except on payment page)
