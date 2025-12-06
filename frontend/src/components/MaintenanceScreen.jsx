@@ -9,7 +9,7 @@ export default function MaintenanceScreen() {
   };
 
   // Get user's first name for personalized greeting
-  const userName = authUser?.fullName?.split(' ')[0] || authUser?.username || 'User';
+  const userName = authUser?.fullName?.split(' ')[0] || authUser?.username || 'Friend';
 
   return (
     <div className="fixed inset-0 z-[9999] bg-base-100 overflow-auto scrollbar-hide scroll-smooth">
@@ -145,16 +145,18 @@ export default function MaintenanceScreen() {
                 </p>
               </div>
 
-              {/* Sign out button */}
-              <div className="flex justify-center pt-2">
-                <button
-                  onClick={handleLogout}
-                  className="btn btn-ghost gap-2"
-                >
-                  <LogOut className="w-5 h-5" />
-                  <span>Sign Out</span>
-                </button>
-              </div>
+              {/* Sign out button - only show if logged in */}
+              {authUser && (
+                <div className="flex justify-center pt-2">
+                  <button
+                    onClick={handleLogout}
+                    className="btn btn-ghost gap-2"
+                  >
+                    <LogOut className="w-5 h-5" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

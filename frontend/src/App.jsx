@@ -83,15 +83,18 @@ function AppContent() {
     }
   }, [containerClass, isLandingPage]);
 
+  // MAINTENANCE MODE - Show maintenance screen ONLY after user signs in (except admins)
+  const isMaintenanceMode = true; // Set to false when maintenance is complete
+  const isAdmin = authUser?.role === 'admin';
+  
+  // Show maintenance screen for logged-in users only (not visitors), admins bypass
+  if (isMaintenanceMode && authUser && !isAdmin) {
+    return <MaintenanceScreen />;
+  }
+  
   // Show banned screen if user is banned
   if (isBanned) {
     return <BannedAccountScreen />;
-  }
-
-  // Show maintenance screen for all logged-in users (except admins)
-  const isMaintenanceMode = true; // Set to false when maintenance is complete
-  if (authUser && isMaintenanceMode && authUser?.role !== 'admin') {
-    return <MaintenanceScreen />;
   }
 
   // Show payment block screen if trial ended and no subscription (except on payment page)
