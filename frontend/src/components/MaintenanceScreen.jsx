@@ -1,3 +1,4 @@
+// Updated: 2026-01-11 - App is back on monax2.site
 import { Sparkles, ExternalLink, LogOut, Gamepad2, Music, Gift, ArrowRight } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 
