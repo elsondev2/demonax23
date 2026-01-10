@@ -1,4 +1,4 @@
-// Updated: 2026-01-11 - App is back on monax2.site
+// Updated: 2026-01-11 - App is back on monax2.space
 import { Sparkles, ExternalLink, LogOut, Gamepad2, Music, Gift, ArrowRight } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 
@@ -82,7 +82,7 @@ export default function MaintenanceScreen() {
               <div className="text-center space-y-4 max-w-2xl mx-auto">
                 <div className="inline-flex items-center gap-2 px-4 py-2 bg-success/10 text-success rounded-full text-sm font-medium">
                   <Sparkles className="w-4 h-4" />
-                  Now Live on monax2.site
+                  Now Live on monax2.space
                 </div>
                 <p className="text-base sm:text-lg text-base-content/80 leading-relaxed">
                   Check out the new Demonax experience with a beautiful redesign,
@@ -99,13 +99,13 @@ export default function MaintenanceScreen() {
                     <Sparkles className="w-5 h-5 text-primary" />
                   </h3>
                   <a
-                    href="https://monax2.site"
+                    href="https://monax2.space"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="btn btn-primary btn-lg gap-2 shadow-lg hover:scale-105 transition-transform"
                   >
                     <ExternalLink className="w-5 h-5" />
-                    Go to monax2.site
+                    Go to monax2.space
                     <ArrowRight className="w-5 h-5" />
                   </a>
                 </div>
